@@ -1906,8 +1906,24 @@
     justify-content: space-between;
   }
 
-  .onboarding-header > span {
+  .onboarding-header-meta {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .onboarding-header-meta > span {
     color: var(--ink-soft);
+    font-size: 0.75rem;
+    font-weight: var(--weight-strong);
+  }
+
+  .onboarding-header-meta button {
+    min-height: 44px;
+    padding: 7px 9px;
+    border: 0;
+    background: transparent;
+    color: var(--moss-700);
     font-size: 0.75rem;
     font-weight: var(--weight-strong);
   }

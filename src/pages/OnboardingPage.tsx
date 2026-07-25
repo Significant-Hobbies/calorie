@@ -2,6 +2,7 @@ import { ArrowLeft, ArrowRight, Check, Info, Sparkles } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { AppMark } from '../components/AppMark';
 import { saveProfile } from '../lib/api';
+import { signOut } from '../lib/auth-client';
 import {
   clearOnboardingDraft,
   type OnboardingDraft,
@@ -157,7 +158,12 @@ export function OnboardingPage({
     <main className="onboarding-page" id="main-content">
       <header className="onboarding-header">
         <AppMark />
-        <span>{step + 1} of 3</span>
+        <div className="onboarding-header-meta">
+          <span>{step + 1} of 3</span>
+          <button type="button" onClick={() => void signOut()}>
+            Sign out
+          </button>
+        </div>
       </header>
       <div
         className="progress-track"
