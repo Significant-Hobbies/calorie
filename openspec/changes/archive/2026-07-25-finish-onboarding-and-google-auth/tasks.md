@@ -22,11 +22,11 @@
 - [x] 4.0 Publish stable homepage, privacy, and terms links for the production OAuth consent screen.
 - [x] 4.1 Create a dedicated Google OAuth web client with the production origin and Better Auth callback.
 - [x] 4.2 Store Google client credentials and a Better Auth secret as Cloudflare Worker secrets.
-- [ ] 4.3 Verify Google configuration, provider redirect, callback, session creation, and per-user D1 profile access in production.
+- [x] 4.3 Verify Google configuration, provider redirect, callback, session creation, and per-user D1 profile access in production.
 
 ## 5. Validation and release
 
-- [ ] 5.1 Run formatting, lint, typecheck, unit tests, production build, strict OpenSpec validation, and Worker dry run.
-- [ ] 5.2 Exercise onboarding back/reload/resume, every goal mode, mobile/desktop layout, local persistence, and accessibility in a browser.
-- [ ] 5.3 Run Impeccable onboarding polish/audit checks and fix material findings.
-- [ ] 5.4 Update PROJECT_STATUS, archive the change, commit, push, pass exact-commit CI and deploy guard, then release and smoke-test production.
+- [x] 5.1 Run formatting, lint, typecheck, unit tests, production build, strict OpenSpec validation, and Worker dry run.
+- [x] 5.2 Exercise onboarding back/reload/resume, every goal mode, mobile/desktop layout, local persistence, and accessibility in a browser.
+- [x] 5.3 Run Impeccable onboarding polish/audit checks and fix material findings.
+- [x] 5.4 Update PROJECT_STATUS, archive the change, commit, push, pass exact-commit CI and deploy guard, then release and smoke-test production.
