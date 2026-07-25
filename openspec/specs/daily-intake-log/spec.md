@@ -1,7 +1,8 @@
 # daily-intake-log Specification
 
 ## Purpose
-TBD - created by archiving change build-calorie-mvp. Update Purpose after archive.
+Define the finished daily food, nutrient, water, and reusable-food logging
+experience.
 ## Requirements
 ### Requirement: Reusable food definitions
 The system SHALL save private foods with calories, carbs, protein, and fibre
@@ -50,4 +51,3 @@ user's local calendar day.
 #### Scenario: Local day boundary
 - **WHEN** the user's timezone crosses midnight
 - **THEN** the Today view starts a new set of daily totals without changing history
-

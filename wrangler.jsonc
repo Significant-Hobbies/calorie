@@ -20,6 +20,7 @@
     {
       "binding": "DB",
       "database_name": "calorie",
+      "database_id": "1818a09c-4b01-4212-a688-c9b9682ef189",
       "migrations_dir": "migrations"
     }
   ],

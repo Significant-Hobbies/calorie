@@ -31,13 +31,12 @@ full sets/reps workout-programming system.
 
 ## Timeline
 
-- 2026-07-25 — local project scaffold, specification, implementation, and
-  browser validation completed
+- 2026-07-25 — finished v1 implemented, validated, and prepared for release
 
 ## Products
 
 - Installable local-first web app
-- Planned production Worker at `https://calorie.significanthobbies.com`
+- Production Worker at `https://calorie.significanthobbies.com`
 
 ## Features (shipped)
 
@@ -54,20 +53,18 @@ full sets/reps workout-programming system.
 
 ## Todo / Planned / Deferred / Blocked
 
-### Planned before production
+### Planned
 
-1. Create the production D1 database and configure its binding ID.
-2. Configure Google OAuth and Better Auth secrets outside the repository.
-3. Apply the production migration and deploy only with explicit approval.
-4. Run a final smoke test on `calorie.significanthobbies.com`.
+1. Configure optional Google OAuth and Better Auth secrets outside the
+   repository if cloud sign-in is wanted.
+2. Add export/import only if moving a local journal between devices becomes
+   important.
 
 ### Deferred
 
-- Lightweight workout events: type, planned/actual time, duration, and note.
-- Export/import or account-based transfer of an existing local journal.
 - Barcode scanning, wearable sync, deeper trends, and richer reminders.
 
 ### Blocked
 
-- Production cloud setup is intentionally blocked on credentials, D1 creation,
-  and explicit deployment approval.
+- None. Account-free use is the primary path, so optional Google OAuth is not a
+  release blocker.

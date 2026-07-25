@@ -1,7 +1,8 @@
 # progress-history Specification
 
 ## Purpose
-TBD - created by archiving change build-calorie-mvp. Update Purpose after archive.
+Define seven- and thirty-day nutrition, hydration, eating-gap, and weight
+history.
 ## Requirements
 ### Requirement: Weight check-ins
 The system SHALL store timestamped weight check-ins and show progress toward the
@@ -30,4 +31,3 @@ medical outcomes from weight or nutrition history.
 #### Scenario: Weight increases
 - **WHEN** the plotted weight trend rises
 - **THEN** the system reports the measured change without calling it good or bad
-

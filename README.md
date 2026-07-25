@@ -56,10 +56,10 @@ bounded goal adjustments, fibre scaled to energy intake, logged eating gaps,
 and simple meal-timing heuristics. Every result is labelled as an estimate in
 the UI; Calorie is not medical advice.
 
-## Product boundary
+## Finished v1 scope
 
-The MVP includes onboarding, reusable foods, one-tap and custom food logging,
-water, weight, 7/30-day history, offline support, and an installable PWA. A
-lightweight workout event—type, planned/actual time, duration, and note—is
-deferred. Exercise programming, sets/reps, progressive overload, and wearable
-sync are intentionally outside this product’s current scope.
+Calorie v1 includes onboarding, reusable foods, one-tap and custom food logging,
+water, weight, 7/30-day history, offline support, and an installable PWA. This
+is the finished product scope, not a preview or incomplete release. Workout
+programming, sets/reps, progressive overload, and wearable sync are separate
+product ideas rather than unfinished Calorie features.

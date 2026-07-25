@@ -1,7 +1,8 @@
 # installable-offline-app Specification
 
 ## Purpose
-TBD - created by archiving change build-calorie-mvp. Update Purpose after archive.
+Define installation, account-free local persistence, and offline behavior for
+the finished web application.
 ## Requirements
 ### Requirement: Installable PWA
 The system SHALL provide a valid web app manifest, install icons, standalone
@@ -43,4 +44,3 @@ data and pending writes on sign-out.
 #### Scenario: Sign out
 - **WHEN** the user signs out on a device
 - **THEN** the service worker and IndexedDB no longer expose that user's cached data
-

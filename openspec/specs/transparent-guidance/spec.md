@@ -1,7 +1,8 @@
 # transparent-guidance Specification
 
 ## Purpose
-TBD - created by archiving change build-calorie-mvp. Update Purpose after archive.
+Define transparent deterministic nutrition, eating-gap, gym-timing, and
+sleep-timing guidance.
 ## Requirements
 ### Requirement: Transparent daily nutrition targets
 The system SHALL calculate an estimated energy target, current protein range,
@@ -52,4 +53,3 @@ dietary needs to use professional guidance.
 #### Scenario: Methodology disclosure
 - **WHEN** the user opens a recommendation explanation
 - **THEN** the system shows the rule, source link, and informational limitation
-

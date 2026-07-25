@@ -1,7 +1,8 @@
 # private-account-setup Specification
 
 ## Purpose
-TBD - created by archiving change build-calorie-mvp. Update Purpose after archive.
+Define account-free onboarding, optional private cloud accounts, and
+goal-setting behavior.
 ## Requirements
 ### Requirement: No-account local journal
 The system SHALL let a user complete onboarding and use the full journal
@@ -47,4 +48,3 @@ the calculated daily calorie target.
 #### Scenario: Activity changes
 - **WHEN** the user changes activity level in settings
 - **THEN** future targets are recalculated and the new inputs are shown
-
