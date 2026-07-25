@@ -66,5 +66,4 @@ full sets/reps workout-programming system.
 
 ### Blocked
 
-- None. Account-free use is the primary path, so optional Google OAuth is not a
-  release blocker.
+- None
