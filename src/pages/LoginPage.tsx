@@ -1,11 +1,16 @@
 import { ArrowRight, Calculator, Cloud, Droplets, Leaf, Smartphone } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { AppMark } from '../components/AppMark';
-import { signInWithGoogle, startLocalMode } from '../lib/auth-client';
+import { getAuthConfig, signInWithGoogle, startLocalMode } from '../lib/auth-client';
 
 export function LoginPage() {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [googleConfigured, setGoogleConfigured] = useState(false);
+
+  useEffect(() => {
+    void getAuthConfig().then((config) => setGoogleConfigured(config.googleConfigured));
+  }, []);
 
   const signIn = async () => {
     setBusy(true);
@@ -59,7 +64,11 @@ export function LoginPage() {
           <i />
         </div>
         <h2 id="private-log-title">Your private daily log</h2>
-        <p>Start privately on this device with no account, or use a Google-backed cloud journal.</p>
+        <p>
+          {googleConfigured
+            ? 'Start privately on this device with no account, or use a Google-backed cloud journal.'
+            : 'Start privately on this device with no account. Your journal stays in this browser.'}
+        </p>
         <button
           className="button button-primary button-large"
           type="button"
@@ -69,15 +78,17 @@ export function LoginPage() {
           Start on this device
           <ArrowRight size={19} aria-hidden="true" />
         </button>
-        <button
-          className="button button-secondary button-large google-button"
-          type="button"
-          disabled={busy}
-          onClick={() => void signIn()}
-        >
-          <Cloud size={19} aria-hidden="true" />
-          {busy ? 'Opening Google…' : 'Continue with Google'}
-        </button>
+        {googleConfigured ? (
+          <button
+            className="button button-secondary button-large google-button"
+            type="button"
+            disabled={busy}
+            onClick={() => void signIn()}
+          >
+            <Cloud size={19} aria-hidden="true" />
+            {busy ? 'Opening Google…' : 'Continue with Google'}
+          </button>
+        ) : null}
         {error ? (
           <p className="form-error" role="alert">
             {error}

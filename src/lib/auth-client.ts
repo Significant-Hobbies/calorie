@@ -9,6 +9,19 @@ export type AppSession = {
   };
 } | null;
 
+export async function getAuthConfig() {
+  try {
+    const response = await fetch('/api/auth/config', {
+      credentials: 'include',
+      cache: 'no-store',
+    });
+    if (!response.ok) return { googleConfigured: false };
+    return (await response.json()) as { googleConfigured: boolean };
+  } catch {
+    return { googleConfigured: false };
+  }
+}
+
 export async function getSession(): Promise<AppSession> {
   if (localStorage.getItem('calorie-local-mode') === 'true') {
     return {
