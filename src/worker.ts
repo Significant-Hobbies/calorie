@@ -675,7 +675,7 @@ function parseRange(c: {
 }): { start: number; end: number } | null {
   const start = finiteNumber(c.req.query('start'), 0, Date.now() + 24 * 60 * 60 * 1000);
   const end = finiteNumber(c.req.query('end'), 0, Date.now() + 48 * 60 * 60 * 1000);
-  if (start === null || end === null || end <= start || end - start > 31 * 24 * 60 * 60 * 1000) {
+  if (start === null || end === null || end <= start || end - start > 43 * 24 * 60 * 60 * 1000) {
     return null;
   }
   return { start, end };
@@ -791,10 +791,11 @@ function dateKey(timestamp: number, timezone: string) {
 
 app.get('/api/app/history', async (c) => {
   const range = parseRange(c);
-  const rangeDays = Number(c.req.query('days')) === 30 ? 30 : 7;
+  const requestedDays = Number(c.req.query('days'));
+  const rangeDays = requestedDays === 30 ? 30 : requestedDays === 7 ? 7 : undefined;
   const timezone = c.req.query('timezone') || 'UTC';
-  if (!range || range.end - range.start > 31 * 24 * 60 * 60 * 1000) {
-    return c.json(jsonError('Choose a 7-day or 30-day history range.'), 400);
+  if (!range || range.end - range.start > 43 * 24 * 60 * 60 * 1000) {
+    return c.json(jsonError('Choose a history range of six weeks or less.'), 400);
   }
   const userId = c.get('userId');
   const [entriesResult, waterResult, weightResult, priorEntry] = await Promise.all([
@@ -843,8 +844,10 @@ app.get('/api/app/history', async (c) => {
     return created;
   };
 
-  for (let index = 0; index < rangeDays; index += 1) {
-    ensureDay(dateKey(range.start + index * 24 * 60 * 60 * 1000, timezone));
+  if (rangeDays) {
+    for (let index = 0; index < rangeDays; index += 1) {
+      ensureDay(dateKey(range.start + index * 24 * 60 * 60 * 1000, timezone));
+    }
   }
   for (const entry of entries) {
     const day = ensureDay(dateKey(entry.eatenAt, timezone));
@@ -875,7 +878,7 @@ app.get('/api/app/history', async (c) => {
   const response: HistoryResponse = {
     days,
     weights: weightResult.results.map(mapWeight),
-    rangeDays,
+    ...(rangeDays ? { rangeDays } : {}),
   };
   return c.json(response);
 });

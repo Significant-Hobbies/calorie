@@ -1,6 +1,8 @@
 import { Activity, CalendarDays, Droplets, Scale, Sprout } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { addWeight, getDashboard, getHistory } from '../lib/api';
+import { HistoryCalendar } from '../components/HistoryCalendar';
+import { addWeight, getCalendarHistory, getDashboard, getHistory } from '../lib/api';
+import { calendarGrid, isSameMonth, localDateKey, shiftMonth } from '../lib/calendar';
 import type { Dashboard, HistoryResponse } from '../lib/types';
 
 function shortDay(date: string) {
@@ -14,27 +16,59 @@ function displayWeight(weightKg: number, units: 'metric' | 'imperial') {
 }
 
 export function ProgressPage() {
+  const today = useMemo(() => new Date(), []);
+  const [viewMode, setViewMode] = useState<'calendar' | 'trends'>('calendar');
   const [rangeDays, setRangeDays] = useState<7 | 30>(7);
   const [history, setHistory] = useState<HistoryResponse | null>(null);
+  const [calendarHistory, setCalendarHistory] = useState<HistoryResponse | null>(null);
+  const [calendarMonth, setCalendarMonth] = useState(
+    () => new Date(today.getFullYear(), today.getMonth(), 1, 12)
+  );
+  const [selectedDate, setSelectedDate] = useState(() => localDateKey(today));
   const [dashboard, setDashboard] = useState<Dashboard | null>(null);
   const [weight, setWeight] = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const load = useCallback(async (days: 7 | 30) => {
+  const loadDashboard = useCallback(async () => {
     setError(null);
     try {
-      const [nextHistory, nextDashboard] = await Promise.all([getHistory(days), getDashboard()]);
-      setHistory(nextHistory);
-      setDashboard(nextDashboard);
+      setDashboard(await getDashboard());
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : 'Progress could not load.');
     }
   }, []);
 
+  const loadTrends = useCallback(async (days: 7 | 30) => {
+    setError(null);
+    try {
+      setHistory(await getHistory(days));
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : 'Progress could not load.');
+    }
+  }, []);
+
+  const loadCalendar = useCallback(async (month: Date) => {
+    setError(null);
+    try {
+      const cells = calendarGrid(month);
+      setCalendarHistory(await getCalendarHistory(cells.map((cell) => cell.date)));
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : 'Calendar history could not load.');
+    }
+  }, []);
+
   useEffect(() => {
-    void load(rangeDays);
-  }, [rangeDays, load]);
+    void loadDashboard();
+  }, [loadDashboard]);
+
+  useEffect(() => {
+    if (viewMode === 'trends') void loadTrends(rangeDays);
+  }, [viewMode, rangeDays, loadTrends]);
+
+  useEffect(() => {
+    if (viewMode === 'calendar') void loadCalendar(calendarMonth);
+  }, [viewMode, calendarMonth, loadCalendar]);
 
   const summary = useMemo(() => {
     if (!history) return null;
@@ -70,12 +104,27 @@ export function ProgressPage() {
         recordedAt: Date.now(),
       });
       setWeight('');
-      await load(rangeDays);
+      await Promise.all([
+        loadDashboard(),
+        viewMode === 'calendar' ? loadCalendar(calendarMonth) : loadTrends(rangeDays),
+      ]);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : 'Weight could not be logged.');
     } finally {
       setSaving(false);
     }
+  };
+
+  const moveMonth = (amount: number) => {
+    const next = shiftMonth(calendarMonth, amount);
+    if (amount > 0 && isSameMonth(calendarMonth, today)) return;
+    setCalendarHistory(null);
+    setCalendarMonth(next);
+    setSelectedDate(
+      isSameMonth(next, today)
+        ? localDateKey(today)
+        : localDateKey(new Date(next.getFullYear(), next.getMonth() + 1, 0, 12))
+    );
   };
 
   const chartMax = history
@@ -90,26 +139,28 @@ export function ProgressPage() {
             day.calories <= (dashboard.target.calorieRange?.[1] ?? Number.POSITIVE_INFINITY)
         ).length
       : 0;
+  const visibleWeights =
+    (viewMode === 'calendar' ? calendarHistory?.weights : history?.weights) ?? [];
 
   return (
     <div className="page-stack">
-      <header className="page-heading split-heading">
+      <header className="page-heading split-heading progress-heading">
         <div>
           <p>A wider view</p>
           <h1>Your progress</h1>
           <span>Patterns are more useful than perfect days.</span>
         </div>
-        <fieldset className="range-toggle">
-          <legend className="sr-only">History range</legend>
-          {([7, 30] as const).map((days) => (
+        <fieldset className="range-toggle view-toggle">
+          <legend className="sr-only">Progress view</legend>
+          {(['calendar', 'trends'] as const).map((view) => (
             <button
-              key={days}
+              key={view}
               type="button"
-              className={rangeDays === days ? 'is-selected' : ''}
-              aria-pressed={rangeDays === days}
-              onClick={() => setRangeDays(days)}
+              className={viewMode === view ? 'is-selected' : ''}
+              aria-pressed={viewMode === view}
+              onClick={() => setViewMode(view)}
             >
-              {days} days
+              {view === 'calendar' ? 'Calendar' : 'Trends'}
             </button>
           ))}
         </fieldset>
@@ -121,77 +172,115 @@ export function ProgressPage() {
         </div>
       ) : null}
 
-      {!history || !dashboard || !summary ? (
+      {!dashboard ||
+      (viewMode === 'calendar' && !calendarHistory) ||
+      (viewMode === 'trends' && (!history || !summary)) ? (
         <div className="page-stack" aria-busy="true">
           <div className="skeleton dashboard-skeleton" />
           <div className="skeleton dashboard-skeleton short" />
         </div>
       ) : (
         <>
-          <section className="metric-grid" aria-label="Period summary">
-            <article>
-              <Activity aria-hidden="true" />
-              <span>Average intake</span>
-              <strong>{summary.averageCalories.toLocaleString()} kcal</strong>
-            </article>
-            <article>
-              <Sprout aria-hidden="true" />
-              <span>Average protein</span>
-              <strong>{summary.averageProtein} g</strong>
-            </article>
-            <article>
-              <Droplets aria-hidden="true" />
-              <span>Average water</span>
-              <strong>{(summary.averageWater / 1000).toFixed(1)} L</strong>
-            </article>
-            <article>
-              <CalendarDays aria-hidden="true" />
-              <span>Fasting windows</span>
-              <strong>{summary.fasts}</strong>
-            </article>
-          </section>
+          {viewMode === 'calendar' && calendarHistory ? (
+            <HistoryCalendar
+              month={calendarMonth}
+              history={calendarHistory}
+              selectedDate={selectedDate}
+              target={dashboard.target}
+              units={dashboard.profile.units}
+              onPreviousMonth={() => moveMonth(-1)}
+              onNextMonth={() => moveMonth(1)}
+              onSelectDate={setSelectedDate}
+            />
+          ) : null}
 
-          <section className="chart-card" aria-labelledby="intake-chart-title">
-            <header>
-              <div>
-                <p>Daily calories</p>
-                <h2 id="intake-chart-title">A gentle rhythm</h2>
+          {viewMode === 'trends' && history && summary ? (
+            <>
+              <div className="trend-toolbar">
+                <p>Choose a window for averages and rhythm.</p>
+                <fieldset className="range-toggle">
+                  <legend className="sr-only">History range</legend>
+                  {([7, 30] as const).map((days) => (
+                    <button
+                      key={days}
+                      type="button"
+                      className={rangeDays === days ? 'is-selected' : ''}
+                      aria-pressed={rangeDays === days}
+                      onClick={() => setRangeDays(days)}
+                    >
+                      {days} days
+                    </button>
+                  ))}
+                </fieldset>
               </div>
-              <span>
-                Range {dashboard.target.calorieRange?.[0]?.toLocaleString() ?? '—'}–
-                {dashboard.target.calorieRange?.[1]?.toLocaleString() ?? '—'}
-              </span>
-            </header>
-            <div
-              className="bar-chart"
-              role="img"
-              aria-label={`Calorie intake for the last ${rangeDays} days. ${inRangeCount} logged days were within the estimate.`}
-            >
-              {history.days.map((day, index) => {
-                const height = day.calories ? Math.max(8, (day.calories / chartMax) * 100) : 3;
-                const inRange =
-                  Boolean(dashboard.target.calorieRange) &&
-                  day.calories >= (dashboard.target.calorieRange?.[0] ?? 0) &&
-                  day.calories <= (dashboard.target.calorieRange?.[1] ?? Number.POSITIVE_INFINITY);
-                const showLabel = rangeDays === 7 || index % 5 === 0 || index === 29;
-                return (
-                  <div className="bar-column" key={day.date}>
-                    <span
-                      className={inRange ? 'bar is-in-range' : 'bar'}
-                      style={{ height: `${height}%` }}
-                      title={`${day.date}: ${Math.round(day.calories)} kcal${inRange ? ', within estimate' : ''}`}
-                    />
-                    <small>{showLabel ? shortDay(day.date) : ''}</small>
+
+              <section className="metric-grid" aria-label="Period summary">
+                <article>
+                  <Activity aria-hidden="true" />
+                  <span>Average intake</span>
+                  <strong>{summary.averageCalories.toLocaleString()} kcal</strong>
+                </article>
+                <article>
+                  <Sprout aria-hidden="true" />
+                  <span>Average protein</span>
+                  <strong>{summary.averageProtein} g</strong>
+                </article>
+                <article>
+                  <Droplets aria-hidden="true" />
+                  <span>Average water</span>
+                  <strong>{(summary.averageWater / 1000).toFixed(1)} L</strong>
+                </article>
+                <article>
+                  <CalendarDays aria-hidden="true" />
+                  <span>Fasting windows</span>
+                  <strong>{summary.fasts}</strong>
+                </article>
+              </section>
+
+              <section className="chart-card" aria-labelledby="intake-chart-title">
+                <header>
+                  <div>
+                    <p>Daily calories</p>
+                    <h2 id="intake-chart-title">A gentle rhythm</h2>
                   </div>
-                );
-              })}
-            </div>
-            <p className="chart-note">
-              <span className="range-key" aria-hidden="true" />
-              {inRangeCount} logged day{inRangeCount === 1 ? '' : 's'} sat inside your estimate.
-              Other days are context—not failures.
-            </p>
-          </section>
+                  <span>
+                    Range {dashboard.target.calorieRange?.[0]?.toLocaleString() ?? '—'}–
+                    {dashboard.target.calorieRange?.[1]?.toLocaleString() ?? '—'}
+                  </span>
+                </header>
+                <div
+                  className="bar-chart"
+                  role="img"
+                  aria-label={`Calorie intake for the last ${rangeDays} days. ${inRangeCount} logged days were within the estimate.`}
+                >
+                  {history.days.map((day, index) => {
+                    const height = day.calories ? Math.max(8, (day.calories / chartMax) * 100) : 3;
+                    const inRange =
+                      Boolean(dashboard.target.calorieRange) &&
+                      day.calories >= (dashboard.target.calorieRange?.[0] ?? 0) &&
+                      day.calories <=
+                        (dashboard.target.calorieRange?.[1] ?? Number.POSITIVE_INFINITY);
+                    const showLabel = rangeDays === 7 || index % 5 === 0 || index === 29;
+                    return (
+                      <div className="bar-column" key={day.date}>
+                        <span
+                          className={inRange ? 'bar is-in-range' : 'bar'}
+                          style={{ height: `${height}%` }}
+                          title={`${day.date}: ${Math.round(day.calories)} kcal${inRange ? ', within estimate' : ''}`}
+                        />
+                        <small>{showLabel ? shortDay(day.date) : ''}</small>
+                      </div>
+                    );
+                  })}
+                </div>
+                <p className="chart-note">
+                  <span className="range-key" aria-hidden="true" />
+                  {inRangeCount} logged day{inRangeCount === 1 ? '' : 's'} sat inside your estimate.
+                  Other days are context—not failures.
+                </p>
+              </section>
+            </>
+          ) : null}
 
           <section className="weight-card" aria-labelledby="weight-title">
             <div className="weight-copy">
@@ -238,9 +327,9 @@ export function ProgressPage() {
             </div>
           </section>
 
-          {history.weights.length > 1 ? (
+          {visibleWeights.length > 1 ? (
             <section className="weight-history" aria-label="Recent weight entries">
-              {[...history.weights]
+              {[...visibleWeights]
                 .sort((a, b) => b.recordedAt - a.recordedAt)
                 .slice(0, 5)
                 .map((entry) => (

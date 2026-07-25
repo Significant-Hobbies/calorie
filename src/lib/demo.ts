@@ -1,3 +1,4 @@
+import { calendarHistoryBounds, dateFromKey, localDateKey } from './calendar';
 import {
   calculateCompletedFasts,
   calculateNutritionTarget,
@@ -261,4 +262,45 @@ export function demoHistory(rangeDays: 7 | 30): HistoryResponse {
     };
   });
   return { days, weights: [...weights], rangeDays };
+}
+
+export function demoCalendarHistory(dateKeys: string[]): HistoryResponse {
+  const target = demoDashboard().target.calorieTarget ?? 2000;
+  const todayKey = localDateKey(new Date());
+  const days = dateKeys.map((dateKey) => {
+    const date = dateFromKey(dateKey);
+    const dayNumber = Math.floor(date.getTime() / (24 * 60 * 60 * 1000));
+    const isToday = dateKey === todayKey;
+    const isFuture = dateKey > todayKey;
+    const isEmpty = dayNumber % 5 === 0;
+    const wave = Math.sin(dayNumber * 1.4);
+    if (isFuture || isEmpty) {
+      return {
+        date: dateKey,
+        calories: 0,
+        carbsG: 0,
+        proteinG: 0,
+        fibreG: 0,
+        waterMl: 0,
+        fastCount: 0,
+      };
+    }
+    return {
+      date: dateKey,
+      calories: isToday ? totals().calories : round(target + wave * 180 - 60),
+      carbsG: isToday ? totals().carbsG : round(205 + wave * 22),
+      proteinG: isToday ? totals().proteinG : round(102 + wave * 11),
+      fibreG: isToday ? totals().fibreG : round(27 + wave * 4),
+      waterMl: isToday ? totals().waterMl : round(1900 + wave * 280),
+      fastCount: dayNumber % 3 === 0 ? 1 : 0,
+    };
+  });
+  const cells = dateKeys.map((date) => ({ date, day: 0, inMonth: true }));
+  const bounds = calendarHistoryBounds(cells);
+  return {
+    days,
+    weights: weights.filter(
+      (entry) => entry.recordedAt >= bounds.start && entry.recordedAt < bounds.end
+    ),
+  };
 }

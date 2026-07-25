@@ -49,6 +49,7 @@ full sets/reps workout-programming system.
 - Calories, carbs, protein, fibre, water, and weight tracking
 - Transparent energy, macro, fasting-window, gym-time, and sleep-time estimates
 - Seven- and thirty-day progress views with non-colour chart cues
+- Navigable month calendar with daily nutrition, water, fasting, and weight details
 - Installable PWA shell, recent cloud-state cache, and queued offline writes
 - Responsive mobile, tablet, and desktop UI with accessible touch targets
 

@@ -116,7 +116,7 @@ export type HistoryDay = Nutrients & {
 export type HistoryResponse = {
   days: HistoryDay[];
   weights: WeightEntry[];
-  rangeDays: 7 | 30;
+  rangeDays?: 7 | 30;
 };
 
 export type PendingWrite = {

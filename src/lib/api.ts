@@ -1,7 +1,9 @@
+import { calendarHistoryBounds } from './calendar';
 import {
   demoAddEntry,
   demoAddWater,
   demoAddWeight,
+  demoCalendarHistory,
   demoDashboard,
   demoDeleteEntry,
   demoDeleteFood,
@@ -14,6 +16,7 @@ import {
   localAddEntry,
   localAddWater,
   localAddWeight,
+  localCalendarHistory,
   localDashboard,
   localDeleteEntry,
   localDeleteFood,
@@ -280,6 +283,37 @@ export async function getHistory(rangeDays: 7 | 30): Promise<HistoryResponse> {
     timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
   });
   return readJson(`/api/app/history?${params}`);
+}
+
+export async function getCalendarHistory(dateKeys: string[]): Promise<HistoryResponse> {
+  if (isDemo()) return demoCalendarHistory(dateKeys);
+  if (isLocalMode()) return localCalendarHistory(dateKeys);
+  const cells = dateKeys.map((date) => ({ date, day: 0, inMonth: true }));
+  const bounds = calendarHistoryBounds(cells);
+  const tomorrow = new Date();
+  tomorrow.setHours(24, 0, 0, 0);
+  const params = new URLSearchParams({
+    start: String(bounds.start),
+    end: String(Math.min(bounds.end, tomorrow.getTime())),
+    timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+  });
+  const response = await readJson<HistoryResponse>(`/api/app/history?${params}`);
+  const byDate = new Map(response.days.map((day) => [day.date, day]));
+  return {
+    ...response,
+    days: dateKeys.map(
+      (date) =>
+        byDate.get(date) ?? {
+          date,
+          calories: 0,
+          carbsG: 0,
+          proteinG: 0,
+          fibreG: 0,
+          waterMl: 0,
+          fastCount: 0,
+        }
+    ),
+  };
 }
 
 export function startOfflineRetry() {

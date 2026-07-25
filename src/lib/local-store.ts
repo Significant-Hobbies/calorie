@@ -1,3 +1,4 @@
+import { calendarHistoryBounds } from './calendar';
 import {
   calculateCompletedFasts,
   calculateNutritionTarget,
@@ -231,17 +232,15 @@ export function localDashboard(): Dashboard {
   };
 }
 
-export function localHistory(rangeDays: 7 | 30): HistoryResponse {
+function buildLocalHistory(
+  dateKeys: string[],
+  startAt: number,
+  endAt: number,
+  rangeDays?: 7 | 30
+): HistoryResponse {
   const state = readState();
-  const today = dayRange();
-  const start = new Date(today.start);
-  start.setDate(start.getDate() - (rangeDays - 1));
-  const startAt = start.getTime();
   const days = new Map<string, HistoryDay>();
-  for (let index = 0; index < rangeDays; index += 1) {
-    const date = new Date(start);
-    date.setDate(date.getDate() + index);
-    const key = dateKey(date.getTime());
+  for (const key of dateKeys) {
     days.set(key, {
       date: key,
       calories: 0,
@@ -253,7 +252,7 @@ export function localHistory(rangeDays: 7 | 30): HistoryResponse {
     });
   }
   const entries = state.entries
-    .filter((entry) => entry.eatenAt >= startAt && entry.eatenAt < today.end)
+    .filter((entry) => entry.eatenAt >= startAt && entry.eatenAt < endAt)
     .sort((a, b) => a.eatenAt - b.eatenAt);
   for (const entry of entries) {
     const day = days.get(dateKey(entry.eatenAt));
@@ -286,8 +285,26 @@ export function localHistory(rangeDays: 7 | 30): HistoryResponse {
       fibreG: round(day.fibreG, 1),
     })),
     weights: state.weights.filter(
-      (entry) => entry.recordedAt >= startAt && entry.recordedAt < today.end
+      (entry) => entry.recordedAt >= startAt && entry.recordedAt < endAt
     ),
-    rangeDays,
+    ...(rangeDays ? { rangeDays } : {}),
   };
+}
+
+export function localHistory(rangeDays: 7 | 30): HistoryResponse {
+  const today = dayRange();
+  const start = new Date(today.start);
+  start.setDate(start.getDate() - (rangeDays - 1));
+  const dateKeys = Array.from({ length: rangeDays }, (_, index) => {
+    const date = new Date(start);
+    date.setDate(date.getDate() + index);
+    return dateKey(date.getTime());
+  });
+  return buildLocalHistory(dateKeys, start.getTime(), today.end, rangeDays);
+}
+
+export function localCalendarHistory(dateKeys: string[]): HistoryResponse {
+  const cells = dateKeys.map((date) => ({ date, day: 0, inMonth: true }));
+  const { start, end } = calendarHistoryBounds(cells);
+  return buildLocalHistory(dateKeys, start, Math.min(end, dayRange().end));
 }
