@@ -16,11 +16,34 @@ const ACTIVITY_FACTORS: Record<ActivityLevel, number> = {
   very: 1.725,
 };
 
-const GOAL_ADJUSTMENTS: Record<Goal, number> = {
-  lose_gentle: -250,
-  lose_steady: -500,
-  maintain: 0,
-  gain_gentle: 250,
+export const GOAL_DETAILS: Record<
+  Goal,
+  { label: string; shortLabel: string; adjustmentCalories: number; explanation: string }
+> = {
+  lose_gentle: {
+    label: 'Lose gradually',
+    shortLabel: 'Gradual loss',
+    adjustmentCalories: -250,
+    explanation: '250 kcal below estimated maintenance',
+  },
+  lose_steady: {
+    label: 'Lose faster',
+    shortLabel: 'Faster loss',
+    adjustmentCalories: -500,
+    explanation: '500 kcal below estimated maintenance',
+  },
+  maintain: {
+    label: 'Maintain my weight',
+    shortLabel: 'Maintenance',
+    adjustmentCalories: 0,
+    explanation: 'At estimated maintenance',
+  },
+  gain_gentle: {
+    label: 'Gain gradually',
+    shortLabel: 'Gradual gain',
+    adjustmentCalories: 250,
+    explanation: '250 kcal above estimated maintenance',
+  },
 };
 
 export const METHODOLOGY_LINKS = {
@@ -75,6 +98,8 @@ export function calculateNutritionTarget(input: {
     return {
       calorieTarget: target,
       calorieRange: [Math.max(800, target - 100), target + 100],
+      maintenanceCalories: null,
+      goalAdjustmentCalories: null,
       restingEnergy: null,
       proteinRangeG: input.weightKg
         ? [round(input.weightKg * 1.2), round(input.weightKg * 1.6)]
@@ -94,6 +119,8 @@ export function calculateNutritionTarget(input: {
     return {
       calorieTarget: null,
       calorieRange: null,
+      maintenanceCalories: null,
+      goalAdjustmentCalories: null,
       restingEnergy: null,
       proteinRangeG: input.weightKg
         ? [round(input.weightKg * 1.2), round(input.weightKg * 1.6)]
@@ -109,17 +136,35 @@ export function calculateNutritionTarget(input: {
     ageYears: input.ageYears,
     equationProfile: input.equationProfile,
   });
-  const target = round(
-    restingEnergy * ACTIVITY_FACTORS[input.activityLevel] + GOAL_ADJUSTMENTS[input.goal]
-  );
+  const maintenanceCalories = round(restingEnergy * ACTIVITY_FACTORS[input.activityLevel]);
+  const goalAdjustmentCalories = GOAL_DETAILS[input.goal].adjustmentCalories;
+  const target = round(maintenanceCalories + goalAdjustmentCalories);
 
   return {
     calorieTarget: target,
     calorieRange: [Math.max(800, target - 100), target + 100],
+    maintenanceCalories,
+    goalAdjustmentCalories,
     restingEnergy,
     proteinRangeG: [round(input.weightKg * 1.2), round(input.weightKg * 1.6)],
     fibreTargetG: round((target / 1000) * 14),
     method: 'mifflin-st-jeor',
+  };
+}
+
+export function calculateTargetWeightProgress(currentWeightKg: number, targetWeightKg: number) {
+  const signedDifferenceKg = round(targetWeightKg - currentWeightKg, 1);
+  const distanceKg = Math.abs(signedDifferenceKg);
+  const direction =
+    distanceKg < 0.05 ? 'reached' : signedDifferenceKg < 0 ? 'lose' : ('gain' as const);
+
+  return {
+    direction,
+    distanceKg,
+    explanation:
+      direction === 'reached'
+        ? 'You are at your target weight.'
+        : `${distanceKg} kg ${direction === 'lose' ? 'to lose' : 'to gain'} to reach your target.`,
   };
 }
 

@@ -1,4 +1,5 @@
 import { cachePrivateValue, clearLocalData, deletePrivateValue, readPrivateValue } from './offline';
+import { clearAllOnboardingDrafts } from './onboarding-draft';
 
 export type AppSession = {
   user: {
@@ -84,7 +85,13 @@ export async function signInWithGoogle() {
 }
 
 export async function signOut() {
+  if (localStorage.getItem('calorie-local-mode') === 'true') {
+    localStorage.removeItem('calorie-local-mode');
+    window.location.reload();
+    return;
+  }
   localStorage.removeItem('calorie-local-mode');
+  clearAllOnboardingDrafts();
   sessionStorage.removeItem('calorie-demo');
   sessionStorage.removeItem('calorie-demo-onboarding');
   await clearLocalData();

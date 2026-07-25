@@ -479,6 +479,14 @@ export function TodayPage({ onOpenFoods }: { onOpenFoods: () => void }) {
                 ? `${dashboard.target.calorieRange?.[0].toLocaleString()}–${dashboard.target.calorieRange?.[1].toLocaleString()} kcal`
                 : 'Set a target'}
             </strong>
+            {dashboard.target.maintenanceCalories ? (
+              <small className="goal-context">
+                {dashboard.target.maintenanceCalories.toLocaleString()} maintenance{' '}
+                {dashboard.target.goalAdjustmentCalories
+                  ? `${dashboard.target.goalAdjustmentCalories > 0 ? '+' : '−'}${Math.abs(dashboard.target.goalAdjustmentCalories)} for your goal`
+                  : 'with no goal adjustment'}
+              </small>
+            ) : null}
           </div>
           <span>{target ? `${Math.round(calorieProgress)}%` : '—'}</span>
         </div>

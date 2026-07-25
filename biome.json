@@ -6,6 +6,10 @@
       "!dist",
       "!node_modules",
       "!.wrangler",
+      "!.agents",
+      "!.claude",
+      "!.codex",
+      "!.impeccable",
       "!coverage",
       "!.artifacts",
       "!worker-configuration.d.ts"

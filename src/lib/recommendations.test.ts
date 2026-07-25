@@ -5,6 +5,7 @@ import {
   calculateNutritionTarget,
   calculateRestingEnergy,
   calculateSleepGuidance,
+  calculateTargetWeightProgress,
   scaleNutrients,
 } from './recommendations';
 import type { FoodEntry } from './types';
@@ -37,6 +38,8 @@ describe('nutrition calculations', () => {
       goal: 'lose_gentle',
     });
     expect(target.calorieTarget).toBe(2352);
+    expect(target.maintenanceCalories).toBe(2602);
+    expect(target.goalAdjustmentCalories).toBe(-250);
     expect(target.proteinRangeG).toEqual([86, 115]);
     expect(target.fibreTargetG).toBe(33);
     expect(target.method).toBe('mifflin-st-jeor');
@@ -55,8 +58,40 @@ describe('nutrition calculations', () => {
       })
     ).toMatchObject({
       calorieTarget: 2000,
+      maintenanceCalories: null,
+      goalAdjustmentCalories: null,
       fibreTargetG: 28,
       method: 'manual',
+    });
+  });
+
+  it('applies every goal adjustment to the same maintenance estimate', () => {
+    const input = {
+      weightKg: 72,
+      heightCm: 175,
+      ageYears: 28,
+      equationProfile: 'male' as const,
+      activityLevel: 'moderate' as const,
+    };
+
+    expect(
+      (['lose_gentle', 'lose_steady', 'maintain', 'gain_gentle'] as const).map((goal) => {
+        const target = calculateNutritionTarget({ ...input, goal });
+        return [goal, target.goalAdjustmentCalories, target.calorieTarget];
+      })
+    ).toEqual([
+      ['lose_gentle', -250, 2352],
+      ['lose_steady', -500, 2102],
+      ['maintain', 0, 2602],
+      ['gain_gentle', 250, 2852],
+    ]);
+  });
+
+  it('describes target-weight progress without inventing a timeline', () => {
+    expect(calculateTargetWeightProgress(80, 72)).toEqual({
+      direction: 'lose',
+      distanceKg: 8,
+      explanation: '8 kg to lose to reach your target.',
     });
   });
 });

@@ -5,6 +5,7 @@ import { getProfile, startOfflineRetry } from './lib/api';
 import { type AppSession, getSession } from './lib/auth-client';
 import type { UserProfile } from './lib/types';
 import { FoodsPage } from './pages/FoodsPage';
+import { LegalPage } from './pages/LegalPage';
 import { LoginPage } from './pages/LoginPage';
 import { OnboardingPage } from './pages/OnboardingPage';
 import { ProgressPage } from './pages/ProgressPage';
@@ -19,12 +20,15 @@ type AppState =
   | { status: 'error'; message: string };
 
 export default function App() {
+  const legalKind =
+    location.pathname === '/privacy' ? 'privacy' : location.pathname === '/terms' ? 'terms' : null;
   const [state, setState] = useState<AppState>({ status: 'loading' });
   const [tab, setTab] = useState<AppTab>(() =>
     new URLSearchParams(location.search).get('quick') === 'food' ? 'foods' : 'today'
   );
 
   useEffect(() => {
+    if (legalKind) return;
     const stopRetry = startOfflineRetry();
     void (async () => {
       const session = await getSession();
@@ -47,7 +51,9 @@ export default function App() {
       }
     })();
     return stopRetry;
-  }, []);
+  }, [legalKind]);
+
+  if (legalKind) return <LegalPage kind={legalKind} />;
 
   if (state.status === 'loading') {
     return (

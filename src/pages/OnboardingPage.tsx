@@ -1,33 +1,52 @@
 import { ArrowLeft, ArrowRight, Check, Info, Sparkles } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { AppMark } from '../components/AppMark';
 import { saveProfile } from '../lib/api';
-import { calculateNutritionTarget } from '../lib/recommendations';
+import {
+  clearOnboardingDraft,
+  type OnboardingDraft,
+  readOnboardingDraft,
+  saveOnboardingDraft,
+} from '../lib/onboarding-draft';
+import {
+  calculateNutritionTarget,
+  calculateTargetWeightProgress,
+  GOAL_DETAILS,
+} from '../lib/recommendations';
 import type { ActivityLevel, EquationProfile, Goal, Units, UserProfile } from '../lib/types';
-
-type Draft = UserProfile & { initialWeightKg: number | null; initialWeightId?: string };
-
-const goalLabels: Record<Goal, string> = {
-  lose_gentle: 'Lose gently',
-  lose_steady: 'Lose steadily',
-  maintain: 'Maintain',
-  gain_gentle: 'Gain gently',
-};
 
 const toDisplayWeight = (kg: number | null, units: Units) =>
   kg === null ? '' : units === 'metric' ? String(kg) : String(Math.round(kg * 2.20462 * 10) / 10);
 const fromDisplayWeight = (value: string, units: Units) => {
   const number = Number(value);
-  if (!Number.isFinite(number)) return null;
+  if (!Number.isFinite(number) || number <= 0) return null;
   return units === 'metric' ? number : Math.round((number / 2.20462) * 10) / 10;
 };
 const toDisplayHeight = (cm: number | null, units: Units) =>
   cm === null ? '' : units === 'metric' ? String(cm) : String(Math.round((cm / 2.54) * 10) / 10);
 const fromDisplayHeight = (value: string, units: Units) => {
   const number = Number(value);
-  if (!Number.isFinite(number)) return null;
+  if (!Number.isFinite(number) || number <= 0) return null;
   return units === 'metric' ? number : Math.round(number * 2.54 * 10) / 10;
 };
+
+function initialState(profile: UserProfile) {
+  const saved = readOnboardingDraft(profile.userId);
+  if (saved) return saved;
+  return {
+    version: 2 as const,
+    step: 0,
+    draft: {
+      ...profile,
+      displayName: profile.displayName || '',
+      units: profile.units || 'metric',
+      genderIdentity: null,
+      equationProfile: profile.equationProfile ?? 'none',
+      initialWeightKg: null,
+      initialWeightId: crypto.randomUUID(),
+    },
+  };
+}
 
 export function OnboardingPage({
   initialProfile,
@@ -36,17 +55,15 @@ export function OnboardingPage({
   initialProfile: UserProfile;
   onComplete: (profile: UserProfile) => void;
 }) {
-  const [step, setStep] = useState(0);
-  const [draft, setDraft] = useState<Draft>({
-    ...initialProfile,
-    displayName: initialProfile.displayName || '',
-    units: initialProfile.units || 'metric',
-    initialWeightKg: null,
-    equationProfile: initialProfile.equationProfile ?? 'none',
-    targetWeightKg: initialProfile.targetWeightKg,
-  });
+  const [savedState] = useState(() => initialState(initialProfile));
+  const [step, setStep] = useState(savedState.step);
+  const [draft, setDraft] = useState<OnboardingDraft>(savedState.draft);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    saveOnboardingDraft(draft.userId, step, draft);
+  }, [draft, step]);
 
   const target = useMemo(
     () =>
@@ -62,16 +79,42 @@ export function OnboardingPage({
     [draft]
   );
 
+  const targetProgress =
+    draft.initialWeightKg && draft.targetWeightKg
+      ? calculateTargetWeightProgress(draft.initialWeightKg, draft.targetWeightKg)
+      : null;
+
   const validateStep = () => {
-    if (step === 0 && !draft.displayName.trim()) return 'Tell us what to call you.';
-    if (
-      step === 1 &&
-      (!draft.ageYears || !draft.heightCm || !draft.initialWeightKg || !draft.equationProfile)
-    ) {
-      return 'Add your age, height, weight, and equation choice.';
+    if (step === 0) {
+      if (!draft.displayName.trim()) return 'Tell us what to call you.';
+      if (draft.goal !== 'maintain' && !draft.targetWeightKg) {
+        return 'Add a target weight, or choose Maintain my weight.';
+      }
     }
-    if (step === 2 && draft.goal !== 'maintain' && !draft.targetWeightKg) {
-      return 'Add a target weight, or choose Maintain.';
+    if (step === 1) {
+      if (!draft.ageYears || draft.ageYears < 18 || draft.ageYears > 120) {
+        return 'Add an age between 18 and 120.';
+      }
+      if (!draft.heightCm || !draft.initialWeightKg || !draft.equationProfile) {
+        return 'Add your height, weight, and energy-equation choice.';
+      }
+      if (
+        draft.targetWeightKg &&
+        (draft.goal === 'lose_gentle' || draft.goal === 'lose_steady') &&
+        draft.targetWeightKg >= draft.initialWeightKg
+      ) {
+        return 'For a loss goal, choose a target below your current weight.';
+      }
+      if (
+        draft.targetWeightKg &&
+        draft.goal === 'gain_gentle' &&
+        draft.targetWeightKg <= draft.initialWeightKg
+      ) {
+        return 'For a gain goal, choose a target above your current weight.';
+      }
+    }
+    if (step === 2 && (!draft.wakeTime || draft.waterTargetMl < 250)) {
+      return 'Add a wake time and a daily water target.';
     }
     return null;
   };
@@ -83,7 +126,7 @@ export function OnboardingPage({
       return;
     }
     setError(null);
-    setStep((current) => Math.min(3, current + 1));
+    setStep((current) => Math.min(2, current + 1));
   };
 
   const finish = async () => {
@@ -98,10 +141,11 @@ export function OnboardingPage({
       const saved = await saveProfile({
         ...draft,
         displayName: draft.displayName.trim(),
+        genderIdentity: null,
         onboardingComplete: true,
-        initialWeightId: draft.initialWeightId ?? crypto.randomUUID(),
         initialWeightKg: draft.initialWeightKg ?? undefined,
       });
+      clearOnboardingDraft(draft.userId);
       onComplete(saved);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : 'We could not save your profile.');
@@ -113,17 +157,17 @@ export function OnboardingPage({
     <main className="onboarding-page" id="main-content">
       <header className="onboarding-header">
         <AppMark />
-        <span>{step + 1} of 4</span>
+        <span>{step + 1} of 3</span>
       </header>
       <div
         className="progress-track"
         role="progressbar"
         aria-label="Onboarding progress"
         aria-valuemin={1}
-        aria-valuemax={4}
+        aria-valuemax={3}
         aria-valuenow={step + 1}
       >
-        <span style={{ width: `${((step + 1) / 4) * 100}%` }} />
+        <span style={{ width: `${((step + 1) / 3) * 100}%` }} />
       </div>
 
       <section className="onboarding-panel">
@@ -132,8 +176,10 @@ export function OnboardingPage({
             <div className="section-icon">
               <Sparkles aria-hidden="true" />
             </div>
-            <h1>Let’s make this yours</h1>
-            <p className="lede">Start with the basics. You can change every detail later.</p>
+            <h1>What would you like to change?</h1>
+            <p className="lede">
+              Your answer sets a real calorie adjustment and a progress destination.
+            </p>
 
             <label className="field">
               <span>What should we call you?</span>
@@ -145,6 +191,57 @@ export function OnboardingPage({
                 }
               />
             </label>
+
+            <fieldset className="field">
+              <legend>Your goal</legend>
+              <div className="choice-stack">
+                {(Object.keys(GOAL_DETAILS) as Goal[]).map((goal) => (
+                  <button
+                    key={goal}
+                    type="button"
+                    className={
+                      draft.goal === goal ? 'choice goal-choice is-selected' : 'choice goal-choice'
+                    }
+                    aria-pressed={draft.goal === goal}
+                    onClick={() =>
+                      setDraft((current) => ({
+                        ...current,
+                        goal,
+                        targetWeightKg: goal === 'maintain' ? null : current.targetWeightKg,
+                      }))
+                    }
+                  >
+                    <span className="choice-dot" />
+                    <span>
+                      <strong>{GOAL_DETAILS[goal].label}</strong>
+                      <small>{GOAL_DETAILS[goal].explanation}</small>
+                    </span>
+                    {draft.goal === goal ? <Check size={18} /> : null}
+                  </button>
+                ))}
+              </div>
+            </fieldset>
+
+            {draft.goal !== 'maintain' ? (
+              <label className="field">
+                <span>Target weight</span>
+                <div className="input-with-unit">
+                  <input
+                    inputMode="decimal"
+                    type="number"
+                    value={toDisplayWeight(draft.targetWeightKg, draft.units)}
+                    onChange={(event) =>
+                      setDraft((current) => ({
+                        ...current,
+                        targetWeightKg: fromDisplayWeight(event.target.value, current.units),
+                      }))
+                    }
+                  />
+                  <b>{draft.units === 'metric' ? 'kg' : 'lb'}</b>
+                </div>
+                <small>Used to show distance to your goal, never a made-up deadline.</small>
+              </label>
+            ) : null}
 
             <fieldset className="field">
               <legend>Measurement units</legend>
@@ -162,29 +259,13 @@ export function OnboardingPage({
                 ))}
               </div>
             </fieldset>
-
-            <label className="field">
-              <span>
-                Gender identity <small>Optional</small>
-              </span>
-              <input
-                value={draft.genderIdentity ?? ''}
-                placeholder="How you describe yourself"
-                onChange={(event) =>
-                  setDraft((current) => ({
-                    ...current,
-                    genderIdentity: event.target.value || null,
-                  }))
-                }
-              />
-            </label>
           </>
         ) : null}
 
         {step === 1 ? (
           <>
-            <h1>Your starting point</h1>
-            <p className="lede">These details power the optional energy estimate.</p>
+            <h1>Build your daily plan</h1>
+            <p className="lede">These inputs turn your goal into transparent daily ranges.</p>
 
             <div className="field-row">
               <label className="field">
@@ -238,44 +319,8 @@ export function OnboardingPage({
                 />
                 <b>{draft.units === 'metric' ? 'kg' : 'lb'}</b>
               </div>
+              <small>Sets your protein range and begins your weight history.</small>
             </label>
-
-            <fieldset className="field">
-              <legend>Which published energy equation should we use?</legend>
-              <div className="choice-stack">
-                {(
-                  [
-                    ['female', 'Female equation'],
-                    ['male', 'Male equation'],
-                    ['none', 'Skip calorie estimate'],
-                  ] as Array<[EquationProfile, string]>
-                ).map(([value, label]) => (
-                  <button
-                    key={value}
-                    type="button"
-                    className={draft.equationProfile === value ? 'choice is-selected' : 'choice'}
-                    aria-pressed={draft.equationProfile === value}
-                    onClick={() => setDraft((current) => ({ ...current, equationProfile: value }))}
-                  >
-                    <span className="choice-dot" />
-                    {label}
-                    {draft.equationProfile === value ? <Check size={18} /> : null}
-                  </button>
-                ))}
-              </div>
-            </fieldset>
-            <p className="inline-note">
-              <Info size={17} aria-hidden="true" />
-              The Mifflin–St Jeor study published separate female and male equations. This choice is
-              not your gender identity.
-            </p>
-          </>
-        ) : null}
-
-        {step === 2 ? (
-          <>
-            <h1>What are we aiming for?</h1>
-            <p className="lede">Pick a direction. Calorie uses ranges, not pass/fail grades.</p>
 
             <label className="field">
               <span>Usual activity</span>
@@ -293,61 +338,66 @@ export function OnboardingPage({
                 <option value="moderate">Moderately active</option>
                 <option value="very">Very active</option>
               </select>
+              <small>Scales resting energy into estimated maintenance calories.</small>
             </label>
 
             <fieldset className="field">
-              <legend>Your goal</legend>
-              <div className="goal-grid">
-                {(Object.keys(goalLabels) as Goal[]).map((goal) => (
+              <legend>Energy equation profile</legend>
+              <div className="segmented segmented-three">
+                {(
+                  [
+                    ['female', 'Female'],
+                    ['male', 'Male'],
+                    ['none', 'Skip'],
+                  ] as Array<[EquationProfile, string]>
+                ).map(([value, label]) => (
                   <button
-                    key={goal}
+                    key={value}
                     type="button"
-                    className={draft.goal === goal ? 'goal-option is-selected' : 'goal-option'}
-                    aria-pressed={draft.goal === goal}
-                    onClick={() => setDraft((current) => ({ ...current, goal }))}
+                    className={draft.equationProfile === value ? 'is-selected' : ''}
+                    aria-pressed={draft.equationProfile === value}
+                    onClick={() => setDraft((current) => ({ ...current, equationProfile: value }))}
                   >
-                    {goalLabels[goal]}
+                    {label}
                   </button>
                 ))}
               </div>
             </fieldset>
+            <p className="inline-note">
+              <Info size={17} aria-hidden="true" />
+              Mifflin–St Jeor publishes female and male equations. This is only a calculation
+              choice, not a gender-identity question.
+            </p>
 
-            {draft.goal !== 'maintain' ? (
-              <label className="field">
-                <span>Target weight</span>
-                <div className="input-with-unit">
-                  <input
-                    inputMode="decimal"
-                    type="number"
-                    value={toDisplayWeight(draft.targetWeightKg, draft.units)}
-                    onChange={(event) =>
-                      setDraft((current) => ({
-                        ...current,
-                        targetWeightKg: fromDisplayWeight(event.target.value, current.units),
-                      }))
-                    }
-                  />
-                  <b>{draft.units === 'metric' ? 'kg' : 'lb'}</b>
-                </div>
-              </label>
-            ) : null}
-
-            <div className="estimate-preview">
-              <span>Starting daily estimate</span>
+            <div className="estimate-preview plan-preview" aria-live="polite">
+              <span>Your plan so far</span>
               <strong>
                 {target.calorieRange
                   ? `${target.calorieRange[0].toLocaleString()}–${target.calorieRange[1].toLocaleString()} kcal`
-                  : 'Add your own later'}
+                  : 'Calorie estimate skipped'}
               </strong>
-              <p>It is an estimate, not a prescription. Your real trend helps you adjust it.</p>
+              {target.maintenanceCalories ? (
+                <p>
+                  {target.maintenanceCalories.toLocaleString()} maintenance{' '}
+                  {target.goalAdjustmentCalories
+                    ? `${target.goalAdjustmentCalories > 0 ? '+' : '−'}${Math.abs(target.goalAdjustmentCalories)} for ${GOAL_DETAILS[draft.goal].shortLabel.toLowerCase()}`
+                    : 'with no goal adjustment'}
+                  .
+                </p>
+              ) : (
+                <p>You can add a manual calorie target later in Settings.</p>
+              )}
+              {targetProgress ? <p>{targetProgress.explanation}</p> : null}
             </div>
           </>
         ) : null}
 
-        {step === 3 ? (
+        {step === 2 ? (
           <>
-            <h1>Your everyday rhythm</h1>
-            <p className="lede">This makes timing suggestions fit your actual day.</p>
+            <h1>Fit it to your day</h1>
+            <p className="lede">
+              Your wake time shapes sleep guidance. Water gets a one-tap target.
+            </p>
 
             <div className="field-row">
               <label className="field">
@@ -380,25 +430,6 @@ export function OnboardingPage({
               </label>
             </div>
 
-            <fieldset className="field">
-              <legend>Count a fast after</legend>
-              <div className="segmented segmented-three">
-                {([12, 14, 16] as const).map((hours) => (
-                  <button
-                    key={hours}
-                    type="button"
-                    className={draft.fastingThresholdHours === hours ? 'is-selected' : ''}
-                    aria-pressed={draft.fastingThresholdHours === hours}
-                    onClick={() =>
-                      setDraft((current) => ({ ...current, fastingThresholdHours: hours }))
-                    }
-                  >
-                    {hours} hours
-                  </button>
-                ))}
-              </div>
-            </fieldset>
-
             <label className="field">
               <span>Daily water target</span>
               <div className="input-with-unit">
@@ -427,12 +458,41 @@ export function OnboardingPage({
               </div>
             </label>
 
-            <div className="ready-note">
-              <AppMark showName={false} />
-              <div>
-                <strong>You’re ready.</strong>
-                <span>First log, then learn from your own pattern.</span>
-              </div>
+            <div className="plan-summary">
+              <span>Your answers, put to work</span>
+              <dl>
+                <div>
+                  <dt>Goal</dt>
+                  <dd>{GOAL_DETAILS[draft.goal].explanation}</dd>
+                </div>
+                <div>
+                  <dt>Daily energy</dt>
+                  <dd>
+                    {target.calorieRange
+                      ? `${target.calorieRange[0].toLocaleString()}–${target.calorieRange[1].toLocaleString()} kcal`
+                      : 'Manual target available in Settings'}
+                  </dd>
+                </div>
+                <div>
+                  <dt>Protein</dt>
+                  <dd>
+                    {target.proteinRangeG
+                      ? `${target.proteinRangeG[0]}–${target.proteinRangeG[1]} g from your weight`
+                      : 'Available after your first weight'}
+                  </dd>
+                </div>
+                <div>
+                  <dt>Water</dt>
+                  <dd>{draft.waterTargetMl.toLocaleString()} ml with one-tap logging</dd>
+                </div>
+                <div>
+                  <dt>Sleep</dt>
+                  <dd>
+                    {draft.sleepHours} hours before a {draft.wakeTime} wake time, adjusted for late
+                    meals
+                  </dd>
+                </div>
+              </dl>
             </div>
           </>
         ) : null}
@@ -464,9 +524,9 @@ export function OnboardingPage({
           className="button button-primary"
           type="button"
           disabled={saving}
-          onClick={step === 3 ? () => void finish() : next}
+          onClick={step === 2 ? () => void finish() : next}
         >
-          {step === 3 ? (saving ? 'Saving…' : 'Open my log') : 'Continue'}
+          {step === 2 ? (saving ? 'Saving…' : 'Open my log') : 'Continue'}
           {!saving && <ArrowRight size={18} aria-hidden="true" />}
         </button>
       </footer>

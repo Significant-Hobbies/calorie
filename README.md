@@ -20,7 +20,7 @@ pnpm dev
 ```
 
 Open the printed Vite URL, choose **Start on this device**, and complete the
-four-step onboarding flow. No credentials or local database are required for
+three-step onboarding flow. No credentials or local database are required for
 the account-free experience.
 
 Useful checks:
@@ -45,16 +45,21 @@ deployment, create the D1 database, place its real database ID in
 - `BETTER_AUTH_SECRET`
 
 Apply `migrations/0001_initial.sql` to the target database only as an explicit
-deployment step. The repository intentionally contains no credentials and has
-not been deployed.
+deployment step. The repository intentionally contains no credentials.
+
+Production uses a dedicated Google web client with
+`https://calorie.significanthobbies.com` as its JavaScript origin and
+`https://calorie.significanthobbies.com/api/auth/callback/google` as its
+callback. Only the standard OpenID Connect identity scopes are requested.
 
 ## How recommendations work
 
 The formulas live in `src/lib/recommendations.ts` and are covered by unit tests.
 They use the Mifflin–St Jeor resting-energy equation, an activity multiplier,
-bounded goal adjustments, fibre scaled to energy intake, logged eating gaps,
-and simple meal-timing heuristics. Every result is labelled as an estimate in
-the UI; Calorie is not medical advice.
+visible goal adjustments (`−250`, `−500`, `0`, or `+250` kcal), fibre scaled to
+energy intake, logged eating gaps, and simple meal-timing heuristics. Onboarding,
+Today, and Settings show how the selected answers change the result. Every
+result is labelled as an estimate in the UI; Calorie is not medical advice.
 
 ## Finished v1 scope
 

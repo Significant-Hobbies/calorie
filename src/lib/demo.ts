@@ -32,7 +32,7 @@ let profile: UserProfile = {
   activityLevel: 'moderate',
   goal: 'lose_gentle',
   targetWeightKg: 68,
-  manualCalorieTarget: 1842,
+  manualCalorieTarget: null,
   wakeTime: '07:00',
   sleepHours: 8,
   fastingThresholdHours: 12,

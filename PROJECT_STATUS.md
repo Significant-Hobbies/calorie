@@ -40,9 +40,10 @@ full sets/reps workout-programming system.
 
 ## Features (shipped)
 
-- Four-step goal-aware onboarding with editable health assumptions
+- Three-step answer-aware onboarding with reload-safe drafts and visible goal math
 - Fully account-free local journal with versioned browser storage
-- Optional Google sign-in and per-user D1 API implementation
+- Working optional Google sign-in with a dedicated production OAuth client and per-user D1 sync
+- Public privacy and terms pages for cloud-account users
 - Reusable foods per unit or per 100 g
 - One-tap and custom amount/time food logging with edit, delete, and undo
 - Calories, carbs, protein, fibre, water, and weight tracking
@@ -55,9 +56,7 @@ full sets/reps workout-programming system.
 
 ### Planned
 
-1. Configure optional Google OAuth and Better Auth secrets outside the
-   repository if cloud sign-in is wanted.
-2. Add export/import only if moving a local journal between devices becomes
+1. Add export/import only if moving a local journal between devices becomes
    important.
 
 ### Deferred

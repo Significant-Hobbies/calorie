@@ -12,14 +12,20 @@ import {
 import { useEffect, useMemo, useState } from 'react';
 import { getDashboard, isLocalMode, saveProfile } from '../lib/api';
 import { signOut } from '../lib/auth-client';
-import { calculateNutritionTarget, METHODOLOGY_LINKS } from '../lib/recommendations';
+import {
+  calculateNutritionTarget,
+  calculateTargetWeightProgress,
+  GOAL_DETAILS,
+  METHODOLOGY_LINKS,
+} from '../lib/recommendations';
 import type { ActivityLevel, EquationProfile, Goal, UserProfile } from '../lib/types';
 
-const goalNames: Record<Goal, string> = {
-  lose_gentle: 'Lose gently',
-  lose_steady: 'Lose steadily',
-  maintain: 'Maintain',
-  gain_gentle: 'Gain gently',
+const displayWeight = (kg: number | null, imperial: boolean) =>
+  kg === null ? '' : imperial ? Math.round(kg * 2.20462 * 10) / 10 : kg;
+const storedWeight = (value: string, imperial: boolean) => {
+  const amount = Number(value);
+  if (!Number.isFinite(amount) || amount <= 0) return null;
+  return imperial ? Math.round((amount / 2.20462) * 10) / 10 : amount;
 };
 
 export function SettingsPage({
@@ -54,6 +60,10 @@ export function SettingsPage({
       }),
     [draft, latestWeightKg]
   );
+  const targetProgress =
+    latestWeightKg && draft.targetWeightKg
+      ? calculateTargetWeightProgress(latestWeightKg, draft.targetWeightKg)
+      : null;
 
   const save = async () => {
     setSaving(true);
@@ -87,7 +97,8 @@ export function SettingsPage({
         <div>
           <h2>{draft.displayName}</h2>
           <p>
-            {goalNames[draft.goal]} · {draft.units === 'metric' ? 'Metric' : 'Imperial'}
+            {GOAL_DETAILS[draft.goal].shortLabel} ·{' '}
+            {draft.units === 'metric' ? 'Metric' : 'Imperial'}
           </p>
         </div>
         <span className="profile-leaf" aria-hidden="true" />
@@ -206,6 +217,7 @@ export function SettingsPage({
                 <option value="moderate">Moderately active</option>
                 <option value="very">Very active</option>
               </select>
+              <small>Scales resting energy into estimated maintenance calories.</small>
             </label>
             <label className="field">
               <span>Goal</span>
@@ -215,16 +227,45 @@ export function SettingsPage({
                   setDraft((current) => ({
                     ...current,
                     goal: event.target.value as Goal,
+                    targetWeightKg:
+                      event.target.value === 'maintain' ? null : current.targetWeightKg,
                   }))
                 }
               >
-                {(Object.keys(goalNames) as Goal[]).map((goal) => (
+                {(Object.keys(GOAL_DETAILS) as Goal[]).map((goal) => (
                   <option value={goal} key={goal}>
-                    {goalNames[goal]}
+                    {GOAL_DETAILS[goal].label}
                   </option>
                 ))}
               </select>
+              <small>{GOAL_DETAILS[draft.goal].explanation}.</small>
             </label>
+            {draft.goal !== 'maintain' ? (
+              <label className="field">
+                <span>Target weight</span>
+                <div className="input-with-unit">
+                  <input
+                    type="number"
+                    inputMode="decimal"
+                    value={displayWeight(draft.targetWeightKg, draft.units === 'imperial')}
+                    onChange={(event) =>
+                      setDraft((current) => ({
+                        ...current,
+                        targetWeightKg: storedWeight(
+                          event.target.value,
+                          current.units === 'imperial'
+                        ),
+                      }))
+                    }
+                  />
+                  <b>{draft.units === 'metric' ? 'kg' : 'lb'}</b>
+                </div>
+                <small>
+                  {targetProgress?.explanation ??
+                    'Used to show your distance from the destination, without an invented ETA.'}
+                </small>
+              </label>
+            ) : null}
             <label className="field">
               <span>
                 Manual calorie target <small>Optional override</small>
@@ -246,6 +287,25 @@ export function SettingsPage({
                 <b>kcal</b>
               </div>
             </label>
+            <div className="target-math">
+              <span>How your range is built</span>
+              {target.maintenanceCalories ? (
+                <strong>
+                  {target.maintenanceCalories.toLocaleString()} maintenance{' '}
+                  {target.goalAdjustmentCalories
+                    ? `${target.goalAdjustmentCalories > 0 ? '+' : '−'}${Math.abs(target.goalAdjustmentCalories)}`
+                    : '± 0'}{' '}
+                  = {target.calorieTarget?.toLocaleString()} kcal
+                </strong>
+              ) : (
+                <strong>
+                  {draft.manualCalorieTarget
+                    ? `${draft.manualCalorieTarget.toLocaleString()} kcal manual target`
+                    : 'Complete body inputs or add a manual target'}
+                </strong>
+              )}
+              <small>The daily range is 100 kcal either side of that center.</small>
+            </div>
           </div>
         ) : null}
 

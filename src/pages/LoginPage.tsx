@@ -97,6 +97,11 @@ export function LoginPage() {
         <p className="privacy-note">
           Local mode stays in this browser. No ads. No social feed. No food judgment.
         </p>
+        <nav className="legal-links" aria-label="Legal">
+          <a href="/privacy">Privacy</a>
+          <span aria-hidden="true">·</span>
+          <a href="/terms">Terms</a>
+        </nav>
 
         {import.meta.env.DEV ? (
           <div className="demo-actions">

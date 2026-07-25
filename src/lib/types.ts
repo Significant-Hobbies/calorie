@@ -64,6 +64,8 @@ export type WeightEntry = {
 export type NutritionTarget = {
   calorieTarget: number | null;
   calorieRange: [number, number] | null;
+  maintenanceCalories: number | null;
+  goalAdjustmentCalories: number | null;
   restingEnergy: number | null;
   proteinRangeG: [number, number] | null;
   fibreTargetG: number | null;
