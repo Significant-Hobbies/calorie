@@ -31,12 +31,12 @@ full sets/reps workout-programming system.
 
 ## Timeline
 
-- 2026-07-25 — finished v1 implemented, validated, and prepared for release
+- 2026-07-25 — finished v1 implemented, validated, and released to Cloudflare
 
 ## Products
 
 - Installable local-first web app
-- Production Worker at `https://calorie.significanthobbies.com`
+- Production Worker — `https://calorie.significanthobbies.com`
 
 ## Features (shipped)
 
