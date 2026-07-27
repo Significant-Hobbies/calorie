@@ -1,5 +1,5 @@
 import { Apple, BarChart3, CircleUserRound, LibraryBig } from 'lucide-react';
-import type { ReactNode } from 'react';
+import { type ReactNode, useEffect, useState } from 'react';
 import { AppMark } from './AppMark';
 
 export type AppTab = 'today' | 'progress' | 'foods' | 'you';
@@ -28,15 +28,23 @@ export function AppShell({
   displayName: string;
   children: ReactNode;
 }) {
+  const [online, setOnline] = useState(navigator.onLine);
+
+  useEffect(() => {
+    const update = () => setOnline(navigator.onLine);
+    window.addEventListener('online', update);
+    window.addEventListener('offline', update);
+    return () => {
+      window.removeEventListener('online', update);
+      window.removeEventListener('offline', update);
+    };
+  }, []);
+
   return (
     <div className="app-shell">
       <header className="app-header">
         <AppMark />
         <div className="header-actions">
-          <span className="connection-state" aria-live="polite">
-            <span className="connection-dot" />
-            <span>{navigator.onLine ? 'Online' : 'Offline'}</span>
-          </span>
           <button
             className="avatar-button"
             type="button"
@@ -47,6 +55,11 @@ export function AppShell({
           </button>
         </div>
       </header>
+      {!online ? (
+        <p className="offline-banner" role="status">
+          Offline — changes will sync when you reconnect.
+        </p>
+      ) : null}
 
       <div className="shell-body">
         <nav className="desktop-nav" aria-label="Primary">

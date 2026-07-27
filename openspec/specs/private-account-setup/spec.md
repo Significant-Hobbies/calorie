@@ -14,12 +14,13 @@ without authentication, and SHALL persist that journal in browser storage.
 
 #### Scenario: Reopen the local journal
 - **WHEN** a local-mode user closes and later reopens the app in the same browser
-- **THEN** their profile, foods, entries, water, weight, and history remain available
+- **THEN** their profile, foods, entries, water, medication definitions,
+  medication check-offs, weight, and history remain available
 
 ### Requirement: Optional Google-authenticated private account
 The system SHALL offer a working Google-authenticated cloud mode in production,
-request only basic identity scopes, and scope all cloud profile and event data
-to the authenticated user.
+request only basic identity scopes, and scope all cloud profile, medication,
+and event data to the authenticated user.
 
 #### Scenario: Start production Google sign-in
 - **WHEN** a visitor chooses Continue with Google on the production origin
@@ -36,7 +37,7 @@ to the authenticated user.
 - **THEN** the system returns an unauthorized response without account data
 
 #### Scenario: Authenticated data access
-- **WHEN** a signed-in user requests profile or event data
+- **WHEN** a signed-in user requests profile, medication, or event data
 - **THEN** the system returns only rows owned by that user's id
 
 ### Requirement: Guided onboarding
@@ -70,16 +71,20 @@ plan before completion.
 
 ### Requirement: Editable assumptions
 The system SHALL let users review and edit every consequential onboarding input,
-including target weight, and override the calculated daily calorie target.
+including target weight, and override the calculated daily calorie range.
 
 #### Scenario: Activity changes
 - **WHEN** the user changes activity level in settings
 - **THEN** future targets are recalculated and the new maintenance and goal
-  inputs are shown
+  range inputs are shown
 
 #### Scenario: Target weight changes
 - **WHEN** the user edits target weight in settings
 - **THEN** Progress and goal summaries use the new destination
+
+#### Scenario: Legacy manual target
+- **WHEN** an existing profile contains one manual calorie target and no manual bounds
+- **THEN** the app presents a range 100 kcal below and above that target until the profile is saved
 
 ### Requirement: Answer-purpose disclosure
 The system SHALL state the purpose of every onboarding answer at the point it is
@@ -89,4 +94,3 @@ requested or in the personalized review.
 - **WHEN** the user reaches the final onboarding step
 - **THEN** the system identifies which answers control calories, protein,
   fibre, progress, hydration, fasting, sleep, display units, and greetings
-

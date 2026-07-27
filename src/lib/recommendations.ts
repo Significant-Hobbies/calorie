@@ -18,46 +18,59 @@ const ACTIVITY_FACTORS: Record<ActivityLevel, number> = {
 
 export const GOAL_DETAILS: Record<
   Goal,
-  { label: string; shortLabel: string; adjustmentCalories: number; explanation: string }
+  { label: string; shortLabel: string; maintenanceFactors: [number, number]; explanation: string }
 > = {
   lose_gentle: {
     label: 'Lose gradually',
     shortLabel: 'Gradual loss',
-    adjustmentCalories: -250,
-    explanation: '250 kcal below estimated maintenance',
+    maintenanceFactors: [0.8, 0.85],
+    explanation: '80–85% of estimated maintenance',
   },
   lose_steady: {
     label: 'Lose faster',
     shortLabel: 'Faster loss',
-    adjustmentCalories: -500,
-    explanation: '500 kcal below estimated maintenance',
+    maintenanceFactors: [0.75, 0.8],
+    explanation: '75–80% of estimated maintenance',
   },
   maintain: {
     label: 'Maintain my weight',
     shortLabel: 'Maintenance',
-    adjustmentCalories: 0,
-    explanation: 'At estimated maintenance',
+    maintenanceFactors: [0.95, 1.05],
+    explanation: '95–105% of estimated maintenance',
   },
   gain_gentle: {
     label: 'Gain gradually',
     shortLabel: 'Gradual gain',
-    adjustmentCalories: 250,
-    explanation: '250 kcal above estimated maintenance',
+    maintenanceFactors: [1.05, 1.1],
+    explanation: '105–110% of estimated maintenance',
   },
 };
 
 export const METHODOLOGY_LINKS = {
   energy: 'https://pubmed.ncbi.nlm.nih.gov/2305711/',
-  protein: 'https://cdn.realfood.gov/DGA.pdf',
+  'loss targets':
+    'https://www.niddk.nih.gov/health-information/diabetes/overview/preventing-type-2-diabetes/game-plan',
+  protein: 'https://pubmed.ncbi.nlm.nih.gov/28642676/',
   fibre:
     'https://nap.nationalacademies.org/catalog/10490/dietary-reference-intakes-for-energy-carbohydrate-fiber-fat-fatty-acids-cholesterol-protein-and-amino-acids',
-  gym: 'https://pmc.ncbi.nlm.nih.gov/articles/PMC6566225/',
+  exercise: 'https://pmc.ncbi.nlm.nih.gov/articles/PMC6566225/',
   sleep: 'https://medlineplus.gov/ency/patientinstructions/000853.htm',
 } as const;
 
 export function round(value: number, precision = 0): number {
   const multiplier = 10 ** precision;
   return Math.round(value * multiplier) / multiplier;
+}
+
+export function formatCalorieAdjustmentRange(range: [number, number] | null): string {
+  if (!range) return 'no goal adjustment';
+  const signed = (value: number) =>
+    value > 0
+      ? `+${value.toLocaleString()}`
+      : value < 0
+        ? `−${Math.abs(value).toLocaleString()}`
+        : '0';
+  return `${signed(range[0])} to ${signed(range[1])}`;
 }
 
 export function scaleNutrients(
@@ -92,18 +105,35 @@ export function calculateNutritionTarget(input: {
   activityLevel: ActivityLevel;
   goal: Goal;
   manualCalorieTarget?: number | null;
+  manualCalorieRange?: [number, number] | null;
 }): NutritionTarget {
-  if (input.manualCalorieTarget) {
-    const target = round(input.manualCalorieTarget);
+  const proteinFactors: [number, number] =
+    input.goal === 'lose_gentle' || input.goal === 'lose_steady' ? [1.6, 2] : [1.4, 1.8];
+  const proteinRange: [number, number] | null = input.weightKg
+    ? [round(input.weightKg * proteinFactors[0]), round(input.weightKg * proteinFactors[1])]
+    : null;
+
+  const legacyManualRange: [number, number] | null = input.manualCalorieTarget
+    ? [
+        Math.max(800, round(input.manualCalorieTarget - 100)),
+        round(input.manualCalorieTarget + 100),
+      ]
+    : null;
+  const manualRange = input.manualCalorieRange ?? legacyManualRange;
+
+  if (manualRange) {
+    const calorieRange: [number, number] = [
+      round(Math.min(...manualRange)),
+      round(Math.max(...manualRange)),
+    ];
+    const target = round((calorieRange[0] + calorieRange[1]) / 2);
     return {
       calorieTarget: target,
-      calorieRange: [Math.max(800, target - 100), target + 100],
+      calorieRange,
       maintenanceCalories: null,
-      goalAdjustmentCalories: null,
+      goalAdjustmentRangeCalories: null,
       restingEnergy: null,
-      proteinRangeG: input.weightKg
-        ? [round(input.weightKg * 1.2), round(input.weightKg * 1.6)]
-        : null,
+      proteinRangeG: proteinRange,
       fibreTargetG: round((target / 1000) * 14),
       method: 'manual',
     };
@@ -120,11 +150,9 @@ export function calculateNutritionTarget(input: {
       calorieTarget: null,
       calorieRange: null,
       maintenanceCalories: null,
-      goalAdjustmentCalories: null,
+      goalAdjustmentRangeCalories: null,
       restingEnergy: null,
-      proteinRangeG: input.weightKg
-        ? [round(input.weightKg * 1.2), round(input.weightKg * 1.6)]
-        : null,
+      proteinRangeG: proteinRange,
       fibreTargetG: null,
       method: 'unavailable',
     };
@@ -137,16 +165,24 @@ export function calculateNutritionTarget(input: {
     equationProfile: input.equationProfile,
   });
   const maintenanceCalories = round(restingEnergy * ACTIVITY_FACTORS[input.activityLevel]);
-  const goalAdjustmentCalories = GOAL_DETAILS[input.goal].adjustmentCalories;
-  const target = round(maintenanceCalories + goalAdjustmentCalories);
+  const factors = GOAL_DETAILS[input.goal].maintenanceFactors;
+  const calorieRange: [number, number] = [
+    Math.max(1200, round(maintenanceCalories * factors[0])),
+    Math.max(1200, round(maintenanceCalories * factors[1])),
+  ];
+  const target = round((calorieRange[0] + calorieRange[1]) / 2);
+  const goalAdjustmentRangeCalories: [number, number] = [
+    calorieRange[0] - maintenanceCalories,
+    calorieRange[1] - maintenanceCalories,
+  ];
 
   return {
     calorieTarget: target,
-    calorieRange: [Math.max(800, target - 100), target + 100],
+    calorieRange,
     maintenanceCalories,
-    goalAdjustmentCalories,
+    goalAdjustmentRangeCalories,
     restingEnergy,
-    proteinRangeG: [round(input.weightKg * 1.2), round(input.weightKg * 1.6)],
+    proteinRangeG: proteinRange,
     fibreTargetG: round((target / 1000) * 14),
     method: 'mifflin-st-jeor',
   };
@@ -170,17 +206,40 @@ export function calculateTargetWeightProgress(currentWeightKg: number, targetWei
 
 export function calculateCompletedFasts(
   entries: Array<Pick<FoodEntry, 'eatenAt'>>,
-  thresholdHours: number
+  timezone: string
 ): FastWindow[] {
   const sorted = [...entries].sort((a, b) => a.eatenAt - b.eatenAt);
-  const thresholdMs = thresholdHours * 60 * 60 * 1000;
+  const dayFormatter = new Intl.DateTimeFormat('en', {
+    timeZone: timezone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  });
+  const eatingDays = new Map<string, { firstAt: number; lastAt: number }>();
+
+  for (const entry of sorted) {
+    const parts = dayFormatter.formatToParts(entry.eatenAt);
+    const part = (type: Intl.DateTimeFormatPartTypes) =>
+      parts.find((item) => item.type === type)?.value ?? '';
+    const key = `${part('year')}-${part('month')}-${part('day')}`;
+    const day = eatingDays.get(key);
+    if (day) {
+      day.lastAt = entry.eatenAt;
+    } else {
+      eatingDays.set(key, { firstAt: entry.eatenAt, lastAt: entry.eatenAt });
+    }
+  }
+
+  const days = [...eatingDays.entries()]
+    .sort(([left], [right]) => left.localeCompare(right))
+    .map(([, day]) => day);
   const windows: FastWindow[] = [];
 
-  for (let index = 1; index < sorted.length; index += 1) {
-    const startAt = sorted[index - 1].eatenAt;
-    const endAt = sorted[index].eatenAt;
+  for (let index = 1; index < days.length; index += 1) {
+    const startAt = days[index - 1].lastAt;
+    const endAt = days[index].firstAt;
     const gap = endAt - startAt;
-    if (gap >= thresholdMs) {
+    if (gap > 0) {
       windows.push({
         startAt,
         endAt,

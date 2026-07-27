@@ -1,5 +1,7 @@
 import {
   Apple,
+  Archive,
+  Check,
   ChevronRight,
   Clock3,
   Droplets,
@@ -7,6 +9,8 @@ import {
   Flame,
   Leaf,
   Moon,
+  Pencil,
+  Pill,
   Plus,
   RotateCcw,
   Save,
@@ -18,26 +22,47 @@ import {
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   addFoodEntry,
+  addMedicationCheckIn,
   addWater,
+  archiveMedication,
   deleteFoodEntry,
+  deleteMedicationCheckIn,
   deleteWater,
   getDashboard,
+  saveMedication,
   updateFoodEntry,
+  updateMedication,
 } from '../lib/api';
 import { directEntryError } from '../lib/entries';
 import {
   calculateGymGuidance,
   calculateSleepGuidance,
+  formatCalorieAdjustmentRange,
   minutesToTime,
   scaleNutrients,
 } from '../lib/recommendations';
-import type { Dashboard, Food, FoodEntry, WaterEntry } from '../lib/types';
+import type {
+  Dashboard,
+  Food,
+  FoodEntry,
+  Medication,
+  MedicationSchedule,
+  WaterEntry,
+} from '../lib/types';
 
 function formatTime(timestamp: number) {
   return new Intl.DateTimeFormat(undefined, {
     hour: 'numeric',
     minute: '2-digit',
   }).format(timestamp);
+}
+
+function formatDuration(hours: number) {
+  const totalMinutes = Math.round(hours * 60);
+  const wholeHours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+  if (!wholeHours) return `${minutes}m`;
+  return minutes ? `${wholeHours}h ${minutes}m` : `${wholeHours}h`;
 }
 
 function greeting() {
@@ -104,6 +129,10 @@ export function TodayPage({ onOpenFoods }: { onOpenFoods: () => void }) {
   const [undo, setUndo] = useState<UndoAction | null>(null);
   const [entryDraft, setEntryDraft] = useState<EntryDraft | null>(null);
   const [entryError, setEntryError] = useState<string | null>(null);
+  const [medicationEditorOpen, setMedicationEditorOpen] = useState(false);
+  const [medicationName, setMedicationName] = useState('');
+  const [medicationSchedule, setMedicationSchedule] = useState<MedicationSchedule>('morning');
+  const [editingMedicationId, setEditingMedicationId] = useState<string | null>(null);
   const entryFoodSelectRef = useRef<HTMLSelectElement>(null);
   const entryNameInputRef = useRef<HTMLInputElement>(null);
   const entrySheetOpen = entryDraft !== null;
@@ -148,6 +177,7 @@ export function TodayPage({ onOpenFoods }: { onOpenFoods: () => void }) {
       lastEntryCalories: last?.calories ?? null,
     });
   }, [dashboard]);
+  const latestFast = useMemo(() => dashboard?.completedFasts.at(-1) ?? null, [dashboard]);
 
   const quickAdd = async (food: Food) => {
     if (!dashboard || pendingId) return;
@@ -204,6 +234,101 @@ export function TodayPage({ onOpenFoods }: { onOpenFoods: () => void }) {
     } catch (caught) {
       setDashboard(dashboard);
       setError(caught instanceof Error ? caught.message : 'Water could not be logged.');
+    } finally {
+      setPendingId(null);
+    }
+  };
+
+  const addMedication = async () => {
+    const name = medicationName.trim();
+    if (!dashboard || !name || pendingId) return;
+    const editing = dashboard.medications.find(
+      (medication) => medication.id === editingMedicationId
+    );
+    const medication: Medication = {
+      id: editing?.id ?? crypto.randomUUID(),
+      name,
+      schedule: medicationSchedule,
+      createdAt: editing?.createdAt ?? Date.now(),
+      archivedAt: null,
+    };
+    setPendingId(`medication-${medication.id}`);
+    setDashboard({
+      ...dashboard,
+      medications: editing
+        ? dashboard.medications.map((item) => (item.id === medication.id ? medication : item))
+        : [...dashboard.medications, medication],
+    });
+    try {
+      if (editing) await updateMedication(medication);
+      else await saveMedication(medication);
+      setMedicationName('');
+      setMedicationSchedule('morning');
+      setEditingMedicationId(null);
+    } catch (caught) {
+      setDashboard(dashboard);
+      setError(caught instanceof Error ? caught.message : 'Medication could not be saved.');
+    } finally {
+      setPendingId(null);
+    }
+  };
+
+  const removeMedication = async (medication: Medication) => {
+    if (!dashboard || pendingId) return;
+    setPendingId(`archive-medication-${medication.id}`);
+    setDashboard({
+      ...dashboard,
+      medications: dashboard.medications.filter((item) => item.id !== medication.id),
+    });
+    try {
+      await archiveMedication(medication);
+    } catch (caught) {
+      setDashboard(dashboard);
+      setError(caught instanceof Error ? caught.message : 'Medication could not be archived.');
+    } finally {
+      setPendingId(null);
+    }
+  };
+
+  const toggleMedication = async (medication: Medication) => {
+    if (!dashboard || pendingId) return;
+    const existing = dashboard.medicationCheckIns.find(
+      (checkIn) => checkIn.medicationId === medication.id
+    );
+    setPendingId(`medication-check-in-${medication.id}`);
+    if (existing) {
+      setDashboard({
+        ...dashboard,
+        medicationCheckIns: dashboard.medicationCheckIns.filter(
+          (checkIn) => checkIn.id !== existing.id
+        ),
+      });
+      try {
+        await deleteMedicationCheckIn(existing.id);
+      } catch (caught) {
+        setDashboard(dashboard);
+        setError(caught instanceof Error ? caught.message : 'Check-off could not be updated.');
+      } finally {
+        setPendingId(null);
+      }
+      return;
+    }
+
+    const checkIn = {
+      id: crypto.randomUUID(),
+      medicationId: medication.id,
+      takenOn: dashboard.date,
+      takenAt: Date.now(),
+    };
+    setDashboard({
+      ...dashboard,
+      medicationCheckIns: [checkIn, ...dashboard.medicationCheckIns],
+    });
+    try {
+      await addMedicationCheckIn(checkIn);
+    } catch (caught) {
+      setDashboard(dashboard);
+      setError(caught instanceof Error ? caught.message : 'Check-off could not be updated.');
     } finally {
       setPendingId(null);
     }
@@ -486,10 +611,11 @@ export function TodayPage({ onOpenFoods }: { onOpenFoods: () => void }) {
     : 0;
   const proteinTarget = dashboard.target.proteinRangeG?.[0] ?? null;
   const fibreTarget = dashboard.target.fibreTargetG;
-  const waterProgress = Math.min(
-    100,
+  const waterPercent = Math.max(
+    0,
     (dashboard.totals.waterMl / dashboard.profile.waterTargetMl) * 100
   );
+  const waterBarProgress = Math.min(100, waterPercent);
 
   const nutrients = [
     {
@@ -570,9 +696,8 @@ export function TodayPage({ onOpenFoods }: { onOpenFoods: () => void }) {
             {dashboard.target.maintenanceCalories ? (
               <small className="goal-context">
                 {dashboard.target.maintenanceCalories.toLocaleString()} maintenance{' '}
-                {dashboard.target.goalAdjustmentCalories
-                  ? `${dashboard.target.goalAdjustmentCalories > 0 ? '+' : '−'}${Math.abs(dashboard.target.goalAdjustmentCalories)} for your goal`
-                  : 'with no goal adjustment'}
+                {formatCalorieAdjustmentRange(dashboard.target.goalAdjustmentRangeCalories)} for
+                your goal
               </small>
             ) : null}
           </div>
@@ -655,13 +780,13 @@ export function TodayPage({ onOpenFoods }: { onOpenFoods: () => void }) {
             <h2 id="water-title">Water</h2>
             <strong>
               {dashboard.totals.waterMl.toLocaleString()}
-              <small> / {dashboard.profile.waterTargetMl.toLocaleString()} ml</small>
+              <small> / {dashboard.profile.waterTargetMl.toLocaleString()} ml target</small>
             </strong>
           </div>
-          <span className="water-percent">{Math.round(waterProgress)}%</span>
+          <span className="water-percent">{Math.round(waterPercent)}%</span>
         </div>
         <div className="water-track" aria-hidden="true">
-          <span style={{ width: `${waterProgress}%` }} />
+          <span style={{ width: `${waterBarProgress}%` }} />
         </div>
         <fieldset className="water-presets">
           <legend className="sr-only">Quick log water</legend>
@@ -679,6 +804,143 @@ export function TodayPage({ onOpenFoods }: { onOpenFoods: () => void }) {
         </fieldset>
       </section>
 
+      <section className="medication-panel" aria-labelledby="medication-title">
+        <div className="section-heading medication-heading">
+          <div>
+            <h2 id="medication-title">
+              <Pill size={19} aria-hidden="true" />
+              Medications
+            </h2>
+            <p>Track the routine you set for today.</p>
+          </div>
+          <button
+            className="text-button"
+            type="button"
+            onClick={() => setMedicationEditorOpen((open) => !open)}
+          >
+            {medicationEditorOpen ? 'Done' : 'Manage'}
+          </button>
+        </div>
+
+        {dashboard.medications.length ? (
+          <div className="medication-list">
+            {dashboard.medications.map((medication) => {
+              const checked = dashboard.medicationCheckIns.some(
+                (checkIn) => checkIn.medicationId === medication.id
+              );
+              return (
+                <div className="medication-row" key={medication.id}>
+                  <button
+                    className={`medication-check${checked ? ' is-checked' : ''}`}
+                    type="button"
+                    disabled={Boolean(pendingId)}
+                    aria-pressed={checked}
+                    onClick={() => void toggleMedication(medication)}
+                  >
+                    <span>{checked ? <Check size={17} aria-hidden="true" /> : null}</span>
+                    <span>
+                      <strong>{medication.name}</strong>
+                      <small>
+                        {medication.schedule === 'either'
+                          ? 'Morning or evening'
+                          : medication.schedule === 'morning'
+                            ? 'Morning'
+                            : 'Evening'}
+                      </small>
+                    </span>
+                  </button>
+                  {medicationEditorOpen ? (
+                    <span className="medication-actions">
+                      <button
+                        className="icon-button subtle"
+                        type="button"
+                        disabled={Boolean(pendingId)}
+                        aria-label={`Edit ${medication.name}`}
+                        onClick={() => {
+                          setEditingMedicationId(medication.id);
+                          setMedicationName(medication.name);
+                          setMedicationSchedule(medication.schedule);
+                        }}
+                      >
+                        <Pencil size={17} aria-hidden="true" />
+                      </button>
+                      <button
+                        className="icon-button subtle"
+                        type="button"
+                        disabled={Boolean(pendingId)}
+                        aria-label={`Archive ${medication.name}`}
+                        onClick={() => void removeMedication(medication)}
+                      >
+                        <Archive size={17} aria-hidden="true" />
+                      </button>
+                    </span>
+                  ) : null}
+                </div>
+              );
+            })}
+          </div>
+        ) : (
+          <p className="medication-empty">Add your routine, then check it off here each day.</p>
+        )}
+
+        {medicationEditorOpen ? (
+          <form
+            className="medication-form"
+            onSubmit={(event) => {
+              event.preventDefault();
+              void addMedication();
+            }}
+          >
+            <label className="field">
+              <span>Medication name</span>
+              <input
+                value={medicationName}
+                maxLength={80}
+                placeholder="e.g. Vitamin D"
+                onChange={(event) => setMedicationName(event.target.value)}
+              />
+            </label>
+            <label className="field">
+              <span>When</span>
+              <select
+                value={medicationSchedule}
+                onChange={(event) =>
+                  setMedicationSchedule(event.target.value as MedicationSchedule)
+                }
+              >
+                <option value="morning">Morning</option>
+                <option value="evening">Evening</option>
+                <option value="either">Either</option>
+              </select>
+            </label>
+            <button
+              className="button button-primary"
+              type="submit"
+              disabled={!medicationName.trim()}
+            >
+              <Plus size={17} aria-hidden="true" />
+              {editingMedicationId ? 'Save changes' : 'Add medication'}
+            </button>
+            {editingMedicationId ? (
+              <button
+                className="text-button medication-cancel"
+                type="button"
+                onClick={() => {
+                  setEditingMedicationId(null);
+                  setMedicationName('');
+                  setMedicationSchedule('morning');
+                }}
+              >
+                Cancel editing
+              </button>
+            ) : null}
+            <small className="medication-note">
+              Routine tracking only—not dosage or medical advice.
+            </small>
+          </form>
+        ) : null}
+      </section>
+
       <section className="recommendations" aria-labelledby="timing-title">
         <div className="section-heading">
           <div>
@@ -693,7 +955,7 @@ export function TodayPage({ onOpenFoods }: { onOpenFoods: () => void }) {
               <Dumbbell aria-hidden="true" />
             </span>
             <span>
-              <strong>Gym window</strong>
+              <strong>Next best exercise window</strong>
               <small>
                 {gym?.state === 'window'
                   ? `${gym.carbsG} g carbs in ${gym.sourceEntry}`
@@ -730,10 +992,11 @@ export function TodayPage({ onOpenFoods }: { onOpenFoods: () => void }) {
             <RotateCcw aria-hidden="true" />
           </span>
           <div>
-            <strong>{dashboard.completedFasts.length}</strong>
+            <strong>{latestFast ? formatDuration(latestFast.durationHours) : '—'}</strong>
             <small>
-              {dashboard.profile.fastingThresholdHours}+ hour eating gap
-              {dashboard.completedFasts.length === 1 ? '' : 's'} logged recently
+              {latestFast
+                ? `Latest fasting window · ${formatTime(latestFast.startAt)}–${formatTime(latestFast.endAt)}`
+                : 'Your last food and next first food set this automatically'}
             </small>
           </div>
         </div>
@@ -992,7 +1255,7 @@ export function TodayPage({ onOpenFoods }: { onOpenFoods: () => void }) {
                             max="100000"
                             step={step}
                             inputMode="decimal"
-                            value={entryDraft[key]}
+                            value={entryDraft[key] || ''}
                             onChange={(event) =>
                               setEntryDraft((current) =>
                                 current

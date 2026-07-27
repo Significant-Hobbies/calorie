@@ -5,9 +5,10 @@
 **Scene:** Someone stands in a bright kitchen after lunch, phone in one hand,
 and logs a familiar bowl before getting back to their day.
 
-Calorie uses a restrained product palette on a pure white background. The
-identity comes from moss-green actions, deep leaf ink, small cherry and amber
-food moments, and a compact seed-and-leaf mark. The generated references are:
+Calorie uses a restrained botanical product palette with composed light and
+dark surfaces. The identity comes from moss-green actions, deep leaf ink, small
+cherry and amber food moments, and a compact seed-and-leaf mark. The generated
+references are:
 
 - `docs/design/calorie-palette.png`
 - `docs/design/calorie-mobile-north-star.png`
@@ -40,6 +41,11 @@ All authored colors use OKLCH.
 Primary green marks primary actions, current selection, progress, and positive
 status. Cherry identifies calories or an attention moment. Amber identifies
 carbs, fibre, and energy timing. Neither accent is decorative filler.
+
+Dark mode is a separate semantic palette, not a color inversion. It keeps green,
+sky, plum, cherry, and amber meanings intact while replacing paper, surface,
+line, and ink tokens with low-glare values. System is the default; explicit
+Light or Dark choices are device-scoped.
 
 ## Typography
 
@@ -84,6 +90,11 @@ Numbers use tabular figures. Labels and buttons stay in the same family.
 - Recommendation row: leading icon, plain-language title, exact time or range,
   and a disclosure explaining the formula.
 - Food row: time, food name, amount, calories, and a compact macro summary.
+- Water panel: a sky-tinted daily total whose percentage may exceed 100%; the
+  track caps visually at its target without blocking further logging.
+- Medication panel: a plum-tinted peer to Water with a named routine,
+  Morning/Evening/Either label, daily checkbox, and explicit manage mode for
+  create, edit, and archive.
 - Bottom sheet: used for quick food logging on mobile; expands into an inline
   side panel on wider screens.
 - Toast: brief save/undo status; never used for validation errors.
@@ -106,3 +117,5 @@ consistently. Avoid “cheat”, “bad”, “earned”, “burn off”, and ot
 punitive language. Errors explain what happened and how to fix it. Sensitive
 calculation inputs include a one-sentence reason.
 
+Medication copy describes routine tracking only. It never records dosage,
+prescribing, interaction, or adherence advice.

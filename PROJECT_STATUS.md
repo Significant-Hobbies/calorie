@@ -10,8 +10,9 @@ account-free with local browser storage; optional Google sign-in can add private
 Cloudflare D1 sync.
 
 In scope: timestamped food entries, reusable foods measured per 100 g or per
-unit, calories/carbs/protein/fibre, water, weight, daily totals, eating-gap
-history, and transparent sleep/gym/goal estimates.
+unit, calories/carbs/protein/fibre, water, medication routines and daily
+check-offs, weight, daily totals, eating-gap history, and transparent
+sleep/exercise/goal estimates.
 
 Out of scope: medical diagnosis, clinical nutrition advice, weight-loss
 prescriptions, barcode scanning, social feeds, paid plans, wearable sync, and a
@@ -31,6 +32,11 @@ full sets/reps workout-programming system.
 
 ## Timeline
 
+- 2026-07-27 — released maintenance-relative calorie ranges, uncapped water
+  logging, private medication routines/check-offs, dark mode, and PWA install
+  hardening
+- 2026-07-27 — implemented and validated automatic food-derived fasting windows
+  plus stronger loss and protein target calibration
 - 2026-07-27 — added direct one-off food entries and released the editing flow
 - 2026-07-25 — finished v1 implemented, validated, and released to Cloudflare
 
@@ -49,10 +55,15 @@ full sets/reps workout-programming system.
 - Direct one-off entries that do not create reusable foods
 - One-tap and custom amount/time food logging with edit, delete, and undo
 - Calories, carbs, protein, fibre, water, and weight tracking
-- Transparent energy, macro, fasting-window, gym-time, and sleep-time estimates
+- Maintenance-relative energy ranges, loss protein ranges, and a 1,200 kcal
+  automatic floor
+- Water logging beyond the daily target and private medication routines with
+  Morning/Evening/Either daily check-offs
+- Automatic fasting, next-exercise, and sleep-time estimates
 - Seven- and thirty-day progress views with non-colour chart cues
 - Navigable month calendar with daily nutrition, water, fasting, and weight details
 - Installable PWA shell, recent cloud-state cache, and queued offline writes
+- System, Light, and composed botanical Dark appearance modes
 - Responsive mobile, tablet, and desktop UI with accessible touch targets
 
 ## Todo / Planned / Deferred / Blocked

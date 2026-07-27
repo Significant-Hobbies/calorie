@@ -18,7 +18,8 @@ account; a Google-authenticated D1 journal is an optional cloud-backed mode.
 ## Product Purpose
 
 Calorie makes lightweight nutrition tracking useful beyond a calorie total. It
-records food, four core nutrients, weight, and personal goals, then turns those
+records food, four core nutrients, water, medication routines, weight, and
+personal goals, then turns those
 inputs into transparent daily targets and practical timing estimates for
 training, fasting, and sleep. Success means logging a familiar meal takes
 seconds and every recommendation can be traced to a visible formula or rule.
@@ -45,7 +46,7 @@ glassmorphism. The interface must not imply medical certainty.
 1. Logging comes first: the primary action stays reachable and familiar.
 2. Show the working: recommendations include the input and rule that produced
    them.
-3. Progress, not punishment: goals use ranges and trends instead of moral
+3. Progress, not punishment: goals use maintenance-relative ranges and trends instead of moral
    judgments about food.
 4. Ask only what the math needs, explain sensitive inputs, and let users edit
    or omit them.

@@ -1,0 +1,59 @@
+{
+  "$schema": "fleet.design-review.v1",
+  "version": 1,
+  "project": "calorie",
+  "target": "app shell dark mode and installability",
+  "mode": "preserve",
+  "register": "product",
+  "context": {
+    "product": "PRODUCT.md",
+    "design": "DESIGN.md"
+  },
+  "direction": {
+    "references": [],
+    "probes": [],
+    "selected": "existing-design",
+    "approval": "not-required",
+    "before": "docs/design/reviews/2026-07-27-daily-care-theme/before-390.png"
+  },
+  "evidence": {
+    "screenshots": [
+      {
+        "width": 390,
+        "path": "docs/design/reviews/2026-07-27-daily-care-theme/after-390-dark.png"
+      },
+      {
+        "width": 768,
+        "path": "docs/design/reviews/2026-07-27-daily-care-theme/after-768.png"
+      },
+      {
+        "width": 1440,
+        "path": "docs/design/reviews/2026-07-27-daily-care-theme/after-1440.png"
+      }
+    ],
+    "projectCheck": {
+      "command": "pnpm check",
+      "status": "pass"
+    },
+    "critique": {
+      "score": 38,
+      "maximum": 40
+    },
+    "audit": {
+      "score": 20,
+      "maximum": 20
+    },
+    "unresolved": {
+      "p0": 0,
+      "p1": 0
+    },
+    "detector": {
+      "posture": "advisory",
+      "findings": []
+    }
+  },
+  "ownerFeedback": {
+    "decision": "delegated",
+    "note": "The owner requested direct implementation without a separate visual approval round."
+  }
+}

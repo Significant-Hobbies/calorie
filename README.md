@@ -1,8 +1,8 @@
 # Calorie
 
-Calorie is a cute, mobile-first food, water, and weight journal. It tracks
-calories, carbs, protein, and fibre, then gives deterministic sleep, gym-timing,
-fasting-window, and goal guidance without using AI.
+Calorie is a cute, mobile-first food, water, medication-routine, and weight
+journal. It tracks calories, carbs, protein, and fibre, then gives deterministic
+sleep, exercise-timing, fasting-window, and goal guidance without using AI.
 
 The app is local-first: **Start on this device** works without an account and
 keeps the journal in versioned browser storage. Google sign-in is optional and
@@ -44,8 +44,10 @@ deployment, create the D1 database, place its real database ID in
 - `GOOGLE_CLIENT_SECRET`
 - `BETTER_AUTH_SECRET`
 
-Apply `migrations/0001_initial.sql` to the target database only as an explicit
-deployment step. The repository intentionally contains no credentials.
+Apply the numbered D1 migrations to the target database only as an explicit
+deployment step. `0002_personalized_daily_care.sql` adds private medication
+routines/check-offs and manual calorie-range columns. The repository
+intentionally contains no credentials.
 
 Production uses a dedicated Google web client with
 `https://calorie.significanthobbies.com` as its JavaScript origin and
@@ -56,15 +58,18 @@ callback. Only the standard OpenID Connect identity scopes are requested.
 
 The formulas live in `src/lib/recommendations.ts` and are covered by unit tests.
 They use the Mifflin–St Jeor resting-energy equation, an activity multiplier,
-visible goal adjustments (`−250`, `−500`, `0`, or `+250` kcal), fibre scaled to
-energy intake, logged eating gaps, and simple meal-timing heuristics. Onboarding,
-Today, and Settings show how the selected answers change the result. Every
-result is labelled as an estimate in the UI; Calorie is not medical advice.
+maintenance-relative goal ranges (75–85% for loss, 95–105% for maintenance,
+and 105–110% for gradual gain), a 1,200 kcal automatic floor, protein ranges,
+fibre scaled to energy intake, logged eating gaps, and simple meal-timing
+heuristics. Onboarding, Today, and Settings show how the selected answers
+change the result. Every result is labelled as an estimate in the UI; Calorie
+is not medical advice.
 
-## Finished v1 scope
+## Current source scope
 
 Calorie v1 includes onboarding, reusable foods, one-tap and custom food logging,
-water, weight, 7/30-day history, offline support, and an installable PWA. This
-is the finished product scope, not a preview or incomplete release. Workout
+water beyond the target, private daily medication check-offs, weight, 7/30-day
+history, light/dark themes, offline support, and an installable PWA. Production
+includes the numbered D1 migrations for medication and profile-range data. Workout
 programming, sets/reps, progressive overload, and wearable sync are separate
 product ideas rather than unfinished Calorie features.

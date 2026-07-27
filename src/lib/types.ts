@@ -3,6 +3,8 @@ export type EquationProfile = 'female' | 'male' | 'none';
 export type ActivityLevel = 'sedentary' | 'light' | 'moderate' | 'very';
 export type Goal = 'lose_gentle' | 'lose_steady' | 'maintain' | 'gain_gentle';
 export type ServingMode = 'per_100g' | 'per_unit';
+export type MedicationSchedule = 'morning' | 'evening' | 'either';
+export type ThemePreference = 'system' | 'light' | 'dark';
 
 export type Nutrients = {
   calories: number;
@@ -23,6 +25,7 @@ export type UserProfile = {
   goal: Goal;
   targetWeightKg: number | null;
   manualCalorieTarget: number | null;
+  manualCalorieRange: [number, number] | null;
   wakeTime: string;
   sleepHours: number;
   fastingThresholdHours: 12 | 14 | 16;
@@ -59,6 +62,21 @@ export type WaterEntry = {
   drankAt: number;
 };
 
+export type Medication = {
+  id: string;
+  name: string;
+  schedule: MedicationSchedule;
+  createdAt: number;
+  archivedAt: number | null;
+};
+
+export type MedicationCheckIn = {
+  id: string;
+  medicationId: string;
+  takenOn: string;
+  takenAt: number;
+};
+
 export type WeightEntry = {
   id: string;
   weightKg: number;
@@ -69,7 +87,7 @@ export type NutritionTarget = {
   calorieTarget: number | null;
   calorieRange: [number, number] | null;
   maintenanceCalories: number | null;
-  goalAdjustmentCalories: number | null;
+  goalAdjustmentRangeCalories: [number, number] | null;
   restingEnergy: number | null;
   proteinRangeG: [number, number] | null;
   fibreTargetG: number | null;
@@ -103,6 +121,8 @@ export type Dashboard = {
   foods: Food[];
   entries: FoodEntry[];
   waterEntries: WaterEntry[];
+  medications: Medication[];
+  medicationCheckIns: MedicationCheckIn[];
   latestWeight: WeightEntry | null;
   totals: Nutrients & { waterMl: number };
   target: NutritionTarget;

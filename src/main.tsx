@@ -1,8 +1,11 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import App from './App';
+import { applyTheme, watchSystemTheme } from './lib/theme';
 import './styles.css';
-import './styles.css';
+
+applyTheme();
+watchSystemTheme();
 
 if ('serviceWorker' in navigator && import.meta.env.PROD) {
   window.addEventListener('load', () => {

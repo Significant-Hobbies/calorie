@@ -1,10 +1,12 @@
 import {
   BookOpen,
   ChevronRight,
+  Download,
   ExternalLink,
   Info,
   LogOut,
   Moon,
+  Palette,
   Save,
   Target,
   UserRound,
@@ -13,12 +15,26 @@ import { useEffect, useMemo, useState } from 'react';
 import { getDashboard, isLocalMode, saveProfile } from '../lib/api';
 import { signOut } from '../lib/auth-client';
 import {
+  canPromptInstall,
+  isInstalledApp,
+  promptInstall,
+  subscribeToInstallPrompt,
+} from '../lib/install';
+import {
   calculateNutritionTarget,
   calculateTargetWeightProgress,
+  formatCalorieAdjustmentRange,
   GOAL_DETAILS,
   METHODOLOGY_LINKS,
 } from '../lib/recommendations';
-import type { ActivityLevel, EquationProfile, Goal, UserProfile } from '../lib/types';
+import { getThemePreference, setThemePreference } from '../lib/theme';
+import type {
+  ActivityLevel,
+  EquationProfile,
+  Goal,
+  ThemePreference,
+  UserProfile,
+} from '../lib/types';
 
 const displayWeight = (kg: number | null, imperial: boolean) =>
   kg === null ? '' : imperial ? Math.round(kg * 2.20462 * 10) / 10 : kg;
@@ -40,12 +56,22 @@ export function SettingsPage({
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [latestWeightKg, setLatestWeightKg] = useState<number | null>(null);
+  const [theme, setTheme] = useState<ThemePreference>(() => getThemePreference());
+  const [installAvailable, setInstallAvailable] = useState(() => canPromptInstall());
 
   useEffect(() => {
     void getDashboard()
       .then((dashboard) => setLatestWeightKg(dashboard.latestWeight?.weightKg ?? null))
       .catch(() => undefined);
   }, []);
+
+  useEffect(
+    () =>
+      subscribeToInstallPrompt(() => {
+        setInstallAvailable(canPromptInstall());
+      }),
+    []
+  );
 
   const target = useMemo(
     () =>
@@ -57,6 +83,7 @@ export function SettingsPage({
         activityLevel: draft.activityLevel,
         goal: draft.goal,
         manualCalorieTarget: draft.manualCalorieTarget,
+        manualCalorieRange: draft.manualCalorieRange,
       }),
     [draft, latestWeightKg]
   );
@@ -69,7 +96,10 @@ export function SettingsPage({
     setSaving(true);
     setMessage(null);
     try {
-      const saved = await saveProfile(draft);
+      const manualCalorieRange: [number, number] | null = draft.manualCalorieRange
+        ? [Math.min(...draft.manualCalorieRange), Math.max(...draft.manualCalorieRange)]
+        : null;
+      const saved = await saveProfile({ ...draft, manualCalorieRange });
       onProfileChange(saved);
       setDraft(saved);
       setMessage('Changes saved.');
@@ -266,45 +296,74 @@ export function SettingsPage({
                 </small>
               </label>
             ) : null}
-            <label className="field">
+            <fieldset className="field">
               <span>
-                Manual calorie target <small>Optional override</small>
+                Manual calorie range <small>Optional override</small>
               </span>
-              <div className="input-with-unit">
+              <div className="field-row">
                 <input
                   type="number"
-                  min="800"
+                  min="1200"
                   max="6000"
-                  placeholder="Use estimate"
-                  value={draft.manualCalorieTarget ?? ''}
+                  placeholder="Lower"
+                  aria-label="Manual calorie range lower bound"
+                  value={draft.manualCalorieRange?.[0] ?? ''}
                   onChange={(event) =>
                     setDraft((current) => ({
                       ...current,
-                      manualCalorieTarget: Number(event.target.value) || null,
+                      manualCalorieTarget: null,
+                      manualCalorieRange: event.target.value
+                        ? [
+                            Number(event.target.value),
+                            current.manualCalorieRange?.[1] ?? Number(event.target.value),
+                          ]
+                        : null,
                     }))
                   }
                 />
-                <b>kcal</b>
+                <input
+                  type="number"
+                  min="1200"
+                  max="6000"
+                  placeholder="Upper"
+                  aria-label="Manual calorie range upper bound"
+                  value={draft.manualCalorieRange?.[1] ?? ''}
+                  onChange={(event) =>
+                    setDraft((current) => ({
+                      ...current,
+                      manualCalorieTarget: null,
+                      manualCalorieRange: event.target.value
+                        ? [
+                            current.manualCalorieRange?.[0] ?? Number(event.target.value),
+                            Number(event.target.value),
+                          ]
+                        : null,
+                    }))
+                  }
+                />
               </div>
-            </label>
+              <small>Leave both blank to use the automatic range.</small>
+            </fieldset>
             <div className="target-math">
               <span>How your range is built</span>
               {target.maintenanceCalories ? (
                 <strong>
                   {target.maintenanceCalories.toLocaleString()} maintenance{' '}
-                  {target.goalAdjustmentCalories
-                    ? `${target.goalAdjustmentCalories > 0 ? '+' : '−'}${Math.abs(target.goalAdjustmentCalories)}`
-                    : '± 0'}{' '}
-                  = {target.calorieTarget?.toLocaleString()} kcal
+                  {formatCalorieAdjustmentRange(target.goalAdjustmentRangeCalories)} ={' '}
+                  {target.calorieRange?.[0].toLocaleString()}–
+                  {target.calorieRange?.[1].toLocaleString()} kcal
                 </strong>
               ) : (
                 <strong>
-                  {draft.manualCalorieTarget
-                    ? `${draft.manualCalorieTarget.toLocaleString()} kcal manual target`
-                    : 'Complete body inputs or add a manual target'}
+                  {target.calorieRange
+                    ? `${target.calorieRange[0].toLocaleString()}–${target.calorieRange[1].toLocaleString()} kcal manual range`
+                    : 'Complete body inputs or add a manual range'}
                 </strong>
               )}
-              <small>The daily range is 100 kcal either side of that center.</small>
+              <small>
+                Automatic ranges use your goal’s share of maintenance and do not go below 1,200
+                kcal.
+              </small>
             </div>
           </div>
         ) : null}
@@ -314,10 +373,9 @@ export function SettingsPage({
             <Moon aria-hidden="true" />
           </span>
           <span>
-            <strong>Sleep, fasting & water</strong>
+            <strong>Sleep & water</strong>
             <small>
-              Wake {draft.wakeTime} · {draft.fastingThresholdHours}h fast ·{' '}
-              {(draft.waterTargetMl / 1000).toFixed(1)}L
+              Wake {draft.wakeTime} · {(draft.waterTargetMl / 1000).toFixed(1)}L
             </small>
           </span>
           <ChevronRight className={openSection === 'rhythm' ? 'is-open' : ''} aria-hidden="true" />
@@ -355,22 +413,6 @@ export function SettingsPage({
               </label>
             </div>
             <label className="field">
-              <span>Fast threshold</span>
-              <select
-                value={draft.fastingThresholdHours}
-                onChange={(event) =>
-                  setDraft((current) => ({
-                    ...current,
-                    fastingThresholdHours: Number(event.target.value) as 12 | 14 | 16,
-                  }))
-                }
-              >
-                <option value="12">12 hours</option>
-                <option value="14">14 hours</option>
-                <option value="16">16 hours</option>
-              </select>
-            </label>
-            <label className="field">
               <span>Water target</span>
               <div className="input-with-unit">
                 <input
@@ -393,6 +435,59 @@ export function SettingsPage({
         ) : null}
       </section>
 
+      <section className="settings-group" aria-label="App preferences">
+        <div className="settings-row settings-choice-row">
+          <span className="settings-icon plum">
+            <Palette aria-hidden="true" />
+          </span>
+          <div>
+            <strong>Appearance</strong>
+            <small>Use your device setting or choose a theme</small>
+          </div>
+          <select
+            aria-label="Appearance"
+            value={theme}
+            onChange={(event) => {
+              const preference = event.target.value as ThemePreference;
+              setTheme(preference);
+              setThemePreference(preference);
+            }}
+          >
+            <option value="system">System</option>
+            <option value="light">Light</option>
+            <option value="dark">Dark</option>
+          </select>
+        </div>
+        <button
+          className="settings-row"
+          type="button"
+          disabled={isInstalledApp()}
+          onClick={() => {
+            if (!installAvailable) {
+              setMessage('Use your browser menu and choose “Install app” or “Add to Home Screen”.');
+              return;
+            }
+            void promptInstall().then((installed) => {
+              setInstallAvailable(canPromptInstall());
+              setMessage(installed ? 'Calorie installed.' : 'Install cancelled.');
+            });
+          }}
+        >
+          <span className="settings-icon">
+            <Download aria-hidden="true" />
+          </span>
+          <span>
+            <strong>{isInstalledApp() ? 'App installed' : 'Install Calorie'}</strong>
+            <small>
+              {installAvailable
+                ? 'Add a fast, full-screen shortcut to this device'
+                : 'Available from supported browser menus'}
+            </small>
+          </span>
+          <ChevronRight aria-hidden="true" />
+        </button>
+      </section>
+
       {openSection ? (
         <button
           className="button button-primary full-button"
@@ -413,9 +508,10 @@ export function SettingsPage({
           <p>Transparent by design</p>
           <h2 id="method-title">How the suggestions work</h2>
           <p>
-            Energy uses Mifflin–St Jeor plus a standard activity multiplier. Protein uses 1.2–1.6
-            g/kg, fibre uses 14 g per 1,000 kcal, and timing suggestions use broad food-to-activity
-            or food-to-bed windows.
+            Energy uses Mifflin–St Jeor plus a standard activity multiplier and an automatic 1,200
+            kcal floor. Protein uses 1.6–2.0 g/kg during loss or 1.4–1.8 g/kg otherwise, fibre uses
+            14 g per 1,000 kcal, and timing suggestions use broad food-to-activity or food-to-bed
+            windows.
           </p>
           <div className="method-links">
             {Object.entries(METHODOLOGY_LINKS).map(([label, href]) => (

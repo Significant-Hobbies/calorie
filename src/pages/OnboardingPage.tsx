@@ -12,6 +12,7 @@ import {
 import {
   calculateNutritionTarget,
   calculateTargetWeightProgress,
+  formatCalorieAdjustmentRange,
   GOAL_DETAILS,
 } from '../lib/recommendations';
 import type { ActivityLevel, EquationProfile, Goal, Units, UserProfile } from '../lib/types';
@@ -76,6 +77,7 @@ export function OnboardingPage({
         activityLevel: draft.activityLevel,
         goal: draft.goal,
         manualCalorieTarget: draft.manualCalorieTarget,
+        manualCalorieRange: draft.manualCalorieRange,
       }),
     [draft]
   );
@@ -385,13 +387,11 @@ export function OnboardingPage({
               {target.maintenanceCalories ? (
                 <p>
                   {target.maintenanceCalories.toLocaleString()} maintenance{' '}
-                  {target.goalAdjustmentCalories
-                    ? `${target.goalAdjustmentCalories > 0 ? '+' : '−'}${Math.abs(target.goalAdjustmentCalories)} for ${GOAL_DETAILS[draft.goal].shortLabel.toLowerCase()}`
-                    : 'with no goal adjustment'}
-                  .
+                  {formatCalorieAdjustmentRange(target.goalAdjustmentRangeCalories)} for{' '}
+                  {GOAL_DETAILS[draft.goal].shortLabel.toLowerCase()}.
                 </p>
               ) : (
-                <p>You can add a manual calorie target later in Settings.</p>
+                <p>You can add a manual calorie range later in Settings.</p>
               )}
               {targetProgress ? <p>{targetProgress.explanation}</p> : null}
             </div>

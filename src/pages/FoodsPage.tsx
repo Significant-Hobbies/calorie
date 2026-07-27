@@ -314,7 +314,7 @@ export function FoodsPage() {
                         min="0"
                         step={key === 'calories' ? '1' : '0.1'}
                         inputMode="decimal"
-                        value={draft[key]}
+                        value={draft[key] || ''}
                         onChange={(event) =>
                           setDraft((current) =>
                             current

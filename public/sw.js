@@ -1,5 +1,5 @@
-const SHELL_CACHE = 'calorie-shell-v1';
-const RUNTIME_CACHE = 'calorie-runtime-v1';
+const SHELL_CACHE = 'calorie-shell-v2';
+const RUNTIME_CACHE = 'calorie-runtime-v2';
 const SHELL = [
   '/',
   '/manifest.webmanifest',

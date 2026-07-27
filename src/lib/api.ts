@@ -1,29 +1,37 @@
 import { calendarHistoryBounds } from './calendar';
 import {
   demoAddEntry,
+  demoAddMedicationCheckIn,
   demoAddWater,
   demoAddWeight,
+  demoArchiveMedication,
   demoCalendarHistory,
   demoDashboard,
   demoDeleteEntry,
   demoDeleteFood,
+  demoDeleteMedicationCheckIn,
   demoDeleteWater,
   demoHistory,
   demoSaveFood,
+  demoSaveMedication,
   demoSaveProfile,
 } from './demo';
 import {
   localAddEntry,
+  localAddMedicationCheckIn,
   localAddWater,
   localAddWeight,
+  localArchiveMedication,
   localCalendarHistory,
   localDashboard,
   localDeleteEntry,
   localDeleteFood,
+  localDeleteMedicationCheckIn,
   localDeleteWater,
   localHistory,
   localProfile,
   localSaveFood,
+  localSaveMedication,
   localSaveProfile,
 } from './local-store';
 import {
@@ -40,6 +48,8 @@ import type {
   FoodEntry,
   FoodEntryWrite,
   HistoryResponse,
+  Medication,
+  MedicationCheckIn,
   UserProfile,
   WaterEntry,
   WeightEntry,
@@ -47,6 +57,25 @@ import type {
 
 const isDemo = () => Boolean(sessionStorage.getItem('calorie-demo'));
 export const isLocalMode = () => localStorage.getItem('calorie-local-mode') === 'true';
+
+function normalizeProfile(profile: UserProfile): UserProfile {
+  const legacyTarget = profile.manualCalorieTarget;
+  return {
+    ...profile,
+    manualCalorieRange:
+      profile.manualCalorieRange ??
+      (legacyTarget ? [Math.max(800, legacyTarget - 100), legacyTarget + 100] : null),
+  };
+}
+
+function normalizeDashboard(dashboard: Dashboard): Dashboard {
+  return {
+    ...dashboard,
+    profile: normalizeProfile(dashboard.profile),
+    medications: dashboard.medications ?? [],
+    medicationCheckIns: dashboard.medicationCheckIns ?? [],
+  };
+}
 
 async function readJson<T>(path: string): Promise<T> {
   const response = await fetch(path, { credentials: 'include', cache: 'no-store' });
@@ -102,16 +131,16 @@ async function writeOffline<T>(input: {
 }
 
 export async function getProfile(): Promise<UserProfile> {
-  if (isDemo()) return demoDashboard().profile;
-  if (isLocalMode()) return localProfile();
+  if (isDemo()) return normalizeProfile(demoDashboard().profile);
+  if (isLocalMode()) return normalizeProfile(localProfile());
   try {
-    const profile = await readJson<UserProfile>('/api/app/profile');
+    const profile = normalizeProfile(await readJson<UserProfile>('/api/app/profile'));
     await cachePrivateValue('profile', profile);
     return profile;
   } catch (error) {
     if (navigator.onLine) throw error;
     const cached = await readPrivateValue<UserProfile>('profile');
-    if (cached) return cached;
+    if (cached) return normalizeProfile(cached);
     throw error;
   }
 }
@@ -140,8 +169,8 @@ export function localDayRange(date = new Date()) {
 }
 
 export async function getDashboard(): Promise<Dashboard> {
-  if (isDemo()) return demoDashboard();
-  if (isLocalMode()) return localDashboard();
+  if (isDemo()) return normalizeDashboard(demoDashboard());
+  if (isLocalMode()) return normalizeDashboard(localDashboard());
   const range = localDayRange();
   const params = new URLSearchParams({
     start: String(range.start),
@@ -150,14 +179,14 @@ export async function getDashboard(): Promise<Dashboard> {
     timezone: range.timezone,
   });
   try {
-    const dashboard = await readJson<Dashboard>(`/api/app/dashboard?${params}`);
+    const dashboard = normalizeDashboard(await readJson<Dashboard>(`/api/app/dashboard?${params}`));
     await cacheDashboard(dashboard);
     return dashboard;
   } catch (error) {
     const profile = await getProfile().catch(() => null);
     if (profile) {
       const cached = await readCachedDashboard(profile.userId);
-      if (cached) return cached;
+      if (cached) return normalizeDashboard(cached);
     }
     throw error;
   }
@@ -243,6 +272,66 @@ export async function deleteWater(id: string) {
   return writeOffline<void>({
     id: `delete-water:${id}`,
     path: `/api/app/water/${id}`,
+    method: 'DELETE',
+    optimistic: undefined,
+  });
+}
+
+export async function saveMedication(input: Medication) {
+  if (isDemo()) return demoSaveMedication(input);
+  if (isLocalMode()) return localSaveMedication(input);
+  return writeOffline<Medication>({
+    id: `medication:${input.id}`,
+    path: '/api/app/medications',
+    method: 'POST',
+    body: input,
+    optimistic: input,
+  });
+}
+
+export async function updateMedication(input: Medication) {
+  if (isDemo()) return demoSaveMedication(input);
+  if (isLocalMode()) return localSaveMedication(input);
+  return writeOffline<Medication>({
+    id: `update-medication:${input.id}:${Date.now()}`,
+    path: `/api/app/medications/${input.id}`,
+    method: 'PATCH',
+    body: input,
+    optimistic: input,
+  });
+}
+
+export async function archiveMedication(input: Medication) {
+  const archived = { ...input, archivedAt: Date.now() };
+  if (isDemo()) return demoArchiveMedication(input.id, archived.archivedAt);
+  if (isLocalMode()) return localArchiveMedication(input.id, archived.archivedAt);
+  return writeOffline<Medication>({
+    id: `archive-medication:${input.id}:${archived.archivedAt}`,
+    path: `/api/app/medications/${input.id}`,
+    method: 'PATCH',
+    body: archived,
+    optimistic: archived,
+  });
+}
+
+export async function addMedicationCheckIn(input: MedicationCheckIn) {
+  if (isDemo()) return demoAddMedicationCheckIn(input);
+  if (isLocalMode()) return localAddMedicationCheckIn(input);
+  return writeOffline<MedicationCheckIn>({
+    id: `medication-check-in:${input.id}`,
+    path: '/api/app/medication-check-ins',
+    method: 'POST',
+    body: input,
+    optimistic: input,
+  });
+}
+
+export async function deleteMedicationCheckIn(id: string) {
+  if (isDemo()) return demoDeleteMedicationCheckIn(id);
+  if (isLocalMode()) return localDeleteMedicationCheckIn(id);
+  return writeOffline<void>({
+    id: `delete-medication-check-in:${id}`,
+    path: `/api/app/medication-check-ins/${id}`,
     method: 'DELETE',
     optimistic: undefined,
   });

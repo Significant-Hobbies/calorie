@@ -1,5 +1,6 @@
 import { calendarHistoryBounds, dateFromKey, localDateKey } from './calendar';
 import { normalizeDirectEntry } from './entries';
+import { activeMedications, upsertMedicationCheckIn } from './medications';
 import {
   calculateCompletedFasts,
   calculateNutritionTarget,
@@ -12,6 +13,8 @@ import type {
   FoodEntry,
   FoodEntryWrite,
   HistoryResponse,
+  Medication,
+  MedicationCheckIn,
   UserProfile,
   WaterEntry,
   WeightEntry,
@@ -36,6 +39,7 @@ let profile: UserProfile = {
   goal: 'lose_gentle',
   targetWeightKg: 68,
   manualCalorieTarget: null,
+  manualCalorieRange: null,
   wakeTime: '07:00',
   sleepHours: 8,
   fastingThresholdHours: 12,
@@ -130,6 +134,18 @@ let waterEntries: WaterEntry[] = [
   { id: 'water-2', amountMl: 500, drankAt: atToday(13, 10) },
 ];
 
+let medications: Medication[] = [
+  {
+    id: 'demo-medication',
+    name: 'Vitamin D',
+    schedule: 'morning',
+    createdAt: now,
+    archivedAt: null,
+  },
+];
+
+let medicationCheckIns: MedicationCheckIn[] = [];
+
 let weights: WeightEntry[] = Array.from({ length: 7 }, (_, index) => ({
   id: `weight-${index}`,
   weightKg: round(72.4 - index * 0.13, 1),
@@ -162,6 +178,10 @@ export function demoDashboard(): Dashboard {
     foods: [...foods],
     entries: [...entries].sort((a, b) => b.eatenAt - a.eatenAt),
     waterEntries: [...waterEntries].sort((a, b) => b.drankAt - a.drankAt),
+    medications: activeMedications(medications),
+    medicationCheckIns: medicationCheckIns.filter(
+      (checkIn) => checkIn.takenOn === new Intl.DateTimeFormat('en-CA').format(new Date())
+    ),
     latestWeight,
     totals: totals(),
     target: calculateNutritionTarget({
@@ -172,10 +192,11 @@ export function demoDashboard(): Dashboard {
       activityLevel: profile.activityLevel,
       goal: profile.goal,
       manualCalorieTarget: profile.manualCalorieTarget,
+      manualCalorieRange: profile.manualCalorieRange,
     }),
     completedFasts: calculateCompletedFasts(
       [{ eatenAt: now - 20 * 60 * 60 * 1000 }, { eatenAt: atToday(7, 30) }, ...entries.slice(1)],
-      profile.fastingThresholdHours
+      Intl.DateTimeFormat().resolvedOptions().timeZone
     ),
     date: new Intl.DateTimeFormat('en-CA').format(new Date()),
     timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
@@ -241,6 +262,27 @@ export function demoAddWater(input: WaterEntry) {
 
 export function demoDeleteWater(id: string) {
   waterEntries = waterEntries.filter((entry) => entry.id !== id);
+}
+
+export function demoSaveMedication(input: Medication) {
+  medications = [input, ...medications.filter((medication) => medication.id !== input.id)];
+  return input;
+}
+
+export function demoArchiveMedication(id: string, archivedAt: number) {
+  const medication = medications.find((item) => item.id === id);
+  if (!medication) throw new Error('Medication not found.');
+  medication.archivedAt = archivedAt;
+  return medication;
+}
+
+export function demoAddMedicationCheckIn(input: MedicationCheckIn) {
+  medicationCheckIns = upsertMedicationCheckIn(medicationCheckIns, input);
+  return input;
+}
+
+export function demoDeleteMedicationCheckIn(id: string) {
+  medicationCheckIns = medicationCheckIns.filter((checkIn) => checkIn.id !== id);
 }
 
 export function demoAddWeight(input: WeightEntry) {

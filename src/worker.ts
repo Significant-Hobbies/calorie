@@ -15,6 +15,9 @@ import type {
   Goal,
   HistoryDay,
   HistoryResponse,
+  Medication,
+  MedicationCheckIn,
+  MedicationSchedule,
   ServingMode,
   UserProfile,
   WaterEntry,
@@ -152,6 +155,8 @@ type ProfileRow = {
   goal: Goal;
   target_weight_kg: number | null;
   manual_calorie_target: number | null;
+  manual_calorie_min: number | null;
+  manual_calorie_max: number | null;
   wake_time: string;
   sleep_hours: number;
   fasting_threshold_hours: 12 | 14 | 16;
@@ -172,6 +177,12 @@ function mapProfile(row: ProfileRow): UserProfile {
     goal: row.goal,
     targetWeightKg: row.target_weight_kg,
     manualCalorieTarget: row.manual_calorie_target,
+    manualCalorieRange:
+      row.manual_calorie_min !== null && row.manual_calorie_max !== null
+        ? [row.manual_calorie_min, row.manual_calorie_max]
+        : row.manual_calorie_target
+          ? [Math.max(800, row.manual_calorie_target - 100), row.manual_calorie_target + 100]
+          : null,
     wakeTime: row.wake_time,
     sleepHours: row.sleep_hours,
     fastingThresholdHours: row.fasting_threshold_hours,
@@ -193,6 +204,7 @@ function defaultProfile(userId: string, name: string): UserProfile {
     goal: 'maintain',
     targetWeightKg: null,
     manualCalorieTarget: null,
+    manualCalorieRange: null,
     wakeTime: '07:00',
     sleepHours: 8,
     fastingThresholdHours: 12,
@@ -273,6 +285,19 @@ function mapFoodEntry(row: FoodEntryRow): FoodEntry {
 
 type WaterRow = { id: string; amount_ml: number; drank_at: number };
 type WeightRow = { id: string; weight_kg: number; recorded_at: number };
+type MedicationRow = {
+  id: string;
+  name: string;
+  schedule: MedicationSchedule;
+  created_at: number;
+  archived_at: number | null;
+};
+type MedicationCheckInRow = {
+  id: string;
+  medication_id: string;
+  taken_on: string;
+  taken_at: number;
+};
 
 function mapWater(row: WaterRow): WaterEntry {
   return { id: row.id, amountMl: row.amount_ml, drankAt: row.drank_at };
@@ -280,6 +305,25 @@ function mapWater(row: WaterRow): WaterEntry {
 
 function mapWeight(row: WeightRow): WeightEntry {
   return { id: row.id, weightKg: row.weight_kg, recordedAt: row.recorded_at };
+}
+
+function mapMedication(row: MedicationRow): Medication {
+  return {
+    id: row.id,
+    name: row.name,
+    schedule: row.schedule,
+    createdAt: row.created_at,
+    archivedAt: row.archived_at,
+  };
+}
+
+function mapMedicationCheckIn(row: MedicationCheckInRow): MedicationCheckIn {
+  return {
+    id: row.id,
+    medicationId: row.medication_id,
+    takenOn: row.taken_on,
+    takenAt: row.taken_at,
+  };
 }
 
 app.get('/api/app/profile', async (c) => {
@@ -314,6 +358,12 @@ app.put('/api/app/profile', async (c) => {
     body.manualCalorieTarget === null || body.manualCalorieTarget === undefined
       ? null
       : finiteNumber(body.manualCalorieTarget, 800, 6000);
+  const manualRangeInput = Array.isArray(body.manualCalorieRange) ? body.manualCalorieRange : null;
+  const manualRangeMin = manualRangeInput ? finiteNumber(manualRangeInput[0], 800, 6000) : null;
+  const manualRangeMax = manualRangeInput ? finiteNumber(manualRangeInput[1], 800, 6000) : null;
+  const hasInvalidManualRange =
+    manualRangeInput !== null &&
+    (manualRangeMin === null || manualRangeMax === null || manualRangeMin > manualRangeMax);
   const sleepHours = finiteNumber(body.sleepHours, 5, 12);
   const waterTargetMl = finiteNumber(body.waterTargetMl, 250, 10000);
   const fastingThreshold = [12, 14, 16].includes(Number(body.fastingThresholdHours))
@@ -334,6 +384,7 @@ app.put('/api/app/profile', async (c) => {
     !goal ||
     sleepHours === null ||
     waterTargetMl === null ||
+    hasInvalidManualRange ||
     fastingThreshold === null ||
     !wakeTime
   ) {
@@ -344,15 +395,20 @@ app.put('/api/app/profile', async (c) => {
   const userId = c.get('userId');
   const genderIdentity = optionalText(body.genderIdentity, 40);
   const onboardingComplete = body.onboardingComplete === false ? 0 : 1;
+  const manualRange =
+    manualRangeMin !== null && manualRangeMax !== null
+      ? ([Math.round(manualRangeMin), Math.round(manualRangeMax)] as const)
+      : null;
 
   const statements = [
     c.env.DB.prepare(
       `INSERT INTO profiles (
         user_id, display_name, units, age_years, gender_identity, equation_profile,
         height_cm, activity_level, goal, target_weight_kg, manual_calorie_target,
+        manual_calorie_min, manual_calorie_max,
         wake_time, sleep_hours, fasting_threshold_hours, water_target_ml,
         onboarding_complete, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT(user_id) DO UPDATE SET
         display_name = excluded.display_name,
         units = excluded.units,
@@ -364,6 +420,8 @@ app.put('/api/app/profile', async (c) => {
         goal = excluded.goal,
         target_weight_kg = excluded.target_weight_kg,
         manual_calorie_target = excluded.manual_calorie_target,
+        manual_calorie_min = excluded.manual_calorie_min,
+        manual_calorie_max = excluded.manual_calorie_max,
         wake_time = excluded.wake_time,
         sleep_hours = excluded.sleep_hours,
         fasting_threshold_hours = excluded.fasting_threshold_hours,
@@ -381,7 +439,9 @@ app.put('/api/app/profile', async (c) => {
       activityLevel,
       goal,
       targetWeightKg,
-      manualTarget,
+      manualRange ? Math.round((manualRange[0] + manualRange[1]) / 2) : manualTarget,
+      manualRange?.[0] ?? null,
+      manualRange?.[1] ?? null,
       wakeTime,
       sleepHours,
       fastingThreshold,
@@ -712,6 +772,117 @@ app.delete('/api/app/water/:id', async (c) => {
     : c.json({ message: 'Water entry not found.' }, 404);
 });
 
+app.post('/api/app/medications', async (c) => {
+  const body = await c.req.json<Record<string, unknown>>().catch(() => null);
+  const id = body ? optionalText(body.id, 80) : null;
+  const name = body ? requiredText(body.name, 80) : null;
+  const schedule =
+    body && ['morning', 'evening', 'either'].includes(String(body.schedule))
+      ? (body.schedule as MedicationSchedule)
+      : null;
+  const createdAt = body ? validTimestamp(body.createdAt) : null;
+  if (!id || !name || !schedule || createdAt === null) {
+    return c.json(jsonError('Add a medication name and when you take it.'), 400);
+  }
+  const now = Date.now();
+  await c.env.DB.prepare(
+    `INSERT OR IGNORE INTO medications
+      (id, user_id, name, schedule, created_at, updated_at, archived_at)
+     VALUES (?, ?, ?, ?, ?, ?, NULL)`
+  )
+    .bind(id, c.get('userId'), name, schedule, createdAt, now)
+    .run();
+  const row = await c.env.DB.prepare(
+    `SELECT id, name, schedule, created_at, archived_at
+     FROM medications WHERE id = ? AND user_id = ?`
+  )
+    .bind(id, c.get('userId'))
+    .first<MedicationRow>();
+  if (!row) return c.json({ message: 'The medication could not be read back.' }, 500);
+  return c.json(mapMedication(row), 201);
+});
+
+app.patch('/api/app/medications/:id', async (c) => {
+  const body = await c.req.json<Record<string, unknown>>().catch(() => null);
+  const name = body ? requiredText(body.name, 80) : null;
+  const schedule =
+    body && ['morning', 'evening', 'either'].includes(String(body.schedule))
+      ? (body.schedule as MedicationSchedule)
+      : null;
+  const archivedAt =
+    body?.archivedAt === null
+      ? null
+      : body?.archivedAt === undefined
+        ? undefined
+        : validTimestamp(body.archivedAt);
+  const hasInvalidArchivedAt =
+    body?.archivedAt !== null && body?.archivedAt !== undefined && archivedAt === null;
+  if (!body || !name || !schedule || archivedAt === undefined || hasInvalidArchivedAt) {
+    return c.json(jsonError('Add a medication name and when you take it.'), 400);
+  }
+  const result = await c.env.DB.prepare(
+    `UPDATE medications SET name = ?, schedule = ?, archived_at = ?, updated_at = ?
+     WHERE id = ? AND user_id = ?`
+  )
+    .bind(name, schedule, archivedAt, Date.now(), c.req.param('id'), c.get('userId'))
+    .run();
+  if (!result.meta.changes) return c.json({ message: 'Medication not found.' }, 404);
+  const row = await c.env.DB.prepare(
+    `SELECT id, name, schedule, created_at, archived_at
+     FROM medications WHERE id = ? AND user_id = ?`
+  )
+    .bind(c.req.param('id'), c.get('userId'))
+    .first<MedicationRow>();
+  if (!row) return c.json({ message: 'The medication could not be read back.' }, 500);
+  return c.json(mapMedication(row));
+});
+
+app.post('/api/app/medication-check-ins', async (c) => {
+  const body = await c.req.json<Record<string, unknown>>().catch(() => null);
+  const id = body ? optionalText(body.id, 80) : null;
+  const medicationId = body ? optionalText(body.medicationId, 80) : null;
+  const takenOn =
+    body && typeof body.takenOn === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(body.takenOn)
+      ? body.takenOn
+      : null;
+  const takenAt = body ? validTimestamp(body.takenAt) : null;
+  if (!id || !medicationId || !takenOn || takenAt === null) {
+    return c.json(jsonError('Choose a medication and valid day.'), 400);
+  }
+  const medication = await c.env.DB.prepare(
+    'SELECT id FROM medications WHERE id = ? AND user_id = ? AND archived_at IS NULL'
+  )
+    .bind(medicationId, c.get('userId'))
+    .first<{ id: string }>();
+  if (!medication) return c.json({ message: 'Medication not found.' }, 404);
+  await c.env.DB.prepare(
+    `INSERT OR IGNORE INTO medication_check_ins
+      (id, user_id, medication_id, taken_on, taken_at, created_at)
+     VALUES (?, ?, ?, ?, ?, ?)`
+  )
+    .bind(id, c.get('userId'), medicationId, takenOn, takenAt, Date.now())
+    .run();
+  const row = await c.env.DB.prepare(
+    `SELECT id, medication_id, taken_on, taken_at FROM medication_check_ins
+     WHERE user_id = ? AND medication_id = ? AND taken_on = ?`
+  )
+    .bind(c.get('userId'), medicationId, takenOn)
+    .first<MedicationCheckInRow>();
+  if (!row) return c.json({ message: 'The medication check-off could not be read back.' }, 500);
+  return c.json(mapMedicationCheckIn(row), 201);
+});
+
+app.delete('/api/app/medication-check-ins/:id', async (c) => {
+  const result = await c.env.DB.prepare(
+    'DELETE FROM medication_check_ins WHERE id = ? AND user_id = ?'
+  )
+    .bind(c.req.param('id'), c.get('userId'))
+    .run();
+  return result.meta.changes
+    ? c.body(null, 204)
+    : c.json({ message: 'Medication check-off not found.' }, 404);
+});
+
 app.post('/api/app/weights', async (c) => {
   const body = await c.req.json<Record<string, unknown>>().catch(() => null);
   const id = body ? optionalText(body.id, 80) : null;
@@ -761,48 +932,72 @@ app.get('/api/app/dashboard', async (c) => {
     return c.json(jsonError('Choose a valid local-day range.'), 400);
   }
   const userId = c.get('userId');
-  const [profile, foodsResult, entriesResult, waterResult, latestWeightRow, fastingRows] =
-    await Promise.all([
-      readProfile(c.env.DB, userId, c.get('userName')),
-      c.env.DB.prepare(
-        `SELECT * FROM foods WHERE user_id = ?
+  const [
+    profile,
+    foodsResult,
+    entriesResult,
+    waterResult,
+    medicationResult,
+    medicationCheckInResult,
+    latestWeightRow,
+    fastingRows,
+  ] = await Promise.all([
+    readProfile(c.env.DB, userId, c.get('userName')),
+    c.env.DB.prepare(
+      `SELECT * FROM foods WHERE user_id = ?
          ORDER BY favourite DESC, last_used_at DESC, name ASC LIMIT 20`
-      )
-        .bind(userId)
-        .all<FoodRow>(),
-      c.env.DB.prepare(
-        `SELECT * FROM food_entries
+    )
+      .bind(userId)
+      .all<FoodRow>(),
+    c.env.DB.prepare(
+      `SELECT * FROM food_entries
          WHERE user_id = ? AND eaten_at >= ? AND eaten_at < ?
          ORDER BY eaten_at DESC`
-      )
-        .bind(userId, range.start, range.end)
-        .all<FoodEntryRow>(),
-      c.env.DB.prepare(
-        `SELECT id, amount_ml, drank_at FROM water_entries
+    )
+      .bind(userId, range.start, range.end)
+      .all<FoodEntryRow>(),
+    c.env.DB.prepare(
+      `SELECT id, amount_ml, drank_at FROM water_entries
          WHERE user_id = ? AND drank_at >= ? AND drank_at < ?
          ORDER BY drank_at DESC`
-      )
-        .bind(userId, range.start, range.end)
-        .all<WaterRow>(),
-      c.env.DB.prepare(
-        `SELECT id, weight_kg, recorded_at FROM weight_entries
+    )
+      .bind(userId, range.start, range.end)
+      .all<WaterRow>(),
+    c.env.DB.prepare(
+      `SELECT id, name, schedule, created_at, archived_at FROM medications
+         WHERE user_id = ? AND archived_at IS NULL
+         ORDER BY created_at ASC`
+    )
+      .bind(userId)
+      .all<MedicationRow>(),
+    c.env.DB.prepare(
+      `SELECT id, medication_id, taken_on, taken_at FROM medication_check_ins
+         WHERE user_id = ? AND taken_on = ? ORDER BY taken_at DESC`
+    )
+      .bind(userId, c.req.query('date') ?? '')
+      .all<MedicationCheckInRow>(),
+    c.env.DB.prepare(
+      `SELECT id, weight_kg, recorded_at FROM weight_entries
          WHERE user_id = ? ORDER BY recorded_at DESC LIMIT 1`
-      )
-        .bind(userId)
-        .first<WeightRow>(),
-      c.env.DB.prepare(
-        `SELECT id, food_id, food_name, amount, unit_label, calories, carbs_g,
+    )
+      .bind(userId)
+      .first<WeightRow>(),
+    c.env.DB.prepare(
+      `SELECT id, food_id, food_name, amount, unit_label, calories, carbs_g,
           protein_g, fibre_g, eaten_at
          FROM food_entries WHERE user_id = ? AND eaten_at >= ?
          ORDER BY eaten_at ASC`
-      )
-        .bind(userId, range.start - 31 * 24 * 60 * 60 * 1000)
-        .all<FoodEntryRow>(),
-    ]);
+    )
+      .bind(userId, range.start - 31 * 24 * 60 * 60 * 1000)
+      .all<FoodEntryRow>(),
+  ]);
 
   const foods: Food[] = foodsResult.results.map(mapFood);
   const entries: FoodEntry[] = entriesResult.results.map(mapFoodEntry);
   const waterEntries: WaterEntry[] = waterResult.results.map(mapWater);
+  const medications: Medication[] = medicationResult.results.map(mapMedication);
+  const medicationCheckIns: MedicationCheckIn[] =
+    medicationCheckInResult.results.map(mapMedicationCheckIn);
   const totals = entries.reduce(
     (sum, entry) => ({
       calories: sum.calories + entry.calories,
@@ -820,6 +1015,7 @@ app.get('/api/app/dashboard', async (c) => {
     }
   );
   const latestWeight = latestWeightRow ? mapWeight(latestWeightRow) : null;
+  const timezone = c.req.query('timezone') ?? 'UTC';
   const target = calculateNutritionTarget({
     weightKg: latestWeight?.weightKg ?? null,
     heightCm: profile.heightCm,
@@ -828,6 +1024,7 @@ app.get('/api/app/dashboard', async (c) => {
     activityLevel: profile.activityLevel,
     goal: profile.goal,
     manualCalorieTarget: profile.manualCalorieTarget,
+    manualCalorieRange: profile.manualCalorieRange,
   });
 
   const dashboard: Dashboard = {
@@ -835,6 +1032,8 @@ app.get('/api/app/dashboard', async (c) => {
     foods,
     entries,
     waterEntries,
+    medications,
+    medicationCheckIns,
     latestWeight,
     totals: {
       calories: round(totals.calories),
@@ -844,12 +1043,9 @@ app.get('/api/app/dashboard', async (c) => {
       waterMl: totals.waterMl,
     },
     target,
-    completedFasts: calculateCompletedFasts(
-      fastingRows.results.map(mapFoodEntry),
-      profile.fastingThresholdHours
-    ),
+    completedFasts: calculateCompletedFasts(fastingRows.results.map(mapFoodEntry), timezone),
     date: c.req.query('date') ?? '',
-    timezone: c.req.query('timezone') ?? 'UTC',
+    timezone,
   };
   return c.json(dashboard);
 });
@@ -898,7 +1094,6 @@ app.get('/api/app/history', async (c) => {
       .bind(userId, range.start)
       .first<FoodEntryRow>(),
   ]);
-  const profile = await readProfile(c.env.DB, userId, c.get('userName'));
   const entries = entriesResult.results.map(mapFoodEntry);
   const water = waterResult.results.map(mapWater);
   const dayMap = new Map<string, HistoryDay>();
@@ -934,7 +1129,7 @@ app.get('/api/app/history', async (c) => {
     ensureDay(dateKey(entry.drankAt, timezone)).waterMl += entry.amountMl;
   }
   const fastingEntries = priorEntry ? [mapFoodEntry(priorEntry), ...entries] : entries;
-  for (const fast of calculateCompletedFasts(fastingEntries, profile.fastingThresholdHours)) {
+  for (const fast of calculateCompletedFasts(fastingEntries, timezone)) {
     if (fast.endAt >= range.start && fast.endAt < range.end) {
       ensureDay(dateKey(fast.endAt, timezone)).fastCount += 1;
     }

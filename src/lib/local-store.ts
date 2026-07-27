@@ -1,5 +1,6 @@
 import { calendarHistoryBounds } from './calendar';
 import { normalizeDirectEntry } from './entries';
+import { activeMedications, upsertMedicationCheckIn } from './medications';
 import {
   calculateCompletedFasts,
   calculateNutritionTarget,
@@ -13,6 +14,8 @@ import type {
   FoodEntryWrite,
   HistoryDay,
   HistoryResponse,
+  Medication,
+  MedicationCheckIn,
   UserProfile,
   WaterEntry,
   WeightEntry,
@@ -21,17 +24,19 @@ import type {
 const LOCAL_STATE_KEY = 'calorie-local-state-v1';
 
 type LocalState = {
-  version: 1;
+  version: 2;
   profile: UserProfile;
   foods: Food[];
   entries: FoodEntry[];
   waterEntries: WaterEntry[];
+  medications: Medication[];
+  medicationCheckIns: MedicationCheckIn[];
   weights: WeightEntry[];
 };
 
 function initialState(): LocalState {
   return {
-    version: 1,
+    version: 2,
     profile: {
       userId: 'local-user',
       displayName: '',
@@ -44,6 +49,7 @@ function initialState(): LocalState {
       goal: 'maintain',
       targetWeightKg: null,
       manualCalorieTarget: null,
+      manualCalorieRange: null,
       wakeTime: '07:00',
       sleepHours: 8,
       fastingThresholdHours: 12,
@@ -53,14 +59,45 @@ function initialState(): LocalState {
     foods: [],
     entries: [],
     waterEntries: [],
+    medications: [],
+    medicationCheckIns: [],
     weights: [],
   };
 }
 
 function readState(): LocalState {
   try {
-    const parsed = JSON.parse(localStorage.getItem(LOCAL_STATE_KEY) ?? '') as LocalState;
-    if (parsed.version === 1) return parsed;
+    const parsed = JSON.parse(localStorage.getItem(LOCAL_STATE_KEY) ?? '') as Omit<
+      Partial<LocalState>,
+      'version' | 'profile'
+    > & {
+      version?: number;
+      profile?: Partial<UserProfile>;
+    };
+    if (parsed.version === 1 || parsed.version === 2) {
+      const fallback = initialState();
+      const legacyManualTarget = parsed.profile?.manualCalorieTarget ?? null;
+      return {
+        ...fallback,
+        ...parsed,
+        version: 2,
+        profile: {
+          ...fallback.profile,
+          ...parsed.profile,
+          manualCalorieRange:
+            parsed.profile?.manualCalorieRange ??
+            (legacyManualTarget
+              ? [Math.max(800, legacyManualTarget - 100), legacyManualTarget + 100]
+              : null),
+        },
+        foods: parsed.foods ?? [],
+        entries: parsed.entries ?? [],
+        waterEntries: parsed.waterEntries ?? [],
+        medications: parsed.medications ?? [],
+        medicationCheckIns: parsed.medicationCheckIns ?? [],
+        weights: parsed.weights ?? [],
+      };
+    }
   } catch {
     // A missing or unreadable local journal starts clean.
   }
@@ -172,6 +209,38 @@ export function localDeleteWater(id: string) {
   writeState(state);
 }
 
+export function localSaveMedication(input: Medication) {
+  const state = readState();
+  state.medications = [
+    input,
+    ...state.medications.filter((medication) => medication.id !== input.id),
+  ];
+  writeState(state);
+  return input;
+}
+
+export function localArchiveMedication(id: string, archivedAt: number) {
+  const state = readState();
+  const medication = state.medications.find((item) => item.id === id);
+  if (!medication) throw new Error('Medication not found.');
+  medication.archivedAt = archivedAt;
+  writeState(state);
+  return medication;
+}
+
+export function localAddMedicationCheckIn(input: MedicationCheckIn) {
+  const state = readState();
+  state.medicationCheckIns = upsertMedicationCheckIn(state.medicationCheckIns, input);
+  writeState(state);
+  return input;
+}
+
+export function localDeleteMedicationCheckIn(id: string) {
+  const state = readState();
+  state.medicationCheckIns = state.medicationCheckIns.filter((checkIn) => checkIn.id !== id);
+  writeState(state);
+}
+
 export function localAddWeight(input: WeightEntry) {
   const state = readState();
   state.weights = [...state.weights.filter((entry) => entry.id !== input.id), input].sort(
@@ -210,6 +279,10 @@ export function localDashboard(): Dashboard {
     ),
     entries,
     waterEntries,
+    medications: activeMedications(state.medications),
+    medicationCheckIns: state.medicationCheckIns
+      .filter((checkIn) => checkIn.takenOn === dateKey(Date.now()))
+      .sort((a, b) => b.takenAt - a.takenAt),
     latestWeight,
     totals: {
       calories: round(nutrients.calories),
@@ -226,10 +299,11 @@ export function localDashboard(): Dashboard {
       activityLevel: state.profile.activityLevel,
       goal: state.profile.goal,
       manualCalorieTarget: state.profile.manualCalorieTarget,
+      manualCalorieRange: state.profile.manualCalorieRange,
     }),
     completedFasts: calculateCompletedFasts(
       state.entries.filter((entry) => entry.eatenAt >= range.start - 31 * 24 * 60 * 60 * 1000),
-      state.profile.fastingThresholdHours
+      Intl.DateTimeFormat().resolvedOptions().timeZone
     ),
     date: dateKey(Date.now()),
     timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
@@ -275,7 +349,7 @@ function buildLocalHistory(
     .sort((a, b) => b.eatenAt - a.eatenAt)[0];
   for (const fast of calculateCompletedFasts(
     prior ? [prior, ...entries] : entries,
-    state.profile.fastingThresholdHours
+    Intl.DateTimeFormat().resolvedOptions().timeZone
   )) {
     const day = days.get(dateKey(fast.endAt));
     if (day) day.fastCount += 1;

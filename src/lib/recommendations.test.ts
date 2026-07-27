@@ -6,6 +6,7 @@ import {
   calculateRestingEnergy,
   calculateSleepGuidance,
   calculateTargetWeightProgress,
+  formatCalorieAdjustmentRange,
   scaleNutrients,
 } from './recommendations';
 import type { FoodEntry } from './types';
@@ -37,11 +38,12 @@ describe('nutrition calculations', () => {
       activityLevel: 'moderate',
       goal: 'lose_gentle',
     });
-    expect(target.calorieTarget).toBe(2352);
+    expect(target.calorieTarget).toBe(2147);
+    expect(target.calorieRange).toEqual([2082, 2212]);
     expect(target.maintenanceCalories).toBe(2602);
-    expect(target.goalAdjustmentCalories).toBe(-250);
-    expect(target.proteinRangeG).toEqual([86, 115]);
-    expect(target.fibreTargetG).toBe(33);
+    expect(target.goalAdjustmentRangeCalories).toEqual([-520, -390]);
+    expect(target.proteinRangeG).toEqual([115, 144]);
+    expect(target.fibreTargetG).toBe(30);
     expect(target.method).toBe('mifflin-st-jeor');
   });
 
@@ -58,8 +60,9 @@ describe('nutrition calculations', () => {
       })
     ).toMatchObject({
       calorieTarget: 2000,
+      calorieRange: [1900, 2100],
       maintenanceCalories: null,
-      goalAdjustmentCalories: null,
+      goalAdjustmentRangeCalories: null,
       fibreTargetG: 28,
       method: 'manual',
     });
@@ -77,14 +80,45 @@ describe('nutrition calculations', () => {
     expect(
       (['lose_gentle', 'lose_steady', 'maintain', 'gain_gentle'] as const).map((goal) => {
         const target = calculateNutritionTarget({ ...input, goal });
-        return [goal, target.goalAdjustmentCalories, target.calorieTarget];
+        return [goal, target.goalAdjustmentRangeCalories, target.calorieRange];
       })
     ).toEqual([
-      ['lose_gentle', -250, 2352],
-      ['lose_steady', -500, 2102],
-      ['maintain', 0, 2602],
-      ['gain_gentle', 250, 2852],
+      ['lose_gentle', [-520, -390], [2082, 2212]],
+      ['lose_steady', [-650, -520], [1952, 2082]],
+      ['maintain', [-130, 130], [2472, 2732]],
+      ['gain_gentle', [130, 260], [2732, 2862]],
     ]);
+  });
+
+  it('limits automatic loss targets and reports the adjustment actually applied', () => {
+    const target = calculateNutritionTarget({
+      weightKg: 60,
+      heightCm: 160,
+      ageYears: 40,
+      equationProfile: 'female',
+      activityLevel: 'sedentary',
+      goal: 'lose_steady',
+    });
+    expect(target.maintenanceCalories).toBe(1487);
+    expect(target.calorieTarget).toBe(1200);
+    expect(target.calorieRange).toEqual([1200, 1200]);
+    expect(target.goalAdjustmentRangeCalories).toEqual([-287, -287]);
+    expect(target.proteinRangeG).toEqual([96, 120]);
+  });
+
+  it('uses explicit manual ranges and formats signed adjustment ranges', () => {
+    const target = calculateNutritionTarget({
+      weightKg: 70,
+      heightCm: null,
+      ageYears: null,
+      equationProfile: 'none',
+      activityLevel: 'light',
+      goal: 'maintain',
+      manualCalorieRange: [2100, 1900],
+    });
+    expect(target.calorieRange).toEqual([1900, 2100]);
+    expect(target.calorieTarget).toBe(2000);
+    expect(formatCalorieAdjustmentRange([-520, -390])).toBe('−520 to −390');
   });
 
   it('describes target-weight progress without inventing a timeline', () => {
@@ -110,17 +144,26 @@ describe('timing calculations', () => {
     eatenAt,
   });
 
-  it('counts threshold-crossing gaps but ignores water by construction', () => {
+  it('uses each eating day’s last and next first food as the fasting window', () => {
     const hour = 60 * 60 * 1000;
-    expect(
-      calculateCompletedFasts(
-        [entry('dinner', 0, 20), entry('breakfast', 14 * hour, 30), entry('lunch', 19 * hour, 40)],
-        12
-      )
-    ).toHaveLength(1);
+    const day = 24 * hour;
+    const result = calculateCompletedFasts(
+      [
+        entry('lunch', 12 * hour, 40),
+        entry('dinner', 20 * hour, 20),
+        entry('breakfast', day + 10 * hour, 30),
+        entry('second dinner', day + 21 * hour, 20),
+        entry('second breakfast', 2 * day + 9 * hour, 30),
+      ],
+      'UTC'
+    );
+    expect(result).toEqual([
+      { startAt: 20 * hour, endAt: day + 10 * hour, durationHours: 14 },
+      { startAt: day + 21 * hour, endAt: 2 * day + 9 * hour, durationHours: 12 },
+    ]);
   });
 
-  it('uses recent carbs to provide a broad gym window', () => {
+  it('uses recent carbs to provide a broad exercise window', () => {
     const now = Date.UTC(2026, 6, 25, 12);
     const result = calculateGymGuidance([entry('Oats', now - 30 * 60 * 1000, 45)], now);
     expect(result.state).toBe('window');

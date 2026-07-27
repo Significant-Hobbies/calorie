@@ -60,7 +60,7 @@ export function LegalPage({ kind }: { kind: 'privacy' | 'terms' }) {
             <h2>Estimates, not medical advice</h2>
             <p>
               Calorie uses published equations and simple rules to produce energy, nutrient,
-              fasting, gym, and sleep estimates. They are informational and are not diagnosis,
+              fasting, exercise, and sleep estimates. They are informational and are not diagnosis,
               treatment, or a substitute for a qualified healthcare professional.
             </p>
             <h2>Your data</h2>

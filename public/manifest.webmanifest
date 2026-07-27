@@ -1,11 +1,11 @@
 {
   "name": "Calorie",
   "short_name": "Calorie",
-  "description": "A small food journal for macros, water, weight, fasting, sleep, and gym timing.",
+  "description": "A small food journal for macros, water, weight, fasting, sleep, and exercise timing.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
-  "background_color": "#ffffff",
+  "background_color": "#f7f8f3",
   "theme_color": "#47743a",
   "orientation": "portrait-primary",
   "categories": ["health", "fitness", "lifestyle"],
@@ -21,20 +21,6 @@
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any maskable"
-    }
-  ],
-  "shortcuts": [
-    {
-      "name": "Log food",
-      "short_name": "Food",
-      "url": "/?quick=food",
-      "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }]
-    },
-    {
-      "name": "Log water",
-      "short_name": "Water",
-      "url": "/?quick=water",
-      "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }]
     }
   ]
 }
