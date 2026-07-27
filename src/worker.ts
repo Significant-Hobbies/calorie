@@ -1,4 +1,5 @@
 import { Hono } from 'hono';
+import { normalizeDirectEntry } from './lib/entries';
 import {
   calculateCompletedFasts,
   calculateNutritionTarget,
@@ -101,6 +102,42 @@ function validTimestamp(value: unknown): number | null {
 
 function jsonError(message: string, fields?: Record<string, string>) {
   return { code: 'VALIDATION_ERROR', message, fields };
+}
+
+function directEntryFromBody(
+  body: Record<string, unknown>,
+  id: string,
+  amount: number,
+  eatenAt: number
+): FoodEntry | null {
+  const foodName = optionalText(body.foodName, 80);
+  const unitLabel = optionalText(body.unitLabel, 24);
+  const calories = finiteNumber(body.calories, 0, 100_000);
+  const carbsG = finiteNumber(body.carbsG, 0, 100_000);
+  const proteinG = finiteNumber(body.proteinG, 0, 100_000);
+  const fibreG = finiteNumber(body.fibreG, 0, 100_000);
+  if (
+    !foodName ||
+    !unitLabel ||
+    calories === null ||
+    carbsG === null ||
+    proteinG === null ||
+    fibreG === null
+  ) {
+    return null;
+  }
+  return normalizeDirectEntry({
+    id,
+    foodId: null,
+    foodName,
+    amount,
+    unitLabel,
+    calories,
+    carbsG,
+    proteinG,
+    fibreG,
+    eatenAt,
+  });
 }
 
 type ProfileRow = {
@@ -512,41 +549,61 @@ app.post('/api/app/entries', async (c) => {
   const foodId = body ? optionalText(body.foodId, 80) : null;
   const amount = body ? finiteNumber(body.amount, 0.01, 10000) : null;
   const eatenAt = body ? validTimestamp(body.eatenAt) : null;
-  if (!id || !foodId || amount === null || eatenAt === null) {
-    return c.json(jsonError('Choose a food, amount, and time.'), 400);
+  if (!body || !id || amount === null || eatenAt === null) {
+    return c.json(jsonError('Add a valid amount and time.'), 400);
   }
-  const foodRow = await c.env.DB.prepare('SELECT * FROM foods WHERE id = ? AND user_id = ?')
-    .bind(foodId, c.get('userId'))
-    .first<FoodRow>();
-  if (!foodRow) return c.json({ message: 'Food not found.' }, 404);
-  const food = mapFood(foodRow);
-  const nutrients = scaleNutrients(food, food.servingMode, amount);
+  let entry: FoodEntry;
+  let foodUpdate: D1PreparedStatement | null = null;
   const now = Date.now();
 
-  await c.env.DB.batch([
-    c.env.DB.prepare(
-      `INSERT OR IGNORE INTO food_entries (
-        id, user_id, food_id, food_name, amount, unit_label, calories,
-        carbs_g, protein_g, fibre_g, eaten_at, created_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-    ).bind(
+  if (foodId) {
+    const foodRow = await c.env.DB.prepare('SELECT * FROM foods WHERE id = ? AND user_id = ?')
+      .bind(foodId, c.get('userId'))
+      .first<FoodRow>();
+    if (!foodRow) return c.json({ message: 'Food not found.' }, 404);
+    const food = mapFood(foodRow);
+    entry = {
       id,
-      c.get('userId'),
-      food.id,
-      food.name,
+      foodId: food.id,
+      foodName: food.name,
       amount,
-      food.servingMode === 'per_100g' ? 'g' : food.unitLabel,
-      nutrients.calories,
-      nutrients.carbsG,
-      nutrients.proteinG,
-      nutrients.fibreG,
+      unitLabel: food.servingMode === 'per_100g' ? 'g' : food.unitLabel,
+      ...scaleNutrients(food, food.servingMode, amount),
       eatenAt,
-      now
-    ),
-    c.env.DB.prepare(
+    };
+    foodUpdate = c.env.DB.prepare(
       'UPDATE foods SET last_used_at = ?, updated_at = ? WHERE id = ? AND user_id = ?'
-    ).bind(eatenAt, now, food.id, c.get('userId')),
-  ]);
+    ).bind(eatenAt, now, food.id, c.get('userId'));
+  } else {
+    const directEntry = directEntryFromBody(body, id, amount, eatenAt);
+    if (!directEntry) {
+      return c.json(jsonError('Add a name, unit, and valid nutrient totals.'), 400);
+    }
+    entry = directEntry;
+  }
+
+  const insert = c.env.DB.prepare(
+    `INSERT OR IGNORE INTO food_entries (
+      id, user_id, food_id, food_name, amount, unit_label, calories,
+      carbs_g, protein_g, fibre_g, eaten_at, created_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+  ).bind(
+    entry.id,
+    c.get('userId'),
+    entry.foodId,
+    entry.foodName,
+    entry.amount,
+    entry.unitLabel,
+    entry.calories,
+    entry.carbsG,
+    entry.proteinG,
+    entry.fibreG,
+    entry.eatenAt,
+    now
+  );
+  if (foodUpdate) await c.env.DB.batch([insert, foodUpdate]);
+  else await insert.run();
+
   const row = await c.env.DB.prepare('SELECT * FROM food_entries WHERE id = ? AND user_id = ?')
     .bind(id, c.get('userId'))
     .first<FoodEntryRow>();
@@ -557,36 +614,53 @@ app.post('/api/app/entries', async (c) => {
 app.patch('/api/app/entries/:id', async (c) => {
   const body = await c.req.json<Record<string, unknown>>().catch(() => null);
   if (!body) return c.json(jsonError('Send an entry to update.'), 400);
-  const foodId = requiredText(body.foodId, 80);
-  const amount = finiteNumber(body.amount, 0.01, 100000);
+  const foodId = optionalText(body.foodId, 80);
+  const amount = finiteNumber(body.amount, 0.01, 10_000);
   const eatenAt = validTimestamp(body.eatenAt);
-  if (!foodId || amount === null || eatenAt === null) {
-    return c.json(jsonError('Choose a food, amount, and valid time.'), 400);
+  if (amount === null || eatenAt === null) {
+    return c.json(jsonError('Add a valid amount and time.'), 400);
   }
 
-  const foodRow = await c.env.DB.prepare('SELECT * FROM foods WHERE id = ? AND user_id = ?')
-    .bind(foodId, c.get('userId'))
-    .first<FoodRow>();
-  if (!foodRow) return c.json({ message: 'Saved food not found.' }, 404);
-  const food = mapFood(foodRow);
-  const nutrients = scaleNutrients(food, food.servingMode, amount);
-  const unitLabel = food.servingMode === 'per_100g' ? 'g' : food.unitLabel;
+  let entry: FoodEntry;
+  if (foodId) {
+    const foodRow = await c.env.DB.prepare('SELECT * FROM foods WHERE id = ? AND user_id = ?')
+      .bind(foodId, c.get('userId'))
+      .first<FoodRow>();
+    if (!foodRow) return c.json({ message: 'Saved food not found.' }, 404);
+    const food = mapFood(foodRow);
+    entry = {
+      id: c.req.param('id'),
+      foodId: food.id,
+      foodName: food.name,
+      amount,
+      unitLabel: food.servingMode === 'per_100g' ? 'g' : food.unitLabel,
+      ...scaleNutrients(food, food.servingMode, amount),
+      eatenAt,
+    };
+  } else {
+    const directEntry = directEntryFromBody(body, c.req.param('id'), amount, eatenAt);
+    if (!directEntry) {
+      return c.json(jsonError('Add a name, unit, and valid nutrient totals.'), 400);
+    }
+    entry = directEntry;
+  }
+
   const result = await c.env.DB.prepare(
     `UPDATE food_entries SET food_id = ?, food_name = ?, amount = ?, unit_label = ?,
       calories = ?, carbs_g = ?, protein_g = ?, fibre_g = ?, eaten_at = ?
      WHERE id = ? AND user_id = ?`
   )
     .bind(
-      food.id,
-      food.name,
-      amount,
-      unitLabel,
-      nutrients.calories,
-      nutrients.carbsG,
-      nutrients.proteinG,
-      nutrients.fibreG,
-      eatenAt,
-      c.req.param('id'),
+      entry.foodId,
+      entry.foodName,
+      entry.amount,
+      entry.unitLabel,
+      entry.calories,
+      entry.carbsG,
+      entry.proteinG,
+      entry.fibreG,
+      entry.eatenAt,
+      entry.id,
       c.get('userId')
     )
     .run();

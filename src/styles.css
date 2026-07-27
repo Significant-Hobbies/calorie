@@ -1206,6 +1206,16 @@
     text-align: right;
   }
 
+  .direct-entry-note {
+    margin: -2px 0 0;
+    color: var(--ink-soft);
+    font-size: 0.8125rem;
+  }
+
+  .macro-fieldset {
+    gap: 9px;
+  }
+
   .segmented,
   .range-toggle {
     display: grid;
@@ -1239,6 +1249,11 @@
     background: var(--white);
     color: var(--moss-900);
     box-shadow: 0 2px 7px rgb(31 50 29 / 9%);
+  }
+
+  .segmented button:disabled {
+    cursor: not-allowed;
+    opacity: 0.5;
   }
 
   .macro-grid,

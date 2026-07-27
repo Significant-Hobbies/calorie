@@ -49,6 +49,10 @@ export type FoodEntry = Nutrients & {
   eatenAt: number;
 };
 
+export type FoodEntryWrite = FoodEntry & {
+  optimistic: FoodEntry;
+};
+
 export type WaterEntry = {
   id: string;
   amountMl: number;

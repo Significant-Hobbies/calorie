@@ -1,4 +1,5 @@
 import { calendarHistoryBounds, dateFromKey, localDateKey } from './calendar';
+import { normalizeDirectEntry } from './entries';
 import {
   calculateCompletedFasts,
   calculateNutritionTarget,
@@ -9,6 +10,7 @@ import type {
   Dashboard,
   Food,
   FoodEntry,
+  FoodEntryWrite,
   HistoryResponse,
   UserProfile,
   WaterEntry,
@@ -201,14 +203,16 @@ export function demoSaveFood(food: Food) {
 
 export function demoDeleteFood(id: string) {
   foods = foods.filter((food) => food.id !== id);
+  entries = entries.map((entry) => (entry.foodId === id ? { ...entry, foodId: null } : entry));
 }
 
-export function demoAddEntry(input: {
-  id: string;
-  foodId: string;
-  amount: number;
-  eatenAt: number;
-}) {
+export function demoAddEntry(input: FoodEntryWrite) {
+  if (!input.foodId) {
+    const { optimistic: _optimistic, ...snapshot } = input;
+    const entry = normalizeDirectEntry(snapshot);
+    entries = [entry, ...entries.filter((item) => item.id !== entry.id)];
+    return entry;
+  }
   const food = foods.find((item) => item.id === input.foodId);
   if (!food) throw new Error('Food not found.');
   const nutrients = scaleNutrients(food, food.servingMode, input.amount);
@@ -221,7 +225,7 @@ export function demoAddEntry(input: {
     ...nutrients,
     eatenAt: input.eatenAt,
   };
-  entries = [entry, ...entries];
+  entries = [entry, ...entries.filter((item) => item.id !== entry.id)];
   food.lastUsedAt = input.eatenAt;
   return entry;
 }

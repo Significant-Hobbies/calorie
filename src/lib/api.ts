@@ -38,6 +38,7 @@ import type {
   Dashboard,
   Food,
   FoodEntry,
+  FoodEntryWrite,
   HistoryResponse,
   UserProfile,
   WaterEntry,
@@ -184,21 +185,16 @@ export async function deleteFood(id: string) {
   return writeJson<void>(`/api/app/foods/${id}`, 'DELETE');
 }
 
-export async function addFoodEntry(input: {
-  id: string;
-  foodId: string;
-  amount: number;
-  eatenAt: number;
-  optimistic: FoodEntry;
-}) {
+export async function addFoodEntry(input: FoodEntryWrite) {
   if (isDemo()) return demoAddEntry(input);
   if (isLocalMode()) return localAddEntry(input);
+  const { optimistic, ...body } = input;
   return writeOffline<FoodEntry>({
     id: `entry:${input.id}`,
     path: '/api/app/entries',
     method: 'POST',
-    body: input,
-    optimistic: input.optimistic,
+    body,
+    optimistic,
   });
 }
 
@@ -213,24 +209,19 @@ export async function deleteFoodEntry(id: string) {
   });
 }
 
-export async function updateFoodEntry(input: {
-  id: string;
-  foodId: string;
-  amount: number;
-  eatenAt: number;
-  optimistic: FoodEntry;
-}) {
+export async function updateFoodEntry(input: FoodEntryWrite) {
   if (isDemo()) {
     demoDeleteEntry(input.id);
     return demoAddEntry(input);
   }
   if (isLocalMode()) return localAddEntry(input);
+  const { optimistic, ...body } = input;
   return writeOffline<FoodEntry>({
     id: `update-entry:${input.id}:${Date.now()}`,
     path: `/api/app/entries/${input.id}`,
     method: 'PATCH',
-    body: input,
-    optimistic: input.optimistic,
+    body,
+    optimistic,
   });
 }
 

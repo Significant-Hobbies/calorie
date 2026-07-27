@@ -1,4 +1,5 @@
 import { calendarHistoryBounds } from './calendar';
+import { normalizeDirectEntry } from './entries';
 import {
   calculateCompletedFasts,
   calculateNutritionTarget,
@@ -9,6 +10,7 @@ import type {
   Dashboard,
   Food,
   FoodEntry,
+  FoodEntryWrite,
   HistoryDay,
   HistoryResponse,
   UserProfile,
@@ -125,13 +127,15 @@ export function localDeleteFood(id: string) {
   writeState(state);
 }
 
-export function localAddEntry(input: {
-  id: string;
-  foodId: string;
-  amount: number;
-  eatenAt: number;
-}) {
+export function localAddEntry(input: FoodEntryWrite) {
   const state = readState();
+  if (!input.foodId) {
+    const { optimistic: _optimistic, ...snapshot } = input;
+    const entry = normalizeDirectEntry(snapshot);
+    state.entries = [entry, ...state.entries.filter((item) => item.id !== entry.id)];
+    writeState(state);
+    return entry;
+  }
   const food = state.foods.find((item) => item.id === input.foodId);
   if (!food) throw new Error('Saved food not found.');
   const entry: FoodEntry = {

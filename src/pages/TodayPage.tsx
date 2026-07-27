@@ -24,6 +24,7 @@ import {
   getDashboard,
   updateFoodEntry,
 } from '../lib/api';
+import { directEntryError } from '../lib/entries';
 import {
   calculateGymGuidance,
   calculateSleepGuidance,
@@ -74,12 +75,19 @@ function withEntries(
 type UndoAction =
   | { kind: 'food'; id: string; label: string }
   | { kind: 'water'; id: string; label: string }
-  | { kind: 'delete-food'; entry: FoodEntry; label: string };
+  | { kind: 'delete-entry'; entry: FoodEntry; label: string };
 
 type EntryDraft = {
   entryId: string | null;
-  foodId: string;
+  mode: 'saved' | 'direct';
+  foodId: string | null;
+  foodName: string;
   amount: number;
+  unitLabel: string;
+  calories: number;
+  carbsG: number;
+  proteinG: number;
+  fibreG: number;
   eatenAt: string;
 };
 
@@ -97,6 +105,7 @@ export function TodayPage({ onOpenFoods }: { onOpenFoods: () => void }) {
   const [entryDraft, setEntryDraft] = useState<EntryDraft | null>(null);
   const [entryError, setEntryError] = useState<string | null>(null);
   const entryFoodSelectRef = useRef<HTMLSelectElement>(null);
+  const entryNameInputRef = useRef<HTMLInputElement>(null);
   const entrySheetOpen = entryDraft !== null;
 
   const load = useCallback(async () => {
@@ -119,8 +128,10 @@ export function TodayPage({ onOpenFoods }: { onOpenFoods: () => void }) {
   }, [undo]);
 
   useEffect(() => {
-    if (entrySheetOpen) entryFoodSelectRef.current?.focus();
-  }, [entrySheetOpen]);
+    if (!entrySheetOpen) return;
+    if (entryDraft?.mode === 'direct') entryNameInputRef.current?.focus();
+    else entryFoodSelectRef.current?.focus();
+  }, [entryDraft?.mode, entrySheetOpen]);
 
   const gym = useMemo(
     () => (dashboard ? calculateGymGuidance(dashboard.entries) : null),
@@ -157,10 +168,7 @@ export function TodayPage({ onOpenFoods }: { onOpenFoods: () => void }) {
     );
     try {
       const saved = await addFoodEntry({
-        id,
-        foodId: food.id,
-        amount: food.defaultAmount,
-        eatenAt: optimistic.eatenAt,
+        ...optimistic,
         optimistic,
       });
       setDashboard((current) =>
@@ -226,15 +234,8 @@ export function TodayPage({ onOpenFoods }: { onOpenFoods: () => void }) {
     } else {
       const entry = action.entry;
       setDashboard(withEntries(dashboard, [entry, ...dashboard.entries], dashboard.waterEntries));
-      if (!entry.foodId) {
-        await load();
-        return;
-      }
       await addFoodEntry({
-        id: entry.id,
-        foodId: entry.foodId,
-        amount: entry.amount,
-        eatenAt: entry.eatenAt,
+        ...entry,
         optimistic: entry,
       }).catch(() => void load());
     }
@@ -243,25 +244,35 @@ export function TodayPage({ onOpenFoods }: { onOpenFoods: () => void }) {
   const openNewEntry = () => {
     if (!dashboard) return;
     const food = dashboard.foods[0];
-    if (!food) {
-      onOpenFoods();
-      return;
-    }
     setEntryError(null);
     setEntryDraft({
       entryId: null,
-      foodId: food.id,
-      amount: food.defaultAmount,
+      mode: food ? 'saved' : 'direct',
+      foodId: food?.id ?? null,
+      foodName: food?.name ?? '',
+      amount: food?.defaultAmount ?? 1,
+      unitLabel: food ? (food.servingMode === 'per_100g' ? 'g' : food.unitLabel) : 'serving',
+      ...(food
+        ? scaleNutrients(food, food.servingMode, food.defaultAmount)
+        : { calories: 0, carbsG: 0, proteinG: 0, fibreG: 0 }),
       eatenAt: toLocalInput(Date.now()),
     });
   };
 
   const openEntry = (entry: FoodEntry) => {
+    const hasSavedFood = dashboard?.foods.some((food) => food.id === entry.foodId) ?? false;
     setEntryError(null);
     setEntryDraft({
       entryId: entry.id,
-      foodId: entry.foodId ?? '',
+      mode: hasSavedFood ? 'saved' : 'direct',
+      foodId: hasSavedFood ? entry.foodId : null,
+      foodName: entry.foodName,
       amount: entry.amount,
+      unitLabel: entry.unitLabel,
+      calories: entry.calories,
+      carbsG: entry.carbsG,
+      proteinG: entry.proteinG,
+      fibreG: entry.fibreG,
       eatenAt: toLocalInput(entry.eatenAt),
     });
   };
@@ -270,15 +281,78 @@ export function TodayPage({ onOpenFoods }: { onOpenFoods: () => void }) {
     if (!dashboard) return;
     const food = dashboard.foods.find((item) => item.id === foodId);
     setEntryDraft((current) =>
-      current && food ? { ...current, foodId, amount: food.defaultAmount } : current
+      current && food
+        ? {
+            ...current,
+            foodId,
+            foodName: food.name,
+            amount: food.defaultAmount,
+            unitLabel: food.servingMode === 'per_100g' ? 'g' : food.unitLabel,
+            ...scaleNutrients(food, food.servingMode, food.defaultAmount),
+          }
+        : current
     );
+  };
+
+  const chooseEntryMode = (mode: EntryDraft['mode']) => {
+    if (!dashboard) return;
+    setEntryError(null);
+    setEntryDraft((current) => {
+      if (!current || current.mode === mode) return current;
+      if (mode === 'direct') {
+        if (current.entryId) {
+          const food = dashboard.foods.find((item) => item.id === current.foodId);
+          const nutrients = food
+            ? scaleNutrients(food, food.servingMode, current.amount)
+            : {
+                calories: current.calories,
+                carbsG: current.carbsG,
+                proteinG: current.proteinG,
+                fibreG: current.fibreG,
+              };
+          return {
+            ...current,
+            mode,
+            foodId: null,
+            foodName: food?.name ?? current.foodName,
+            unitLabel:
+              food?.servingMode === 'per_100g' ? 'g' : (food?.unitLabel ?? current.unitLabel),
+            ...nutrients,
+          };
+        }
+        return {
+          ...current,
+          mode,
+          foodId: null,
+          foodName: '',
+          amount: 1,
+          unitLabel: 'serving',
+          calories: 0,
+          carbsG: 0,
+          proteinG: 0,
+          fibreG: 0,
+        };
+      }
+
+      const food = dashboard.foods[0];
+      if (!food) return current;
+      return {
+        ...current,
+        mode,
+        foodId: food.id,
+        foodName: food.name,
+        amount: food.defaultAmount,
+        unitLabel: food.servingMode === 'per_100g' ? 'g' : food.unitLabel,
+        ...scaleNutrients(food, food.servingMode, food.defaultAmount),
+      };
+    });
   };
 
   const saveEntry = async () => {
     if (!dashboard || !entryDraft || pendingId) return;
     const food = dashboard.foods.find((item) => item.id === entryDraft.foodId);
     const eatenAt = new Date(entryDraft.eatenAt).getTime();
-    if (!food) {
+    if (entryDraft.mode === 'saved' && !food) {
       setEntryError('Choose a saved food.');
       return;
     }
@@ -292,15 +366,35 @@ export function TodayPage({ onOpenFoods }: { onOpenFoods: () => void }) {
     }
 
     const id = entryDraft.entryId ?? crypto.randomUUID();
-    const optimistic: FoodEntry = {
-      id,
-      foodId: food.id,
-      foodName: food.name,
-      amount: entryDraft.amount,
-      unitLabel: food.servingMode === 'per_100g' ? 'g' : food.unitLabel,
-      ...scaleNutrients(food, food.servingMode, entryDraft.amount),
-      eatenAt,
-    };
+    const optimistic: FoodEntry =
+      entryDraft.mode === 'saved' && food
+        ? {
+            id,
+            foodId: food.id,
+            foodName: food.name,
+            amount: entryDraft.amount,
+            unitLabel: food.servingMode === 'per_100g' ? 'g' : food.unitLabel,
+            ...scaleNutrients(food, food.servingMode, entryDraft.amount),
+            eatenAt,
+          }
+        : {
+            id,
+            foodId: null,
+            foodName: entryDraft.foodName,
+            amount: entryDraft.amount,
+            unitLabel: entryDraft.unitLabel,
+            calories: entryDraft.calories,
+            carbsG: entryDraft.carbsG,
+            proteinG: entryDraft.proteinG,
+            fibreG: entryDraft.fibreG,
+            eatenAt,
+          };
+    const directError = optimistic.foodId === null ? directEntryError(optimistic) : null;
+    if (directError) {
+      setEntryError(directError);
+      return;
+    }
+
     const previous = dashboard;
     const nextEntries = entryDraft.entryId
       ? dashboard.entries.map((entry) => (entry.id === id ? optimistic : entry))
@@ -310,17 +404,11 @@ export function TodayPage({ onOpenFoods }: { onOpenFoods: () => void }) {
     try {
       const saved = entryDraft.entryId
         ? await updateFoodEntry({
-            id,
-            foodId: food.id,
-            amount: entryDraft.amount,
-            eatenAt,
+            ...optimistic,
             optimistic,
           })
         : await addFoodEntry({
-            id,
-            foodId: food.id,
-            amount: entryDraft.amount,
-            eatenAt,
+            ...optimistic,
             optimistic,
           });
       setDashboard((current) =>
@@ -332,7 +420,9 @@ export function TodayPage({ onOpenFoods }: { onOpenFoods: () => void }) {
             )
           : current
       );
-      if (!entryDraft.entryId) setUndo({ kind: 'food', id, label: `${food.name} logged` });
+      if (!entryDraft.entryId) {
+        setUndo({ kind: 'food', id, label: `${optimistic.foodName} logged` });
+      }
       setEntryDraft(null);
     } catch (caught) {
       setDashboard(previous);
@@ -358,9 +448,7 @@ export function TodayPage({ onOpenFoods }: { onOpenFoods: () => void }) {
     setEntryDraft(null);
     try {
       await deleteFoodEntry(entry.id);
-      if (entry.foodId) {
-        setUndo({ kind: 'delete-food', entry, label: `${entry.foodName} removed` });
-      }
+      setUndo({ kind: 'delete-entry', entry, label: `${entry.foodName} removed` });
     } catch (caught) {
       setDashboard(previous);
       setError(caught instanceof Error ? caught.message : 'Entry could not be removed.');
@@ -663,7 +751,7 @@ export function TodayPage({ onOpenFoods }: { onOpenFoods: () => void }) {
             onClick={openNewEntry}
           >
             <Plus size={18} aria-hidden="true" />
-            Log food
+            Add entry
           </button>
         </div>
         {dashboard.entries.length ? (
@@ -696,7 +784,7 @@ export function TodayPage({ onOpenFoods }: { onOpenFoods: () => void }) {
             <Leaf aria-hidden="true" />
             <div>
               <strong>Nothing logged yet</strong>
-              <span>Tap a usual food above, or save a new one.</span>
+              <span>Tap a usual food above, or add a one-off entry.</span>
             </div>
           </div>
         )}
@@ -714,9 +802,7 @@ export function TodayPage({ onOpenFoods }: { onOpenFoods: () => void }) {
             <header>
               <div>
                 <p>{entryDraft.entryId ? 'Correct your log' : 'Add to today'}</p>
-                <h2 id="entry-sheet-title">
-                  {entryDraft.entryId ? 'Edit food entry' : 'Log food'}
-                </h2>
+                <h2 id="entry-sheet-title">{entryDraft.entryId ? 'Edit entry' : 'New entry'}</h2>
               </div>
               <button
                 className="icon-button"
@@ -729,85 +815,215 @@ export function TodayPage({ onOpenFoods }: { onOpenFoods: () => void }) {
             </header>
 
             <div className="sheet-fields">
-              <label className="field">
-                <span>Saved food</span>
-                <select
-                  ref={entryFoodSelectRef}
-                  value={entryDraft.foodId}
-                  onChange={(event) => chooseEntryFood(event.target.value)}
+              <fieldset className="segmented entry-source-toggle">
+                <legend className="sr-only">Entry source</legend>
+                <button
+                  className={entryDraft.mode === 'saved' ? 'is-selected' : ''}
+                  type="button"
+                  disabled={dashboard.foods.length === 0}
+                  aria-pressed={entryDraft.mode === 'saved'}
+                  onClick={() => chooseEntryMode('saved')}
                 >
-                  {!entryDraft.foodId ? <option value="">Choose a food</option> : null}
-                  {dashboard.foods.map((food) => (
-                    <option value={food.id} key={food.id}>
-                      {food.name}
-                    </option>
-                  ))}
-                </select>
-              </label>
+                  Saved food
+                </button>
+                <button
+                  className={entryDraft.mode === 'direct' ? 'is-selected' : ''}
+                  type="button"
+                  aria-pressed={entryDraft.mode === 'direct'}
+                  onClick={() => chooseEntryMode('direct')}
+                >
+                  Just this entry
+                </button>
+              </fieldset>
 
-              <div className="field-row">
-                <label className="field">
-                  <span>Amount</span>
-                  <div className="input-with-unit">
+              {entryDraft.mode === 'saved' ? (
+                <>
+                  <label className="field">
+                    <span>Saved food</span>
+                    <select
+                      ref={entryFoodSelectRef}
+                      value={entryDraft.foodId ?? ''}
+                      onChange={(event) => chooseEntryFood(event.target.value)}
+                    >
+                      {!entryDraft.foodId ? <option value="">Choose a food</option> : null}
+                      {dashboard.foods.map((food) => (
+                        <option value={food.id} key={food.id}>
+                          {food.name}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+
+                  <div className="field-row">
+                    <label className="field">
+                      <span>Amount</span>
+                      <div className="input-with-unit">
+                        <input
+                          type="number"
+                          min="0.1"
+                          max="10000"
+                          step="0.1"
+                          inputMode="decimal"
+                          value={entryDraft.amount}
+                          onChange={(event) =>
+                            setEntryDraft((current) =>
+                              current
+                                ? { ...current, amount: Number(event.target.value) || 0 }
+                                : current
+                            )
+                          }
+                        />
+                        <b>
+                          {dashboard.foods.find((food) => food.id === entryDraft.foodId)
+                            ?.servingMode === 'per_100g'
+                            ? 'g'
+                            : (dashboard.foods.find((food) => food.id === entryDraft.foodId)
+                                ?.unitLabel ?? 'unit')}
+                        </b>
+                      </div>
+                    </label>
+                    <label className="field">
+                      <span>Time eaten</span>
+                      <div className="input-with-leading-icon">
+                        <Clock3 size={17} aria-hidden="true" />
+                        <input
+                          type="datetime-local"
+                          max={toLocalInput(Date.now() + 24 * 60 * 60 * 1000)}
+                          value={entryDraft.eatenAt}
+                          onChange={(event) =>
+                            setEntryDraft((current) =>
+                              current ? { ...current, eatenAt: event.target.value } : current
+                            )
+                          }
+                        />
+                      </div>
+                    </label>
+                  </div>
+
+                  {entryDraft.foodId ? (
+                    <div className="entry-preview">
+                      {(() => {
+                        const food = dashboard.foods.find((item) => item.id === entryDraft.foodId);
+                        if (!food) return null;
+                        const preview = scaleNutrients(food, food.servingMode, entryDraft.amount);
+                        return (
+                          <>
+                            <strong>{preview.calories} kcal</strong>
+                            <span>
+                              {preview.carbsG}g carbs · {preview.proteinG}g protein ·{' '}
+                              {preview.fibreG}g fibre
+                            </span>
+                          </>
+                        );
+                      })()}
+                    </div>
+                  ) : null}
+                </>
+              ) : (
+                <>
+                  <p className="direct-entry-note">
+                    Add the totals once. This won’t create a saved food.
+                  </p>
+                  <label className="field">
+                    <span>Food name</span>
                     <input
-                      type="number"
-                      min="0.1"
-                      step="0.1"
-                      inputMode="decimal"
-                      value={entryDraft.amount}
+                      ref={entryNameInputRef}
+                      maxLength={80}
+                      placeholder="e.g. Lunch special"
+                      value={entryDraft.foodName}
                       onChange={(event) =>
                         setEntryDraft((current) =>
-                          current
-                            ? { ...current, amount: Number(event.target.value) || 0 }
-                            : current
+                          current ? { ...current, foodName: event.target.value } : current
                         )
                       }
                     />
-                    <b>
-                      {dashboard.foods.find((food) => food.id === entryDraft.foodId)
-                        ?.servingMode === 'per_100g'
-                        ? 'g'
-                        : (dashboard.foods.find((food) => food.id === entryDraft.foodId)
-                            ?.unitLabel ?? 'unit')}
-                    </b>
-                  </div>
-                </label>
-                <label className="field">
-                  <span>Time eaten</span>
-                  <div className="input-with-leading-icon">
-                    <Clock3 size={17} aria-hidden="true" />
-                    <input
-                      type="datetime-local"
-                      max={toLocalInput(Date.now() + 24 * 60 * 60 * 1000)}
-                      value={entryDraft.eatenAt}
-                      onChange={(event) =>
-                        setEntryDraft((current) =>
-                          current ? { ...current, eatenAt: event.target.value } : current
-                        )
-                      }
-                    />
-                  </div>
-                </label>
-              </div>
+                  </label>
 
-              {entryDraft.foodId ? (
-                <div className="entry-preview">
-                  {(() => {
-                    const food = dashboard.foods.find((item) => item.id === entryDraft.foodId);
-                    if (!food) return null;
-                    const preview = scaleNutrients(food, food.servingMode, entryDraft.amount);
-                    return (
-                      <>
-                        <strong>{preview.calories} kcal</strong>
-                        <span>
-                          {preview.carbsG}g carbs · {preview.proteinG}g protein · {preview.fibreG}g
-                          fibre
-                        </span>
-                      </>
-                    );
-                  })()}
-                </div>
-              ) : null}
+                  <div className="field-row">
+                    <label className="field">
+                      <span>Amount</span>
+                      <input
+                        type="number"
+                        min="0.1"
+                        max="10000"
+                        step="0.1"
+                        inputMode="decimal"
+                        value={entryDraft.amount}
+                        onChange={(event) =>
+                          setEntryDraft((current) =>
+                            current
+                              ? { ...current, amount: Number(event.target.value) || 0 }
+                              : current
+                          )
+                        }
+                      />
+                    </label>
+                    <label className="field">
+                      <span>Unit</span>
+                      <input
+                        maxLength={24}
+                        placeholder="serving"
+                        value={entryDraft.unitLabel}
+                        onChange={(event) =>
+                          setEntryDraft((current) =>
+                            current ? { ...current, unitLabel: event.target.value } : current
+                          )
+                        }
+                      />
+                    </label>
+                  </div>
+
+                  <fieldset className="field macro-fieldset">
+                    <legend>Totals for this entry</legend>
+                    <div className="macro-grid">
+                      {(
+                        [
+                          ['calories', 'Calories', '1'],
+                          ['carbsG', 'Carbs (g)', '0.1'],
+                          ['proteinG', 'Protein (g)', '0.1'],
+                          ['fibreG', 'Fibre (g)', '0.1'],
+                        ] as const
+                      ).map(([key, label, step]) => (
+                        <label className="field" key={key}>
+                          <span>{label}</span>
+                          <input
+                            type="number"
+                            min="0"
+                            max="100000"
+                            step={step}
+                            inputMode="decimal"
+                            value={entryDraft[key]}
+                            onChange={(event) =>
+                              setEntryDraft((current) =>
+                                current
+                                  ? { ...current, [key]: Number(event.target.value) || 0 }
+                                  : current
+                              )
+                            }
+                          />
+                        </label>
+                      ))}
+                    </div>
+                  </fieldset>
+
+                  <label className="field">
+                    <span>Time eaten</span>
+                    <div className="input-with-leading-icon">
+                      <Clock3 size={17} aria-hidden="true" />
+                      <input
+                        type="datetime-local"
+                        max={toLocalInput(Date.now() + 24 * 60 * 60 * 1000)}
+                        value={entryDraft.eatenAt}
+                        onChange={(event) =>
+                          setEntryDraft((current) =>
+                            current ? { ...current, eatenAt: event.target.value } : current
+                          )
+                        }
+                      />
+                    </div>
+                  </label>
+                </>
+              )}
             </div>
 
             {entryError ? (
