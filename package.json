@@ -24,25 +24,30 @@
     "check": "pnpm lint && pnpm typecheck && pnpm test && pnpm build"
   },
   "dependencies": {
-    "better-auth": "1.6.9",
+    "better-auth": "1.6.25",
     "drizzle-orm": "0.45.2",
-    "hono": "4.12.15",
+    "hono": "4.12.32",
     "idb": "8.0.3",
-    "lucide-react": "1.11.0",
-    "react": "19.2.5",
-    "react-dom": "19.2.5"
+    "lucide-react": "1.27.0",
+    "react": "19.2.8",
+    "react-dom": "19.2.8"
   },
   "devDependencies": {
-    "@biomejs/biome": "2.5.0",
-    "@cloudflare/workers-types": "5.20260724.1",
-    "@types/react": "19.2.14",
+    "@biomejs/biome": "2.5.5",
+    "@cloudflare/workers-types": "5.20260727.1",
+    "@types/react": "19.2.17",
     "@types/react-dom": "19.2.3",
-    "@vitejs/plugin-react-swc": "4.3.0",
+    "@vitejs/plugin-react-swc": "4.3.2",
     "concurrently": "9.2.1",
-    "lightningcss": "1.32.0",
+    "lightningcss": "1.33.0",
     "typescript": "6.0.3",
-    "vite": "8.0.10",
-    "vitest": "4.1.5",
+    "vite": "8.1.5",
+    "vitest": "4.1.10",
     "wrangler": "4.114.0"
+  },
+  "pnpm": {
+    "overrides": {
+      "shell-quote": "1.9.0"
+    }
   }
 }
