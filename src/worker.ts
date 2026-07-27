@@ -26,7 +26,12 @@ import type {
 import { type AuthBindings, createAuth, isGoogleConfigured } from './server/auth';
 
 type AppBindings = AuthBindings;
-type AppVariables = { userId: string; userName: string };
+type AppVariables = {
+  userId: string;
+  userName: string;
+  userEmail: string;
+  userImage: string | null;
+};
 
 const app = new Hono<{ Bindings: AppBindings; Variables: AppVariables }>();
 
@@ -80,6 +85,8 @@ app.use('/api/app/*', async (c, next) => {
   }
   c.set('userId', session.user.id);
   c.set('userName', session.user.name || 'You');
+  c.set('userEmail', session.user.email || '');
+  c.set('userImage', session.user.image || null);
   await next();
 });
 
@@ -329,6 +336,22 @@ function mapMedicationCheckIn(row: MedicationCheckInRow): MedicationCheckIn {
 app.get('/api/app/profile', async (c) => {
   const profile = await readProfile(c.env.DB, c.get('userId'), c.get('userName'));
   return c.json(profile);
+});
+
+app.get('/api/app/bootstrap', async (c) => {
+  const userId = c.get('userId');
+  const profile = await readProfile(c.env.DB, userId, c.get('userName'));
+  return c.json({
+    session: {
+      user: {
+        id: userId,
+        name: c.get('userName'),
+        email: c.get('userEmail'),
+        image: c.get('userImage'),
+      },
+    },
+    profile,
+  });
 });
 
 app.put('/api/app/profile', async (c) => {

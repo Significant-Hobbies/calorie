@@ -1,8 +1,5 @@
-import { createAuthClient } from 'better-auth/react';
 import { cachePrivateValue, clearLocalData, deletePrivateValue, readPrivateValue } from './offline';
 import { clearAllOnboardingDrafts } from './onboarding-draft';
-
-const authClient = createAuthClient();
 
 export type AppSession = {
   user: {
@@ -98,7 +95,15 @@ export async function signOut() {
   sessionStorage.removeItem('calorie-demo');
   sessionStorage.removeItem('calorie-demo-onboarding');
   await clearLocalData();
-  const result = await authClient.signOut();
-  if (result.error) throw new Error(result.error.message ?? 'Sign out could not be completed.');
+  const response = await fetch('/api/auth/sign-out', {
+    method: 'POST',
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/json' },
+    body: '{}',
+  });
+  if (!response.ok) {
+    const result = (await response.json().catch(() => null)) as { message?: string } | null;
+    throw new Error(result?.message ?? 'Sign out could not be completed.');
+  }
   window.location.reload();
 }
