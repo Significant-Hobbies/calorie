@@ -13,7 +13,7 @@
     "dev:api": "wrangler dev --port 8787",
     "build": "vite build",
     "preview": "vite preview",
-    "deploy": "pnpm check && wrangler deploy",
+    "deploy": "pnpm check && wrangler deploy --tag \"$(git rev-parse HEAD)\"",
     "db:migrate:local": "wrangler d1 migrations apply calorie --local",
     "db:migrate:remote": "wrangler d1 migrations apply calorie --remote",
     "types:worker": "wrangler types",
