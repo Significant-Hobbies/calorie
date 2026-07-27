@@ -1,16 +1,23 @@
-import { useEffect, useState } from 'react';
+import { lazy, Suspense, useEffect, useState } from 'react';
 import { AppMark } from './components/AppMark';
 import { AppShell, type AppTab } from './components/AppShell';
-import { getProfile, startOfflineRetry } from './lib/api';
-import { type AppSession, getSession } from './lib/auth-client';
+import { getBootstrap, startOfflineRetry } from './lib/api';
+import type { AppSession } from './lib/auth-client';
 import type { UserProfile } from './lib/types';
-import { FoodsPage } from './pages/FoodsPage';
 import { LegalPage } from './pages/LegalPage';
 import { LoginPage } from './pages/LoginPage';
 import { OnboardingPage } from './pages/OnboardingPage';
-import { ProgressPage } from './pages/ProgressPage';
-import { SettingsPage } from './pages/SettingsPage';
 import { TodayPage } from './pages/TodayPage';
+
+const FoodsPage = lazy(() =>
+  import('./pages/FoodsPage').then((module) => ({ default: module.FoodsPage }))
+);
+const ProgressPage = lazy(() =>
+  import('./pages/ProgressPage').then((module) => ({ default: module.ProgressPage }))
+);
+const SettingsPage = lazy(() =>
+  import('./pages/SettingsPage').then((module) => ({ default: module.SettingsPage }))
+);
 
 type AppState =
   | { status: 'loading' }
@@ -31,13 +38,13 @@ export default function App() {
     if (legalKind) return;
     const stopRetry = startOfflineRetry();
     void (async () => {
-      const session = await getSession();
-      if (!session) {
-        setState({ status: 'signed-out' });
-        return;
-      }
       try {
-        const profile = await getProfile();
+        const bootstrap = await getBootstrap();
+        if (!bootstrap) {
+          setState({ status: 'signed-out' });
+          return;
+        }
+        const { session, profile } = bootstrap;
         setState({
           status: profile.onboardingComplete ? 'ready' : 'onboarding',
           session,
@@ -112,7 +119,17 @@ export default function App() {
       user={state.session.user}
       displayName={state.profile.displayName}
     >
-      {content}
+      <Suspense
+        fallback={
+          <div className="page-stack tab-loading" aria-busy="true">
+            <span className="sr-only">Opening section</span>
+            <div className="skeleton skeleton-title" />
+            <div className="skeleton skeleton-line" />
+          </div>
+        }
+      >
+        {content}
+      </Suspense>
     </AppShell>
   );
 }

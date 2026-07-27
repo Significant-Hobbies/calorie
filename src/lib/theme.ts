@@ -4,7 +4,7 @@ const THEME_KEY = 'calorie-theme';
 
 export function getThemePreference(): ThemePreference {
   const stored = localStorage.getItem(THEME_KEY);
-  return stored === 'light' || stored === 'dark' ? stored : 'system';
+  return stored === 'system' || stored === 'dark' ? stored : 'light';
 }
 
 function resolvedTheme(preference: ThemePreference): 'light' | 'dark' {
@@ -19,8 +19,7 @@ export function applyTheme(preference = getThemePreference()) {
 }
 
 export function setThemePreference(preference: ThemePreference) {
-  if (preference === 'system') localStorage.removeItem(THEME_KEY);
-  else localStorage.setItem(THEME_KEY, preference);
+  localStorage.setItem(THEME_KEY, preference);
   applyTheme(preference);
 }
 

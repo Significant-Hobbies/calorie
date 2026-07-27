@@ -442,7 +442,7 @@ export function SettingsPage({
           </span>
           <div>
             <strong>Appearance</strong>
-            <small>Use your device setting or choose a theme</small>
+            <small>Light by default; choose Dark or follow your device</small>
           </div>
           <select
             aria-label="Appearance"
@@ -453,9 +453,9 @@ export function SettingsPage({
               setThemePreference(preference);
             }}
           >
-            <option value="system">System</option>
             <option value="light">Light</option>
             <option value="dark">Dark</option>
+            <option value="system">System</option>
           </select>
         </div>
         <button

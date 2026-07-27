@@ -1,3 +1,4 @@
+import { type AppSession, getSession } from './auth-client';
 import { calendarHistoryBounds } from './calendar';
 import {
   demoAddEntry,
@@ -37,6 +38,7 @@ import {
 import {
   cacheDashboard,
   cachePrivateValue,
+  deletePrivateValue,
   flushPendingWrites,
   queueWrite,
   readCachedDashboard,
@@ -57,6 +59,11 @@ import type {
 
 const isDemo = () => Boolean(sessionStorage.getItem('calorie-demo'));
 export const isLocalMode = () => localStorage.getItem('calorie-local-mode') === 'true';
+
+type AppBootstrap = {
+  session: NonNullable<AppSession>;
+  profile: UserProfile;
+};
 
 function normalizeProfile(profile: UserProfile): UserProfile {
   const legacyTarget = profile.manualCalorieTarget;
@@ -127,6 +134,51 @@ async function writeOffline<T>(input: {
       createdAt: Date.now(),
     });
     return input.optimistic;
+  }
+}
+
+export async function getBootstrap(): Promise<AppBootstrap | null> {
+  if (isDemo() || isLocalMode()) {
+    const session = await getSession();
+    if (!session) return null;
+    const profile = isDemo() ? demoDashboard().profile : localProfile();
+    return { session, profile: normalizeProfile(profile) };
+  }
+
+  try {
+    const response = await fetch('/api/app/bootstrap', {
+      credentials: 'include',
+      cache: 'no-store',
+    });
+    if (response.status === 401) {
+      await deletePrivateValue('session');
+      return null;
+    }
+    const data = (await response.json().catch(() => null)) as
+      | AppBootstrap
+      | { message?: string }
+      | null;
+    if (!response.ok || !data || !('session' in data) || !('profile' in data)) {
+      const message =
+        data && 'message' in data && typeof data.message === 'string'
+          ? data.message
+          : 'Calorie could not open right now.';
+      throw new Error(message);
+    }
+
+    const bootstrap = {
+      session: data.session,
+      profile: normalizeProfile(data.profile),
+    };
+    await Promise.all([
+      cachePrivateValue('session', bootstrap.session),
+      cachePrivateValue('profile', bootstrap.profile),
+    ]);
+    return bootstrap;
+  } catch (error) {
+    const [session, profile] = await Promise.all([getSession(), getProfile().catch(() => null)]);
+    if (session && profile) return { session, profile };
+    throw error;
   }
 }
 

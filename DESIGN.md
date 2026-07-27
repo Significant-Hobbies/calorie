@@ -44,8 +44,8 @@ carbs, fibre, and energy timing. Neither accent is decorative filler.
 
 Dark mode is a separate semantic palette, not a color inversion. It keeps green,
 sky, plum, cherry, and amber meanings intact while replacing paper, surface,
-line, and ink tokens with low-glare values. System is the default; explicit
-Light or Dark choices are device-scoped.
+line, and ink tokens with low-glare values. Light is the first-run default;
+explicit Light, Dark, and System choices are device-scoped.
 
 ## Typography
 
