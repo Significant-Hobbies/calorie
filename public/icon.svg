@@ -1,7 +1,1 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Calorie">
-  <rect width="512" height="512" rx="112" fill="#47743a"/>
-  <path d="M250 390c-19-92 5-187 81-272 26 70 5 157-81 272Z" fill="#fff"/>
-  <path d="M245 388c-85-28-131-91-135-184 70 17 123 74 135 184Z" fill="#dbead5"/>
-  <circle cx="358" cy="132" r="34" fill="#df3b32"/>
-</svg>
-
+<svg xmlns="http://www.w3.org/2000/svg" aria-label="Calorie" role="img" viewBox="0 0 512 512"><rect width="512" height="512" fill="#47743a" rx="112"/><path fill="#fff" d="M250 390c-19-92 5-187 81-272 26 70 5 157-81 272Z"/><path fill="#dbead5" d="M245 388c-85-28-131-91-135-184 70 17 123 74 135 184Z"/><circle cx="358" cy="132" r="34" fill="#df3b32"/></svg>
