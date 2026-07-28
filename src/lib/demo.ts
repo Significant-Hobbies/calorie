@@ -290,6 +290,34 @@ export function demoAddWeight(input: WeightEntry) {
   return input;
 }
 
+function demoTimingEntry(input: {
+  date: string;
+  id: string;
+  foodId: string;
+  foodName: string;
+  hours: number;
+  minutes: number;
+  calories: number;
+  carbsG: number;
+  proteinG: number;
+  fibreG: number;
+}) {
+  const eatenAt = dateFromKey(input.date);
+  eatenAt.setHours(input.hours, input.minutes, 0, 0);
+  return {
+    id: `${input.date}-${input.id}`,
+    foodId: input.foodId,
+    foodName: input.foodName,
+    amount: 1,
+    unitLabel: 'serving',
+    calories: round(input.calories),
+    carbsG: round(input.carbsG, 1),
+    proteinG: round(input.proteinG, 1),
+    fibreG: round(input.fibreG, 1),
+    eatenAt: eatenAt.getTime(),
+  } satisfies FoodEntry;
+}
+
 export function demoHistory(rangeDays: 7 | 30): HistoryResponse {
   const target = demoDashboard().target.calorieTarget ?? 2000;
   const days = Array.from({ length: rangeDays }, (_, index) => {
@@ -307,7 +335,51 @@ export function demoHistory(rangeDays: 7 | 30): HistoryResponse {
       fastCount: index % 3 === 0 ? 1 : 0,
     };
   });
-  return { days, weights: [...weights], rangeDays };
+  const historyEntries = days.flatMap((day, index) => {
+    if (index === rangeDays - 1) return [...entries];
+    const breakfastMinutes = 25 + (index % 4) * 8;
+    const lunchMinutes = 35 + (index % 3) * 10;
+    const dinnerMinutes = 15 + (index % 5) * 20;
+    return [
+      demoTimingEntry({
+        date: day.date,
+        id: 'oats',
+        foodId: 'oats',
+        foodName: 'Oats & berries',
+        hours: 7,
+        minutes: breakfastMinutes,
+        calories: day.calories * 0.25,
+        carbsG: day.carbsG * 0.3,
+        proteinG: day.proteinG * 0.2,
+        fibreG: day.fibreG * 0.3,
+      }),
+      demoTimingEntry({
+        date: day.date,
+        id: 'dal',
+        foodId: 'dal',
+        foodName: 'Dal + rice',
+        hours: 12,
+        minutes: lunchMinutes,
+        calories: day.calories * 0.4,
+        carbsG: day.carbsG * 0.45,
+        proteinG: day.proteinG * 0.35,
+        fibreG: day.fibreG * 0.4,
+      }),
+      demoTimingEntry({
+        date: day.date,
+        id: 'paneer',
+        foodId: 'paneer',
+        foodName: 'Paneer & vegetables',
+        hours: 20 + Math.floor(dinnerMinutes / 60),
+        minutes: dinnerMinutes % 60,
+        calories: day.calories * 0.35,
+        carbsG: day.carbsG * 0.25,
+        proteinG: day.proteinG * 0.45,
+        fibreG: day.fibreG * 0.3,
+      }),
+    ];
+  });
+  return { days, weights: [...weights], entries: historyEntries, rangeDays };
 }
 
 export function demoCalendarHistory(dateKeys: string[]): HistoryResponse {

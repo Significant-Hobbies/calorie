@@ -51,6 +51,7 @@
     --white: #ffffff;
     --line: #dfe5dc;
     --surface: #f7f8f3;
+    --control-track: #e8ece5;
     --chrome: rgb(255 255 255 / 94%);
     --chrome-strong: rgb(255 255 255 / 96%);
     --detail-tile: rgb(255 255 255 / 68%);
@@ -92,6 +93,7 @@
     --white: #182019;
     --line: #344037;
     --surface: #141b16;
+    --control-track: #202a22;
     --chrome: rgb(16 21 18 / 94%);
     --chrome-strong: rgb(16 21 18 / 96%);
     --detail-tile: #2a392a;
@@ -1383,7 +1385,7 @@
     border: 0;
     margin: 0;
     border-radius: 13px;
-    background: #e8ece5;
+    background: var(--control-track);
   }
 
   .segmented-three {
@@ -1540,6 +1542,330 @@
 
   .metric-grid strong {
     font-size: 1rem;
+  }
+
+  .timing-insights {
+    display: grid;
+    gap: 20px;
+    padding: 18px;
+    border: 1px solid var(--line);
+    border-radius: var(--radius-lg);
+    background: var(--white);
+    box-shadow: 0 5px 20px rgb(31 50 29 / 5%);
+  }
+
+  .timing-header,
+  .timing-distribution-heading,
+  .timing-distribution-heading > div {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+  }
+
+  .timing-header p {
+    color: var(--moss-700);
+    font-size: 0.75rem;
+    font-weight: var(--weight-strong);
+    letter-spacing: 0.11em;
+    text-transform: uppercase;
+  }
+
+  .timing-header h2 {
+    margin-top: 2px;
+    font-size: 1.125rem;
+    line-height: 1.2;
+    letter-spacing: -0.025em;
+  }
+
+  .timing-header > span,
+  .timing-distribution-heading > span {
+    flex: none;
+    padding: 5px 9px;
+    border-radius: 999px;
+    background: var(--moss-100);
+    color: var(--moss-900);
+    font-size: 0.75rem;
+    font-weight: var(--weight-strong);
+  }
+
+  .timing-clock {
+    padding: 4px 2px 0;
+  }
+
+  .timing-clock-labels {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 9px;
+    color: var(--ink-soft);
+    font-size: 0.75rem;
+    font-weight: var(--weight-label);
+  }
+
+  .timing-rail {
+    position: relative;
+    height: 8px;
+    margin: 0 11px 22px;
+    border-radius: 999px;
+    background: var(--surface);
+  }
+
+  .timing-tick {
+    position: absolute;
+    top: -4px;
+    bottom: -4px;
+    width: 1px;
+    background: var(--line);
+  }
+
+  .timing-tick.is-noon {
+    left: 50%;
+  }
+
+  .timing-marker {
+    position: absolute;
+    top: 50%;
+    left: var(--timing-position);
+    width: 30px;
+    height: 30px;
+    display: grid;
+    place-items: center;
+    border: 3px solid var(--white);
+    border-radius: 50%;
+    color: var(--moss-900);
+    transform: translate(-50%, -50%);
+  }
+
+  .timing-marker.is-first {
+    background: var(--amber-soft);
+    color: var(--moss-900);
+    outline: 1px solid var(--amber);
+  }
+
+  .timing-marker.is-last {
+    background: var(--plum-soft);
+    color: var(--plum);
+    outline: 1px solid var(--plum);
+  }
+
+  .timing-marker svg {
+    width: 15px;
+    height: 15px;
+  }
+
+  .timing-clock-values {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+  }
+
+  .timing-clock-values > div {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    align-items: center;
+    column-gap: 7px;
+  }
+
+  .timing-clock-values > div:last-child {
+    text-align: right;
+  }
+
+  .timing-clock-values svg {
+    width: 17px;
+    color: var(--moss-700);
+  }
+
+  .timing-clock-values > div:last-child svg {
+    grid-column: 2;
+    grid-row: 1 / span 2;
+    justify-self: end;
+    color: var(--plum);
+  }
+
+  .timing-clock-values span {
+    color: var(--ink-soft);
+    font-size: 0.75rem;
+  }
+
+  .timing-clock-values strong {
+    grid-column: 2;
+    font-size: 0.9375rem;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .timing-clock-values > div:last-child span,
+  .timing-clock-values > div:last-child strong {
+    grid-column: 1;
+  }
+
+  .timing-facts {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    margin: 0;
+    border-top: 1px solid var(--line);
+    border-bottom: 1px solid var(--line);
+  }
+
+  .timing-facts > div {
+    min-width: 0;
+    padding: 15px 12px 15px 0;
+  }
+
+  .timing-facts > div:nth-child(2) {
+    padding-right: 0;
+    padding-left: 12px;
+    border-left: 1px solid var(--line);
+  }
+
+  .timing-facts > div:last-child {
+    grid-column: 1 / -1;
+    padding-right: 0;
+    border-top: 1px solid var(--line);
+  }
+
+  .timing-facts dt,
+  .timing-facts small {
+    color: var(--ink-soft);
+    font-size: 0.75rem;
+    line-height: 1.4;
+  }
+
+  .timing-facts dd {
+    margin: 3px 0 1px;
+    overflow-wrap: anywhere;
+    font-size: 1rem;
+    font-weight: var(--weight-strong);
+    line-height: 1.25;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .timing-distribution {
+    display: grid;
+    gap: 13px;
+  }
+
+  .timing-distribution-heading > div {
+    justify-content: flex-start;
+  }
+
+  .timing-distribution-heading svg {
+    width: 19px;
+    color: var(--moss-700);
+  }
+
+  .timing-distribution-heading h3 {
+    font-size: 0.9375rem;
+    line-height: 1.25;
+  }
+
+  .timing-distribution-heading p {
+    color: var(--ink-soft);
+    font-size: 0.75rem;
+  }
+
+  .timing-band-bar {
+    height: 15px;
+    display: flex;
+    gap: 2px;
+    overflow: hidden;
+    border-radius: 999px;
+    background: var(--surface);
+  }
+
+  .timing-band {
+    min-width: 0;
+    flex-basis: 0;
+  }
+
+  .timing-band.is-before_noon,
+  .timing-band-legend i.is-before_noon {
+    background: var(--amber);
+  }
+
+  .timing-band.is-midday,
+  .timing-band-legend i.is-midday {
+    background: var(--moss-600);
+  }
+
+  .timing-band.is-after_five,
+  .timing-band-legend i.is-after_five {
+    background: var(--plum);
+  }
+
+  .timing-band-legend {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
+    padding: 0;
+    list-style: none;
+  }
+
+  .timing-band-legend li {
+    min-width: 0;
+    display: grid;
+    gap: 2px;
+  }
+
+  .timing-band-legend li > span {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    color: var(--ink-soft);
+    font-size: 0.75rem;
+  }
+
+  .timing-band-legend i {
+    width: 7px;
+    height: 7px;
+    flex: none;
+    border-radius: 50%;
+  }
+
+  .timing-band-legend strong {
+    padding-left: 12px;
+    font-size: 0.8125rem;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .timing-protein-note,
+  .timing-footnote {
+    color: var(--ink-soft);
+    font-size: 0.75rem;
+    line-height: 1.4;
+  }
+
+  .timing-protein-note {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .timing-protein-note svg {
+    width: 15px;
+    color: var(--moss-700);
+  }
+
+  .timing-footnote {
+    padding-top: 14px;
+    border-top: 1px solid var(--line);
+  }
+
+  .timing-empty {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 18px 0;
+  }
+
+  .timing-empty h3 {
+    font-size: 1rem;
+  }
+
+  .timing-empty p {
+    max-width: 48ch;
+    margin-top: 3px;
+    color: var(--ink-soft);
+    font-size: 0.8125rem;
   }
 
   .chart-card,
@@ -2752,6 +3078,30 @@
       grid-template-columns: repeat(4, 1fr);
     }
 
+    .timing-facts {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+
+    .timing-facts > div {
+      padding-right: 16px;
+      padding-left: 16px;
+    }
+
+    .timing-facts > div:first-child {
+      padding-left: 0;
+    }
+
+    .timing-facts > div:nth-child(2),
+    .timing-facts > div:last-child {
+      border-top: 0;
+      border-left: 1px solid var(--line);
+    }
+
+    .timing-facts > div:last-child {
+      grid-column: auto;
+      padding-right: 0;
+    }
+
     .calendar-card {
       padding: 20px;
     }
@@ -2862,9 +3212,37 @@
       align-items: flex-start;
       flex-direction: column;
     }
+
+    .timing-insights {
+      padding: 16px;
+    }
   }
 
   @media (max-width: 360px) {
+    .timing-header,
+    .timing-distribution-heading {
+      align-items: flex-start;
+      flex-direction: column;
+    }
+
+    .timing-facts {
+      grid-template-columns: 1fr;
+    }
+
+    .timing-facts > div,
+    .timing-facts > div:nth-child(2),
+    .timing-facts > div:last-child {
+      grid-column: auto;
+      padding-right: 0;
+      padding-left: 0;
+      border-top: 1px solid var(--line);
+      border-left: 0;
+    }
+
+    .timing-facts > div:first-child {
+      border-top: 0;
+    }
+
     .calendar-card {
       margin-right: -16px;
       margin-left: -16px;

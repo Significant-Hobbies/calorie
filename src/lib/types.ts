@@ -140,7 +140,36 @@ export type HistoryDay = Nutrients & {
 export type HistoryResponse = {
   days: HistoryDay[];
   weights: WeightEntry[];
+  entries?: FoodEntry[];
   rangeDays?: 7 | 30;
+};
+
+export type MealTimingBandKey = 'before_noon' | 'midday' | 'after_five';
+
+export type MealTimingBand = {
+  key: MealTimingBandKey;
+  calories: number;
+  proteinG: number;
+  calorieShare: number;
+  proteinShare: number;
+};
+
+export type MealTimingAnalysis = {
+  loggedDays: number;
+  entryCount: number;
+  typicalFirstMinutes: number | null;
+  typicalLastMinutes: number | null;
+  averageEatingWindowMinutes: number | null;
+  eatingWindowDays: number;
+  sleepRoutineMinutes: number;
+  nearSleepDays: number;
+  bands: MealTimingBand[];
+  leadingProteinBand: MealTimingBandKey | null;
+  mostLoggedFood: {
+    name: string;
+    entryCount: number;
+    typicalMinutes: number;
+  } | null;
 };
 
 export type PendingWrite = {

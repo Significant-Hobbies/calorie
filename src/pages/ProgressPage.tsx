@@ -1,8 +1,10 @@
 import { Activity, CalendarDays, Droplets, Scale, Sprout } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { HistoryCalendar } from '../components/HistoryCalendar';
+import { MealTimingInsights } from '../components/MealTimingInsights';
 import { addWeight, getCalendarHistory, getDashboard, getHistory } from '../lib/api';
 import { calendarGrid, isSameMonth, localDateKey, shiftMonth } from '../lib/calendar';
+import { analyzeMealTiming } from '../lib/meal-timing';
 import type { Dashboard, HistoryResponse } from '../lib/types';
 
 function shortDay(date: string) {
@@ -86,6 +88,15 @@ export function ProgressPage() {
       fasts: history.days.reduce((sum, day) => sum + day.fastCount, 0),
     };
   }, [history]);
+  const mealTiming = useMemo(() => {
+    if (!history || !dashboard) return null;
+    return analyzeMealTiming({
+      entries: history.entries ?? [],
+      timezone: dashboard.timezone,
+      wakeTime: dashboard.profile.wakeTime,
+      sleepHours: dashboard.profile.sleepHours,
+    });
+  }, [dashboard, history]);
 
   const saveWeight = async () => {
     if (!dashboard) return;
@@ -236,6 +247,10 @@ export function ProgressPage() {
                   <strong>{summary.fasts}</strong>
                 </article>
               </section>
+
+              {mealTiming ? (
+                <MealTimingInsights analysis={mealTiming} rangeDays={rangeDays} />
+              ) : null}
 
               <section className="chart-card" aria-labelledby="intake-chart-title">
                 <header>

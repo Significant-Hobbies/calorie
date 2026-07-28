@@ -1,0 +1,50 @@
+- region [ref=f1e566] [box=16,640,358,796]:
+  - generic [ref=f1e567] [box=33,657,324,42]:
+    - generic [ref=f1e568] [box=33,657,159,42]:
+      - paragraph [ref=f1e569] [box=33,657,159,18]: Meal timing
+      - heading "Your eating rhythm" [level=2] [ref=f1e570] [box=33,677,159,22]
+    - generic [ref=f1e571] [box=256,663,101,28]: 7 logged days
+  - img "Typical first food at 7:34; typical last food at 20:12." [ref=f1e572] [box=33,718,324,108]:
+    - generic [ref=f1e573] [box=35,722,320,18]:
+      - generic [ref=f1e574] [box=35,722,51,18]: Midnight
+      - generic [ref=f1e575] [box=180,722,31,18]: Noon
+      - generic [ref=f1e576] [box=304,722,51,18]: Midnight
+    - generic [ref=f1e588] [box=35,779,320,47]:
+      - generic [ref=f1e589] [box=35,779,154,47]:
+        - generic [ref=f1e595] [box=59,782,130,18]: Typical first food
+        - strong [ref=f1e596] [box=59,803,130,23]: 7:34
+      - generic [ref=f1e597] [box=201,779,154,47]:
+        - generic [ref=f1e600] [box=201,781,88,18]: Typical last food
+        - strong [ref=f1e601] [box=201,802,88,23]: 20:12
+  - generic [ref=f1e602] [box=33,846,324,217]:
+    - generic [ref=f1e603] [box=33,847,162,119]:
+      - term [ref=f1e604] [box=33,862,150,17]: Eating window
+      - definition [ref=f1e605] [box=33,882,150,20]: 12 hr 6 min
+      - generic [ref=f1e606] [box=33,908,149,17]: 7 days with multiple entries
+    - generic [ref=f1e607] [box=195,847,162,119]:
+      - term [ref=f1e608] [box=208,862,149,17]: Near estimated sleep
+      - definition [ref=f1e609] [box=208,882,149,20]: 2 of 7 days
+      - generic [ref=f1e610] [box=208,908,145,41]: Last food within 2 hr either side of 23:00
+    - generic [ref=f1e611] [box=33,966,324,96]:
+      - term [ref=f1e612] [box=33,982,324,17]: Most logged food
+      - definition [ref=f1e613] [box=33,1001,324,20]: Dal + rice
+      - text: 7 entries · usually around 12:45
+  - generic [ref=f1e614] [box=33,1082,324,234]:
+    - generic [ref=f1e615] [box=33,1082,324,85]:
+      - generic [ref=f1e620] [box=64,1082,205,85]:
+        - heading "When calories land" [level=3] [ref=f1e621] [box=64,1097,205,19]
+        - paragraph [ref=f1e622] [box=64,1131,205,36]: Most logged calories land noon–5 pm
+      - generic [ref=f1e623] [box=280,1111,77,28]: 20 entries
+    - img "Before noon 26 percent, Noon–5 pm 41 percent, After 5 pm 33 percent" [ref=f1e624] [box=33,1180,324,15]
+    - list [ref=f1e628] [box=33,1224,324,40]:
+      - listitem [ref=f1e629] [box=33,1224,103,40]:
+        - generic [ref=f1e630] [box=33,1224,103,18]: Before noon
+        - strong [ref=f1e632] [box=33,1244,103,20]: 26%
+      - listitem [ref=f1e633] [box=144,1224,103,40]:
+        - generic [ref=f1e634] [box=144,1224,103,18]: Noon–5 pm
+        - strong [ref=f1e636] [box=144,1244,103,20]: 41%
+      - listitem [ref=f1e637] [box=254,1224,103,40]:
+        - generic [ref=f1e638] [box=254,1224,103,18]: After 5 pm
+        - strong [ref=f1e640] [box=254,1244,103,20]: 33%
+    - paragraph [ref=f1e641] [box=33,1293,324,24]: The largest share of logged protein lands after 5 pm.
+  - paragraph [ref=f1e645] [box=33,1337,324,82]: Based on 7-day logged entries only. Missing days are not counted, and these patterns do not establish cause and effect. Sleep time is estimated from your saved wake time and sleep duration.

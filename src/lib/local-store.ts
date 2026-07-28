@@ -365,7 +365,7 @@ function buildLocalHistory(
     weights: state.weights.filter(
       (entry) => entry.recordedAt >= startAt && entry.recordedAt < endAt
     ),
-    ...(rangeDays ? { rangeDays } : {}),
+    ...(rangeDays ? { rangeDays, entries } : {}),
   };
 }
 

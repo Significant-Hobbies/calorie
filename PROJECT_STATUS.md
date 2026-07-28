@@ -1,6 +1,6 @@
 # Calorie — PROJECT STATUS
 
-Last updated: 2026-07-27
+Last updated: 2026-07-28
 
 ## Why / What
 
@@ -32,6 +32,8 @@ full sets/reps workout-programming system.
 
 ## Timeline
 
+- 2026-07-28 — released deterministic meal-timing insights from existing food
+  timestamps across 7- and 30-day trends
 - 2026-07-27 — released maintenance-relative calorie ranges, uncapped water
   logging, private medication routines/check-offs, dark mode, and PWA install
   hardening
@@ -61,6 +63,8 @@ full sets/reps workout-programming system.
   Morning/Evening/Either daily check-offs
 - Automatic fasting, next-exercise, and sleep-time estimates
 - Seven- and thirty-day progress views with non-colour chart cues
+- Timezone-aware eating rhythm, nutrient timing, and repeated-food timing
+  analysis with visible samples and assumptions
 - Navigable month calendar with daily nutrition, water, fasting, and weight details
 - Installable PWA shell, recent cloud-state cache, and queued offline writes
 - System, Light, and composed botanical Dark appearance modes
@@ -75,7 +79,8 @@ full sets/reps workout-programming system.
 
 ### Deferred
 
-- Barcode scanning, wearable sync, deeper trends, and richer reminders.
+- Barcode scanning, wearable sync, weight/health correlations, and richer
+  reminders.
 
 ### Blocked
 

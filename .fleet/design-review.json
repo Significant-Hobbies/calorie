@@ -2,7 +2,7 @@
   "$schema": "fleet.design-review.v1",
   "version": 1,
   "project": "calorie",
-  "target": "app shell dark mode and installability",
+  "target": "Progress meal timing insights",
   "mode": "preserve",
   "register": "product",
   "context": {
@@ -14,33 +14,37 @@
     "probes": [],
     "selected": "existing-design",
     "approval": "not-required",
-    "before": "docs/design/reviews/2026-07-27-daily-care-theme/before-390.png"
+    "before": "docs/design/reviews/2026-07-28-meal-timing-insights/before-390.png"
   },
   "evidence": {
     "screenshots": [
       {
         "width": 390,
-        "path": "docs/design/reviews/2026-07-27-daily-care-theme/after-390-dark.png"
+        "path": "docs/design/reviews/2026-07-28-meal-timing-insights/after-390.png"
       },
       {
         "width": 768,
-        "path": "docs/design/reviews/2026-07-27-daily-care-theme/after-768.png"
+        "path": "docs/design/reviews/2026-07-28-meal-timing-insights/after-768.png"
       },
       {
         "width": 1440,
-        "path": "docs/design/reviews/2026-07-27-daily-care-theme/after-1440.png"
+        "path": "docs/design/reviews/2026-07-28-meal-timing-insights/after-1440.png"
+      },
+      {
+        "width": 390,
+        "path": "docs/design/reviews/2026-07-28-meal-timing-insights/after-390-dark.png"
       }
     ],
     "projectCheck": {
-      "command": "pnpm check",
+      "command": "pnpm check; openspec validate meal-timing-insights --strict; git diff --check",
       "status": "pass"
     },
     "critique": {
-      "score": 38,
+      "score": 36,
       "maximum": 40
     },
     "audit": {
-      "score": 20,
+      "score": 19,
       "maximum": 20
     },
     "unresolved": {
@@ -49,11 +53,15 @@
     },
     "detector": {
       "posture": "advisory",
-      "findings": []
+      "findings": [
+        "CLI detector: 0 findings in MealTimingInsights.tsx, ProgressPage.tsx, or styles.css.",
+        "Detector reported 16 side-tab matches in generated Worker artifacts and one broken-image text match in generated type declarations; all were non-rendered false positives.",
+        "Browser overlay injection was unavailable because mutable injection was blocked; responsive and accessibility checks used the live surface and saved snapshots."
+      ]
     }
   },
   "ownerFeedback": {
-    "decision": "delegated",
-    "note": "The owner requested direct implementation without a separate visual approval round."
+    "decision": "keep",
+    "note": "Owner approved the direction by requesting release on 2026-07-28."
   }
 }
