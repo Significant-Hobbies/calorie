@@ -70,18 +70,8 @@ full sets/reps workout-programming system.
 - System, Light, and composed botanical Dark appearance modes
 - Responsive mobile, tablet, and desktop UI with accessible touch targets
 
-## Todo / Planned / Deferred / Blocked
+## Work queue
 
-### Planned
-
-1. Add export/import only if moving a local journal between devices becomes
-   important.
-
-### Deferred
-
-- Barcode scanning, wearable sync, weight/health correlations, and richer
-  reminders.
-
-### Blocked
-
-- None
+Open work is tracked only in [GitHub Issues](https://github.com/sarthakagrawal927/calorie/issues).
+An open issue is a to-do, a linked pull request is in progress, and merge plus
+issue closure makes the work done.
