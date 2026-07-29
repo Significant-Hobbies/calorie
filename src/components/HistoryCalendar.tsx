@@ -8,6 +8,7 @@ import {
   Utensils,
 } from 'lucide-react';
 import { dateFromKey, isSameMonth, localDateKey } from '../lib/calendar';
+import { entriesForLocalDate } from '../lib/history';
 import type { HistoryDay, HistoryResponse, NutritionTarget, WeightEntry } from '../lib/types';
 
 type HistoryCalendarProps = {
@@ -23,8 +24,9 @@ type HistoryCalendarProps = {
 
 const WEEKDAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
-function hasDayData(day: HistoryDay, weights: WeightEntry[]) {
+function hasDayData(day: HistoryDay, weights: WeightEntry[], hasFoodEntry = false) {
   return (
+    hasFoodEntry ||
     day.calories > 0 ||
     day.waterMl > 0 ||
     day.fastCount > 0 ||
@@ -49,9 +51,21 @@ function fullDate(date: string) {
   }).format(dateFromKey(date));
 }
 
-function cellLabel(day: HistoryDay, weights: WeightEntry[]) {
+function formatTime(timestamp: number) {
+  return new Intl.DateTimeFormat(undefined, {
+    hour: 'numeric',
+    minute: '2-digit',
+  }).format(timestamp);
+}
+
+function formatAmount(amount: number, unitLabel: string) {
+  return `${amount.toLocaleString(undefined, { maximumFractionDigits: 1 })} ${unitLabel}`;
+}
+
+function cellLabel(day: HistoryDay, weights: WeightEntry[], hasFoodEntry: boolean) {
   const parts = [fullDate(day.date)];
   if (day.calories > 0) parts.push(`${Math.round(day.calories)} calories`);
+  else if (hasFoodEntry) parts.push('food logged');
   if (day.waterMl > 0) parts.push(`${day.waterMl} millilitres water`);
   if (day.fastCount > 0) parts.push(`${day.fastCount} completed fast`);
   if (weights.some((entry) => localDateKey(new Date(entry.recordedAt)) === day.date)) {
@@ -74,11 +88,17 @@ export function HistoryCalendar({
   const today = new Date();
   const todayKey = localDateKey(today);
   const byDate = new Map(history.days.map((day) => [day.date, day]));
+  const entryDates = new Set(
+    (history.entries ?? []).map((entry) => localDateKey(new Date(entry.eatenAt)))
+  );
   const selectedDay = byDate.get(selectedDate);
   const selectedWeights = history.weights.filter(
     (entry) => localDateKey(new Date(entry.recordedAt)) === selectedDate
   );
-  const selectedHasData = selectedDay ? hasDayData(selectedDay, history.weights) : false;
+  const selectedEntries = entriesForLocalDate(history.entries ?? [], selectedDate);
+  const selectedHasData = selectedDay
+    ? hasDayData(selectedDay, history.weights, selectedEntries.length > 0)
+    : false;
   const canMoveNext = !isSameMonth(month, today);
   const monthLabel = new Intl.DateTimeFormat(undefined, {
     month: 'long',
@@ -138,7 +158,8 @@ export function HistoryCalendar({
           const dayWeights = history.weights.filter(
             (entry) => localDateKey(new Date(entry.recordedAt)) === dateKey
           );
-          const hasData = hasDayData(day, dayWeights);
+          const hasFoodEntry = entryDates.has(dateKey);
+          const hasData = hasDayData(day, dayWeights, hasFoodEntry);
 
           if (!inMonth) {
             return (
@@ -162,7 +183,7 @@ export function HistoryCalendar({
               key={dateKey}
               disabled={isFuture}
               aria-pressed={dateKey === selectedDate}
-              aria-label={cellLabel(day, dayWeights)}
+              aria-label={cellLabel(day, dayWeights, hasFoodEntry)}
               onClick={() => onSelectDate(dateKey)}
             >
               <span className="calendar-day-number">{date.getDate()}</span>
@@ -241,6 +262,38 @@ export function HistoryCalendar({
                 <strong>{selectedDay.fastCount}</strong>
               </div>
             </div>
+            <section className="calendar-foods" aria-labelledby={`calendar-foods-${selectedDate}`}>
+              <header>
+                <h4 id={`calendar-foods-${selectedDate}`}>Food entries</h4>
+                <span>
+                  {selectedEntries.length} {selectedEntries.length === 1 ? 'entry' : 'entries'}
+                </span>
+              </header>
+              {selectedEntries.length > 0 ? (
+                <ol className="calendar-food-list">
+                  {selectedEntries.map((entry) => (
+                    <li className="calendar-food-row" key={entry.id}>
+                      <time dateTime={new Date(entry.eatenAt).toISOString()}>
+                        {formatTime(entry.eatenAt)}
+                      </time>
+                      <span className="calendar-food-dot" aria-hidden="true" />
+                      <div>
+                        <span className="calendar-food-name">
+                          <strong>{entry.foodName}</strong>
+                          <b>{Math.round(entry.calories)} kcal</b>
+                        </span>
+                        <span>
+                          {formatAmount(entry.amount, entry.unitLabel)} · {Math.round(entry.carbsG)}
+                          C · {Math.round(entry.proteinG)}P · {Math.round(entry.fibreG)}F
+                        </span>
+                      </div>
+                    </li>
+                  ))}
+                </ol>
+              ) : (
+                <p className="calendar-food-empty">No food entries were logged on this day.</p>
+              )}
+            </section>
             {target.calorieRange ? (
               <p className="calendar-target-note">
                 Your intake estimate for this goal is {target.calorieRange[0].toLocaleString()}–

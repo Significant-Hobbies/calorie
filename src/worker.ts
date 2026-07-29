@@ -1170,7 +1170,8 @@ app.get('/api/app/history', async (c) => {
   const response: HistoryResponse = {
     days,
     weights: weightResult.results.map(mapWeight),
-    ...(rangeDays ? { rangeDays, entries } : {}),
+    entries,
+    ...(rangeDays ? { rangeDays } : {}),
   };
   return c.json(response);
 });

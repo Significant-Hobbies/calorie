@@ -1,5 +1,6 @@
 import { calendarHistoryBounds } from './calendar';
 import { normalizeDirectEntry } from './entries';
+import { entriesWithinRange } from './history';
 import { activeMedications, upsertMedicationCheckIn } from './medications';
 import {
   calculateCompletedFasts,
@@ -329,9 +330,7 @@ function buildLocalHistory(
       fastCount: 0,
     });
   }
-  const entries = state.entries
-    .filter((entry) => entry.eatenAt >= startAt && entry.eatenAt < endAt)
-    .sort((a, b) => a.eatenAt - b.eatenAt);
+  const entries = entriesWithinRange(state.entries, startAt, endAt);
   for (const entry of entries) {
     const day = days.get(dateKey(entry.eatenAt));
     if (!day) continue;
@@ -365,7 +364,8 @@ function buildLocalHistory(
     weights: state.weights.filter(
       (entry) => entry.recordedAt >= startAt && entry.recordedAt < endAt
     ),
-    ...(rangeDays ? { rangeDays, entries } : {}),
+    entries,
+    ...(rangeDays ? { rangeDays } : {}),
   };
 }
 

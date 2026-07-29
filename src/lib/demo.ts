@@ -1,5 +1,6 @@
 import { calendarHistoryBounds, dateFromKey, localDateKey } from './calendar';
 import { normalizeDirectEntry } from './entries';
+import { entriesWithinRange } from './history';
 import { activeMedications, upsertMedicationCheckIn } from './medications';
 import {
   calculateCompletedFasts,
@@ -12,6 +13,7 @@ import type {
   Food,
   FoodEntry,
   FoodEntryWrite,
+  HistoryDay,
   HistoryResponse,
   Medication,
   MedicationCheckIn,
@@ -318,28 +320,15 @@ function demoTimingEntry(input: {
   } satisfies FoodEntry;
 }
 
-export function demoHistory(rangeDays: 7 | 30): HistoryResponse {
-  const target = demoDashboard().target.calorieTarget ?? 2000;
-  const days = Array.from({ length: rangeDays }, (_, index) => {
-    const date = new Date();
-    date.setDate(date.getDate() - (rangeDays - index - 1));
-    const isToday = index === rangeDays - 1;
-    const wave = Math.sin(index * 1.4);
-    return {
-      date: new Intl.DateTimeFormat('en-CA').format(date),
-      calories: isToday ? totals().calories : round(target + wave * 180 - 60),
-      carbsG: isToday ? totals().carbsG : round(205 + wave * 22),
-      proteinG: isToday ? totals().proteinG : round(102 + wave * 11),
-      fibreG: isToday ? totals().fibreG : round(27 + wave * 4),
-      waterMl: isToday ? totals().waterMl : round(1900 + wave * 280),
-      fastCount: index % 3 === 0 ? 1 : 0,
-    };
-  });
-  const historyEntries = days.flatMap((day, index) => {
-    if (index === rangeDays - 1) return [...entries];
-    const breakfastMinutes = 25 + (index % 4) * 8;
-    const lunchMinutes = 35 + (index % 3) * 10;
-    const dinnerMinutes = 15 + (index % 5) * 20;
+function demoEntriesForDays(days: HistoryDay[]) {
+  const todayKey = localDateKey(new Date());
+  return days.flatMap((day) => {
+    if (day.date === todayKey) return [...entries];
+    if (day.calories <= 0) return [];
+    const dayNumber = Math.floor(dateFromKey(day.date).getTime() / (24 * 60 * 60 * 1000));
+    const breakfastMinutes = 25 + (dayNumber % 4) * 8;
+    const lunchMinutes = 35 + (dayNumber % 3) * 10;
+    const dinnerMinutes = 15 + (dayNumber % 5) * 20;
     return [
       demoTimingEntry({
         date: day.date,
@@ -379,7 +368,26 @@ export function demoHistory(rangeDays: 7 | 30): HistoryResponse {
       }),
     ];
   });
-  return { days, weights: [...weights], entries: historyEntries, rangeDays };
+}
+
+export function demoHistory(rangeDays: 7 | 30): HistoryResponse {
+  const target = demoDashboard().target.calorieTarget ?? 2000;
+  const days = Array.from({ length: rangeDays }, (_, index) => {
+    const date = new Date();
+    date.setDate(date.getDate() - (rangeDays - index - 1));
+    const isToday = index === rangeDays - 1;
+    const wave = Math.sin(index * 1.4);
+    return {
+      date: new Intl.DateTimeFormat('en-CA').format(date),
+      calories: isToday ? totals().calories : round(target + wave * 180 - 60),
+      carbsG: isToday ? totals().carbsG : round(205 + wave * 22),
+      proteinG: isToday ? totals().proteinG : round(102 + wave * 11),
+      fibreG: isToday ? totals().fibreG : round(27 + wave * 4),
+      waterMl: isToday ? totals().waterMl : round(1900 + wave * 280),
+      fastCount: index % 3 === 0 ? 1 : 0,
+    };
+  });
+  return { days, weights: [...weights], entries: demoEntriesForDays(days), rangeDays };
 }
 
 export function demoCalendarHistory(dateKeys: string[]): HistoryResponse {
@@ -420,5 +428,6 @@ export function demoCalendarHistory(dateKeys: string[]): HistoryResponse {
     weights: weights.filter(
       (entry) => entry.recordedAt >= bounds.start && entry.recordedAt < bounds.end
     ),
+    entries: entriesWithinRange(demoEntriesForDays(days), bounds.start, bounds.end),
   };
 }
