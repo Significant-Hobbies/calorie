@@ -97,7 +97,13 @@ export function LoginPage() {
         <p className="privacy-note">
           Local mode stays in this browser. No ads. No social feed. No food judgment.
         </p>
-        <nav className="legal-links" aria-label="Legal">
+        <nav className="legal-links" aria-label="Product information">
+          <a href="/changelog">Changelog</a>
+          <span aria-hidden="true">·</span>
+          <a href="https://github.com/Significant-Hobbies/calorie/issues">Roadmap</a>
+          <span aria-hidden="true">·</span>
+          <a href="https://github.com/Significant-Hobbies/calorie">Source</a>
+          <span aria-hidden="true">·</span>
           <a href="/privacy">Privacy</a>
           <span aria-hidden="true">·</span>
           <a href="/terms">Terms</a>

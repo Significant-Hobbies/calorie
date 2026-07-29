@@ -4,6 +4,7 @@ import { AppShell, type AppTab } from './components/AppShell';
 import { getBootstrap, startOfflineRetry } from './lib/api';
 import type { AppSession } from './lib/auth-client';
 import type { UserProfile } from './lib/types';
+import { ChangelogPage } from './pages/ChangelogPage';
 import { LegalPage } from './pages/LegalPage';
 import { LoginPage } from './pages/LoginPage';
 import { OnboardingPage } from './pages/OnboardingPage';
@@ -29,13 +30,14 @@ type AppState =
 export default function App() {
   const legalKind =
     location.pathname === '/privacy' ? 'privacy' : location.pathname === '/terms' ? 'terms' : null;
+  const isChangelog = location.pathname === '/changelog';
   const [state, setState] = useState<AppState>({ status: 'loading' });
   const [tab, setTab] = useState<AppTab>(() =>
     new URLSearchParams(location.search).get('quick') === 'food' ? 'foods' : 'today'
   );
 
   useEffect(() => {
-    if (legalKind) return;
+    if (legalKind || isChangelog) return;
     const stopRetry = startOfflineRetry();
     void (async () => {
       try {
@@ -58,9 +60,10 @@ export default function App() {
       }
     })();
     return stopRetry;
-  }, [legalKind]);
+  }, [isChangelog, legalKind]);
 
   if (legalKind) return <LegalPage kind={legalKind} />;
+  if (isChangelog) return <ChangelogPage />;
 
   if (state.status === 'loading') {
     return (

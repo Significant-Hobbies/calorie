@@ -32,6 +32,8 @@ full sets/reps workout-programming system.
 
 ## Timeline
 
+- 2026-07-29 — added a public, editorial `/changelog` with verified release
+  outcomes plus direct repository Roadmap and Source links
 - 2026-07-29 — released chronological food-entry details for selected dates in
   calendar history across local, demo, and private cloud journals
 - 2026-07-28 — released deterministic meal-timing insights from existing food
