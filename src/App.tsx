@@ -67,10 +67,12 @@ export default function App() {
 
   if (state.status === 'loading') {
     return (
-      <main className="splash" aria-busy="true">
+      <main className="splash" aria-busy="true" aria-live="polite">
         <AppMark size="large" />
-        <div className="skeleton skeleton-title" />
-        <div className="skeleton skeleton-line" />
+        <p className="splash-status" role="status">
+          Opening your food journal…
+        </p>
+        <div className="skeleton skeleton-line" aria-hidden="true" />
       </main>
     );
   }

@@ -3142,6 +3142,12 @@
     color: var(--ink-soft);
   }
 
+  .splash-status {
+    margin: 0;
+    color: var(--ink-soft);
+    font-weight: var(--weight-label);
+  }
+
   .skeleton {
     min-height: 18px;
     border-radius: 12px;
