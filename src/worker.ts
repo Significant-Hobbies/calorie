@@ -1,4 +1,5 @@
 import { Hono } from 'hono';
+import { handleAgentEdge } from './agent-edge.mjs';
 import { normalizeDirectEntry } from './lib/entries';
 import {
   calculateCompletedFasts,
@@ -41,6 +42,12 @@ const SECURITY_HEADERS = {
   'Referrer-Policy': 'strict-origin-when-cross-origin',
   'Permissions-Policy': 'camera=(), microphone=(), geolocation=()',
 };
+
+app.use('*', async (c, next) => {
+  const agentResponse = handleAgentEdge(c.req.raw);
+  if (agentResponse) return agentResponse;
+  await next();
+});
 
 app.use('/api/*', async (c, next) => {
   await next();
