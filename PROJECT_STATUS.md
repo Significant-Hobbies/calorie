@@ -32,6 +32,9 @@ full sets/reps workout-programming system.
 
 ## Timeline
 
+- 2026-07-31 — prepared and locally verified public agent discovery,
+  privacy/changelog Markdown, sitemap coverage, and complete homepage
+  search/social metadata; production deployment remains separate
 - 2026-07-30 — released remaining-macro completion suggestions, an inferred
   daily rating, a dedicated food-analytics Insights tab, and last-used quick
   picks replacing the favourite pin
