@@ -1,6 +1,10 @@
-## Shared Fleet Standard
+## Repository operating rules
 
-Also read and follow the shared Fleet instructions at `../AGENTS.md`.
+This repository is independently operable. Its tracked instructions and
+commands are authoritative; no sibling Fleet checkout is required. Keep changes
+scoped, use the smallest relevant repo-local check, track durable follow-up in
+this repository's GitHub Issues, and require explicit approval before deploys,
+migrations, or credential changes.
 
 ## Project
 
@@ -20,7 +24,5 @@ Also read and follow the shared Fleet instructions at `../AGENTS.md`.
 
 ## Visual work
 
-Use the Fleet-local Impeccable workflow. `PRODUCT.md` owns design context,
-`DESIGN.md` owns visual tokens and interaction rules, and `PROJECT_STATUS.md`
-owns product delivery status.
-
+`PRODUCT.md` owns design context, `DESIGN.md` owns visual tokens and interaction
+rules, and `PROJECT_STATUS.md` owns product delivery status.
