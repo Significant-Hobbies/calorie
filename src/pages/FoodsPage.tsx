@@ -1,4 +1,4 @@
-import { Apple, Check, Pencil, Plus, Search, Star, Trash2, X } from 'lucide-react';
+import { Apple, Pencil, Plus, Search, Trash2, X } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { createFood, deleteFood, getDashboard, saveFood } from '../lib/api';
 import type { Food, ServingMode } from '../lib/types';
@@ -52,12 +52,7 @@ export function FoodsPage() {
     const term = query.trim().toLocaleLowerCase();
     return [...foods]
       .filter((food) => !term || food.name.toLocaleLowerCase().includes(term))
-      .sort(
-        (a, b) =>
-          Number(b.favourite) - Number(a.favourite) ||
-          (b.lastUsedAt ?? 0) - (a.lastUsedAt ?? 0) ||
-          a.name.localeCompare(b.name)
-      );
+      .sort((a, b) => (b.lastUsedAt ?? 0) - (a.lastUsedAt ?? 0) || a.name.localeCompare(b.name));
   }, [foods, query]);
 
   const openNew = () => {
@@ -175,8 +170,8 @@ export function FoodsPage() {
         <section className="food-list" aria-label="Saved foods">
           {filtered.map((food) => (
             <button className="food-row" key={food.id} type="button" onClick={() => openEdit(food)}>
-              <span className={food.favourite ? 'food-glyph is-favourite' : 'food-glyph'}>
-                {food.favourite ? <Star aria-hidden="true" /> : <Apple aria-hidden="true" />}
+              <span className="food-glyph">
+                <Apple aria-hidden="true" />
               </span>
               <span className="food-row-copy">
                 <strong>{food.name}</strong>
@@ -349,22 +344,6 @@ export function FoodsPage() {
                   <b>{draft.servingMode === 'per_100g' ? 'g' : draft.unitLabel || 'unit'}</b>
                 </div>
               </label>
-
-              <button
-                className="favourite-toggle"
-                type="button"
-                aria-pressed={draft.favourite}
-                onClick={() =>
-                  setDraft((current) =>
-                    current ? { ...current, favourite: !current.favourite } : current
-                  )
-                }
-              >
-                <span className={draft.favourite ? 'check-box is-checked' : 'check-box'}>
-                  {draft.favourite ? <Check size={15} aria-hidden="true" /> : null}
-                </span>
-                Show this in Today’s quick picks
-              </button>
             </div>
 
             {error ? (

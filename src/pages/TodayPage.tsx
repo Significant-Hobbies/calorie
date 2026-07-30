@@ -15,6 +15,7 @@ import {
   RotateCcw,
   Save,
   Sprout,
+  Star,
   Trash2,
   Wheat,
   X,
@@ -33,7 +34,9 @@ import {
   updateFoodEntry,
   updateMedication,
 } from '../lib/api';
+import { computeDailyRating } from '../lib/daily-rating';
 import { directEntryError } from '../lib/entries';
+import { computeMacroCompletion } from '../lib/macro-completion';
 import {
   calculateGymGuidance,
   calculateSleepGuidance,
@@ -178,6 +181,37 @@ export function TodayPage({ onOpenFoods }: { onOpenFoods: () => void }) {
     });
   }, [dashboard]);
   const latestFast = useMemo(() => dashboard?.completedFasts.at(-1) ?? null, [dashboard]);
+  const completion = useMemo(
+    () =>
+      dashboard
+        ? computeMacroCompletion({
+            totals: dashboard.totals,
+            target: dashboard.target,
+            foods: dashboard.foods,
+          })
+        : null,
+    [dashboard]
+  );
+  const quickFoods = useMemo(
+    () =>
+      dashboard
+        ? [...dashboard.foods].sort(
+            (a, b) => (b.lastUsedAt ?? 0) - (a.lastUsedAt ?? 0) || a.name.localeCompare(b.name)
+          )
+        : [],
+    [dashboard]
+  );
+  const rating = useMemo(
+    () =>
+      dashboard
+        ? computeDailyRating({
+            totals: dashboard.totals,
+            target: dashboard.target,
+            waterTargetMl: dashboard.profile.waterTargetMl,
+          })
+        : null,
+    [dashboard]
+  );
 
   const quickAdd = async (food: Food) => {
     if (!dashboard || pendingId) return;
@@ -701,7 +735,19 @@ export function TodayPage({ onOpenFoods }: { onOpenFoods: () => void }) {
               </small>
             ) : null}
           </div>
-          <span>{target ? `${Math.round(calorieProgress)}%` : '—'}</span>
+          <div className="summary-topline-right">
+            {rating ? (
+              <span
+                className="daily-rating"
+                title={`Based on ${rating.factors.map((f) => f.label).join(', ')} completion`}
+              >
+                <Star aria-hidden="true" />
+                <strong>{rating.rating.toFixed(1)}</strong>
+                <small>{rating.label}</small>
+              </span>
+            ) : null}
+            <span>{target ? `${Math.round(calorieProgress)}%` : '—'}</span>
+          </div>
         </div>
         <div className="progress-bar" aria-hidden="true">
           <span style={{ width: `${calorieProgress}%` }} />
@@ -726,6 +772,77 @@ export function TodayPage({ onOpenFoods }: { onOpenFoods: () => void }) {
         </div>
       </section>
 
+      {completion ? (
+        <section className="remaining-panel" aria-labelledby="remaining-title">
+          <div className="section-heading">
+            <div>
+              <h2 id="remaining-title">Remaining today</h2>
+              <p>
+                {completion.complete
+                  ? 'You’ve hit your tracked targets.'
+                  : completion.leadingMacro === 'calories'
+                    ? 'Calories are your widest gap.'
+                    : completion.leadingMacro === 'protein'
+                      ? 'Protein is your widest gap.'
+                      : 'Fibre is your widest gap.'}
+              </p>
+            </div>
+          </div>
+          {completion.complete ? (
+            <div className="remaining-complete">
+              <Check aria-hidden="true" />
+              <span>Targets met — enjoy the rest of your day.</span>
+            </div>
+          ) : (
+            <>
+              <div className="remaining-totals">
+                <div>
+                  <strong>{completion.remainingCalories.toLocaleString()}</strong>
+                  <small>kcal left</small>
+                </div>
+                <div>
+                  <strong>{completion.remainingProteinG.toLocaleString()}</strong>
+                  <small>g protein left</small>
+                </div>
+                <div>
+                  <strong>{completion.remainingFibreG.toLocaleString()}</strong>
+                  <small>g fibre left</small>
+                </div>
+              </div>
+              {completion.suggestions.length ? (
+                <div className="remaining-suggestions">
+                  <p className="remaining-suggestions-label">One serving covers the most:</p>
+                  {completion.suggestions.map((item) => (
+                    <button
+                      key={item.food.id}
+                      className="quick-food"
+                      type="button"
+                      disabled={Boolean(pendingId)}
+                      onClick={() => void quickAdd(item.food)}
+                    >
+                      <span className="food-glyph" aria-hidden="true">
+                        <Apple size={20} />
+                      </span>
+                      <span>
+                        <strong>{item.food.name}</strong>
+                        <small>
+                          {item.calories} kcal · {item.proteinG}g protein · {item.fibreG}g fibre
+                        </small>
+                      </span>
+                      <Plus size={18} aria-hidden="true" />
+                    </button>
+                  ))}
+                </div>
+              ) : (
+                <p className="remaining-no-foods">
+                  Save a few foods to get one-tap suggestions that fill the gap.
+                </p>
+              )}
+            </>
+          )}
+        </section>
+      ) : null}
+
       <section className="quick-section" aria-labelledby="quick-food-title">
         <div className="section-heading">
           <div>
@@ -737,7 +854,7 @@ export function TodayPage({ onOpenFoods }: { onOpenFoods: () => void }) {
           </button>
         </div>
         <div className="quick-foods">
-          {dashboard.foods.slice(0, 4).map((food) => (
+          {quickFoods.slice(0, 4).map((food) => (
             <button
               key={food.id}
               className="quick-food"

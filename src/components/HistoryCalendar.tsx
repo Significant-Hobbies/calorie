@@ -5,9 +5,11 @@ import {
   Droplets,
   Scale,
   Sprout,
+  Star,
   Utensils,
 } from 'lucide-react';
 import { dateFromKey, isSameMonth, localDateKey } from '../lib/calendar';
+import { computeDailyRating } from '../lib/daily-rating';
 import { entriesForLocalDate } from '../lib/history';
 import type { HistoryDay, HistoryResponse, NutritionTarget, WeightEntry } from '../lib/types';
 
@@ -17,6 +19,7 @@ type HistoryCalendarProps = {
   selectedDate: string;
   target: NutritionTarget;
   units: 'metric' | 'imperial';
+  waterTargetMl: number;
   onPreviousMonth: () => void;
   onNextMonth: () => void;
   onSelectDate: (date: string) => void;
@@ -81,6 +84,7 @@ export function HistoryCalendar({
   selectedDate,
   target,
   units,
+  waterTargetMl,
   onPreviousMonth,
   onNextMonth,
   onSelectDate,
@@ -99,6 +103,18 @@ export function HistoryCalendar({
   const selectedHasData = selectedDay
     ? hasDayData(selectedDay, history.weights, selectedEntries.length > 0)
     : false;
+  const selectedRating = selectedDay
+    ? computeDailyRating({
+        totals: {
+          calories: selectedDay.calories,
+          proteinG: selectedDay.proteinG,
+          fibreG: selectedDay.fibreG,
+          waterMl: selectedDay.waterMl,
+        },
+        target,
+        waterTargetMl,
+      })
+    : null;
   const canMoveNext = !isSameMonth(month, today);
   const monthLabel = new Intl.DateTimeFormat(undefined, {
     month: 'long',
@@ -223,9 +239,21 @@ export function HistoryCalendar({
             <p>{selectedDate === todayKey ? 'Today' : 'Day detail'}</p>
             <h3>{fullDate(selectedDate)}</h3>
           </div>
-          <span className={selectedHasData ? 'day-status has-data' : 'day-status'}>
-            {selectedHasData ? 'Logged' : 'No log'}
-          </span>
+          <div className="calendar-detail-status">
+            {selectedRating ? (
+              <span
+                className="daily-rating"
+                title={`Based on ${selectedRating.factors.map((f) => f.label).join(', ')} completion`}
+              >
+                <Star aria-hidden="true" />
+                <strong>{selectedRating.rating.toFixed(1)}</strong>
+                <small>{selectedRating.label}</small>
+              </span>
+            ) : null}
+            <span className={selectedHasData ? 'day-status has-data' : 'day-status'}>
+              {selectedHasData ? 'Logged' : 'No log'}
+            </span>
+          </div>
         </header>
 
         {selectedDay && selectedHasData ? (

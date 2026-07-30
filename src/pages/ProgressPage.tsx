@@ -199,6 +199,7 @@ export function ProgressPage() {
               selectedDate={selectedDate}
               target={dashboard.target}
               units={dashboard.profile.units}
+              waterTargetMl={dashboard.profile.waterTargetMl}
               onPreviousMonth={() => moveMonth(-1)}
               onNextMonth={() => moveMonth(1)}
               onSelectDate={setSelectedDate}

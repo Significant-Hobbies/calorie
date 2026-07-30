@@ -273,10 +273,7 @@ export function localDashboard(): Dashboard {
   return {
     profile: state.profile,
     foods: [...state.foods].sort(
-      (a, b) =>
-        Number(b.favourite) - Number(a.favourite) ||
-        (b.lastUsedAt ?? 0) - (a.lastUsedAt ?? 0) ||
-        a.name.localeCompare(b.name)
+      (a, b) => (b.lastUsedAt ?? 0) - (a.lastUsedAt ?? 0) || a.name.localeCompare(b.name)
     ),
     entries,
     waterEntries,

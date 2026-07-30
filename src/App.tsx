@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useState } from 'react';
+import { lazy, type ReactNode, Suspense, useEffect, useState } from 'react';
 import { AppMark } from './components/AppMark';
 import { AppShell, type AppTab } from './components/AppShell';
 import { getBootstrap, startOfflineRetry } from './lib/api';
@@ -12,6 +12,9 @@ import { TodayPage } from './pages/TodayPage';
 
 const FoodsPage = lazy(() =>
   import('./pages/FoodsPage').then((module) => ({ default: module.FoodsPage }))
+);
+const InsightsPage = lazy(() =>
+  import('./pages/InsightsPage').then((module) => ({ default: module.InsightsPage }))
 );
 const ProgressPage = lazy(() =>
   import('./pages/ProgressPage').then((module) => ({ default: module.ProgressPage }))
@@ -103,19 +106,29 @@ export default function App() {
     );
   }
 
-  const content =
-    tab === 'today' ? (
-      <TodayPage onOpenFoods={() => setTab('foods')} />
-    ) : tab === 'progress' ? (
-      <ProgressPage />
-    ) : tab === 'foods' ? (
-      <FoodsPage />
-    ) : (
-      <SettingsPage
-        profile={state.profile}
-        onProfileChange={(profile) => setState({ ...state, profile })}
-      />
-    );
+  let content: ReactNode;
+  switch (tab) {
+    case 'today':
+      content = <TodayPage onOpenFoods={() => setTab('foods')} />;
+      break;
+    case 'progress':
+      content = <ProgressPage />;
+      break;
+    case 'insights':
+      content = <InsightsPage />;
+      break;
+    case 'foods':
+      content = <FoodsPage />;
+      break;
+    case 'you':
+      content = (
+        <SettingsPage
+          profile={state.profile}
+          onProfileChange={(profile) => setState({ ...state, profile })}
+        />
+      );
+      break;
+  }
 
   return (
     <AppShell

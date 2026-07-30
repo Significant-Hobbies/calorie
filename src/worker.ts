@@ -495,13 +495,13 @@ app.get('/api/app/foods', async (c) => {
     ? await c.env.DB.prepare(
         `SELECT * FROM foods
          WHERE user_id = ? AND name LIKE ? ESCAPE '\\'
-         ORDER BY favourite DESC, last_used_at DESC, name ASC LIMIT 50`
+         ORDER BY last_used_at DESC, name ASC LIMIT 50`
       )
         .bind(c.get('userId'), `%${search.replaceAll('%', '\\%').replaceAll('_', '\\_')}%`)
         .all<FoodRow>()
     : await c.env.DB.prepare(
         `SELECT * FROM foods WHERE user_id = ?
-         ORDER BY favourite DESC, last_used_at DESC, name ASC LIMIT 100`
+         ORDER BY last_used_at DESC, name ASC LIMIT 100`
       )
         .bind(c.get('userId'))
         .all<FoodRow>();
@@ -968,7 +968,7 @@ app.get('/api/app/dashboard', async (c) => {
     readProfile(c.env.DB, userId, c.get('userName')),
     c.env.DB.prepare(
       `SELECT * FROM foods WHERE user_id = ?
-         ORDER BY favourite DESC, last_used_at DESC, name ASC LIMIT 20`
+         ORDER BY last_used_at DESC, name ASC LIMIT 20`
     )
       .bind(userId)
       .all<FoodRow>(),

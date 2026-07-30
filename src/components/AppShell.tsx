@@ -1,8 +1,8 @@
-import { Apple, BarChart3, CircleUserRound, LibraryBig } from 'lucide-react';
+import { Apple, BarChart3, CircleUserRound, LibraryBig, PieChart } from 'lucide-react';
 import { type ReactNode, useEffect, useState } from 'react';
 import { AppMark } from './AppMark';
 
-export type AppTab = 'today' | 'progress' | 'foods' | 'you';
+export type AppTab = 'today' | 'progress' | 'insights' | 'foods' | 'you';
 
 const tabs: Array<{
   id: AppTab;
@@ -11,6 +11,7 @@ const tabs: Array<{
 }> = [
   { id: 'today', label: 'Today', icon: Apple },
   { id: 'progress', label: 'Progress', icon: BarChart3 },
+  { id: 'insights', label: 'Insights', icon: PieChart },
   { id: 'foods', label: 'Foods', icon: LibraryBig },
   { id: 'you', label: 'You', icon: CircleUserRound },
 ];

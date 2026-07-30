@@ -32,6 +32,9 @@ full sets/reps workout-programming system.
 
 ## Timeline
 
+- 2026-07-30 — released remaining-macro completion suggestions, an inferred
+  daily rating, a dedicated food-analytics Insights tab, and last-used quick
+  picks replacing the favourite pin
 - 2026-07-29 — added a public, editorial `/changelog` with verified release
   outcomes plus direct repository Roadmap and Source links
 - 2026-07-29 — released chronological food-entry details for selected dates in
@@ -71,6 +74,13 @@ full sets/reps workout-programming system.
   analysis with visible samples and assumptions
 - Navigable month calendar with daily nutrition, water, fasting, weight, and
   chronological food-entry details
+- Remaining-macro completion suggestions on Today with one-tap foods that
+  best close the day's largest gap
+- Inferred 1–5 daily rating from calorie, protein, fibre, and water target
+  completion on Today and in calendar day detail
+- Food-analytics Insights tab with most-logged and biggest-calorie-contributor
+  rankings over 7- and 30-day windows
+- Last-used quick picks on Today replacing the favourite pin
 - Installable PWA shell, recent cloud-state cache, and queued offline writes
 - System, Light, and composed botanical Dark appearance modes
 - Responsive mobile, tablet, and desktop UI with accessible touch targets
