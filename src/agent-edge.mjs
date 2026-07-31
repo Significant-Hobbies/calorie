@@ -76,23 +76,14 @@ export function handleAgentEdge(request) {
   if (path === '/index.md') {
     return text(AGENT_SURFACE.indexMd, 'text/markdown; charset=utf-8');
   }
+  if (path === '/sitemap.xml') {
+    return text(sitemapForCatalog(catalogForOrigin(url.origin)), 'application/xml; charset=utf-8');
+  }
+  if (path === '/robots.txt') {
+    return text(robotsForOrigin(url.origin), 'text/plain; charset=utf-8');
+  }
   if (path === '/api/ai') {
-    // Re-bind origin so preview/custom domains stay correct
-    const catalog = {
-      ...AGENT_SURFACE.catalog,
-      url: url.origin,
-      llms: `${url.origin}/llms.txt`,
-      llmsFull: `${url.origin}/llms-full.txt`,
-      sitemap: AGENT_SURFACE.catalog.sitemap
-        ? String(AGENT_SURFACE.catalog.sitemap).replace(AGENT_SURFACE.url, url.origin)
-        : `${url.origin}/sitemap.xml`,
-      surfaces: (AGENT_SURFACE.catalog.surfaces || []).map((s) => ({
-        ...s,
-        url: s.url ? String(s.url).replace(AGENT_SURFACE.url, url.origin) : s.url,
-        md: s.md ? String(s.md).replace(AGENT_SURFACE.url, url.origin) : s.md,
-      })),
-    };
-    return json(catalog);
+    return json(catalogForOrigin(url.origin));
   }
 
   // Homepage markdown negotiation
@@ -104,6 +95,55 @@ export function handleAgentEdge(request) {
   }
 
   return null;
+}
+
+function catalogForOrigin(origin) {
+  return {
+    ...AGENT_SURFACE.catalog,
+    url: origin,
+    llms: `${origin}/llms.txt`,
+    llmsFull: `${origin}/llms-full.txt`,
+    sitemap: `${origin}/sitemap.xml`,
+    robots: `${origin}/robots.txt`,
+    surfaces: (AGENT_SURFACE.catalog.surfaces || []).map((surface) => ({
+      ...surface,
+      url: forOrigin(surface.url, origin),
+      md: forOrigin(surface.md, origin),
+    })),
+  };
+}
+
+function forOrigin(value, origin) {
+  return String(value).split(AGENT_SURFACE.url).join(origin);
+}
+
+function sitemapForCatalog(catalog) {
+  const routes = catalog.surfaces
+    .map((surface) => `  <url><loc>${escapeXml(surface.url)}</loc></url>`)
+    .join('\n');
+  return `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${routes}\n</urlset>\n`;
+}
+
+function robotsForOrigin(origin) {
+  return `User-agent: *
+Allow: /
+
+Sitemap: ${origin}/sitemap.xml
+# Agent indexing
+Allow: /llms.txt
+Allow: /llms-full.txt
+Allow: /index.md
+Allow: /api/ai
+`;
+}
+
+function escapeXml(value) {
+  return String(value)
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&apos;');
 }
 
 function wantsMarkdown(request) {

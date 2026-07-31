@@ -19,4 +19,27 @@ describe('public agent surfaces', () => {
     expect(body).toMatch(/^# Calorie/);
     expect(body).toContain('No public food, water, weight, profile, or journal data');
   });
+
+  it.each(['https://calorie.significanthobbies.com', 'https://calorie-preview.example'])(
+    'keeps sitemap and robots on the request origin: %s',
+    async (origin) => {
+      const [sitemap, robots] = await Promise.all([
+        app.request(`${origin}/sitemap.xml`),
+        app.request(`${origin}/robots.txt`),
+      ]);
+
+      expect(sitemap.status).toBe(200);
+      expect(sitemap.headers.get('content-type')).toContain('application/xml');
+      const sitemapBody = await sitemap.text();
+      expect(sitemapBody).toContain(`<loc>${origin}/</loc>`);
+      expect(sitemapBody).toContain(`<loc>${origin}/privacy</loc>`);
+      expect(sitemapBody).toContain(`<loc>${origin}/changelog</loc>`);
+      if (origin !== 'https://calorie.significanthobbies.com') {
+        expect(sitemapBody).not.toContain('https://calorie.significanthobbies.com');
+      }
+
+      expect(robots.status).toBe(200);
+      expect(await robots.text()).toContain(`Sitemap: ${origin}/sitemap.xml`);
+    }
+  );
 });
