@@ -1,0 +1,30 @@
+# Calorie — full agent brief
+
+Private, local-first food, water, and weight journal with transparent
+deterministic guidance.
+
+## Public boundary
+
+- Product explanation and optional Google sign-in
+- Deterministic methodology with visible assumptions
+- No public food, water, weight, profile, or journal data
+
+## Product links
+
+- Home: https://calorie.significanthobbies.com/
+- Privacy: https://calorie.significanthobbies.com/privacy
+- Changelog: https://calorie.significanthobbies.com/changelog
+
+## Machine surfaces
+
+- https://calorie.significanthobbies.com/llms.txt
+- https://calorie.significanthobbies.com/llms-full.txt
+- https://calorie.significanthobbies.com/api/ai
+- https://calorie.significanthobbies.com/index.md
+- https://calorie.significanthobbies.com/sitemap.xml
+- https://calorie.significanthobbies.com/robots.txt
+
+## Contact
+
+- Owner: https://sarthakagrawal.dev
+- Agent email: sarthakagrawal@agentmail.to

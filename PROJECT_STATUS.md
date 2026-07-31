@@ -32,6 +32,8 @@ full sets/reps workout-programming system.
 
 ## Timeline
 
+- 2026-07-31 — added the full agent brief as a static asset so Cloudflare's
+  asset-first routing serves `/llms-full.txt` before the SPA fallback
 - 2026-07-31 — prepared and locally verified public agent discovery,
   privacy/changelog Markdown, sitemap coverage, and complete homepage
   search/social metadata; production deployment remains separate
