@@ -42,16 +42,11 @@ export function computeDailyRating(input: DailyRatingInput): DailyRating | null 
   const raw = 1 + average * 4;
   const rating = Math.round(raw * 2) / 2;
 
+  const completeCount = factors.filter((factor) => factor.share >= 1).length;
   const label =
-    rating >= 4.5
-      ? 'Excellent day'
-      : rating >= 3.5
-        ? 'Solid day'
-        : rating >= 2.5
-          ? 'Getting there'
-          : rating >= 1.5
-            ? 'Slow start'
-            : 'Just beginning';
+    completeCount === factors.length
+      ? `All ${factors.length} target${factors.length === 1 ? '' : 's'} in view`
+      : `${completeCount} of ${factors.length} target${factors.length === 1 ? '' : 's'} in view`;
 
   return { rating, label, factors };
 }

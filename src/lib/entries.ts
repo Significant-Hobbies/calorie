@@ -1,4 +1,4 @@
-import type { FoodEntry } from './types';
+import type { Food, FoodEntry } from './types';
 
 const MAX_AMOUNT = 10_000;
 const MAX_NUTRIENT = 100_000;
@@ -38,5 +38,22 @@ export function normalizeDirectEntry(entry: FoodEntry): FoodEntry {
     ...entry,
     foodName: entry.foodName.trim(),
     unitLabel: entry.unitLabel.trim(),
+  };
+}
+
+export function foodFromDirectEntry(entry: FoodEntry, id: string): Food {
+  const normalized = normalizeDirectEntry(entry);
+  return {
+    id,
+    name: normalized.foodName,
+    servingMode: 'per_unit',
+    unitLabel: normalized.unitLabel,
+    defaultAmount: normalized.amount,
+    calories: normalized.calories / normalized.amount,
+    carbsG: normalized.carbsG / normalized.amount,
+    proteinG: normalized.proteinG / normalized.amount,
+    fibreG: normalized.fibreG / normalized.amount,
+    favourite: true,
+    lastUsedAt: null,
   };
 }

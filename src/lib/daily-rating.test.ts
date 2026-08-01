@@ -38,7 +38,7 @@ describe('computeDailyRating', () => {
       waterTargetMl: 2000,
     });
     expect(result?.rating).toBe(5);
-    expect(result?.label).toBe('Excellent day');
+    expect(result?.label).toBe('All 4 targets in view');
   });
 
   it('rates an empty day at 1', () => {
@@ -48,7 +48,7 @@ describe('computeDailyRating', () => {
       waterTargetMl: 2000,
     });
     expect(result?.rating).toBe(1);
-    expect(result?.label).toBe('Just beginning');
+    expect(result?.label).toBe('0 of 4 targets in view');
   });
 
   it('rates a half-completed day at 3', () => {
@@ -58,7 +58,7 @@ describe('computeDailyRating', () => {
       waterTargetMl: 2000,
     });
     expect(result?.rating).toBe(3);
-    expect(result?.label).toBe('Getting there');
+    expect(result?.label).toBe('0 of 4 targets in view');
   });
 
   it('caps overshoot at 100% per factor', () => {

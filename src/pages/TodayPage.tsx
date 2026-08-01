@@ -15,7 +15,6 @@ import {
   RotateCcw,
   Save,
   Sprout,
-  Star,
   Trash2,
   Wheat,
   X,
@@ -26,6 +25,7 @@ import {
   addMedicationCheckIn,
   addWater,
   archiveMedication,
+  createFood,
   deleteFoodEntry,
   deleteMedicationCheckIn,
   deleteWater,
@@ -35,7 +35,7 @@ import {
   updateMedication,
 } from '../lib/api';
 import { computeDailyRating } from '../lib/daily-rating';
-import { directEntryError } from '../lib/entries';
+import { directEntryError, foodFromDirectEntry } from '../lib/entries';
 import { computeMacroCompletion } from '../lib/macro-completion';
 import {
   calculateGymGuidance,
@@ -117,6 +117,7 @@ type EntryDraft = {
   proteinG: number;
   fibreG: number;
   eatenAt: string;
+  saveForLater: boolean;
 };
 
 function toLocalInput(timestamp: number) {
@@ -415,6 +416,7 @@ export function TodayPage({ onOpenFoods }: { onOpenFoods: () => void }) {
         ? scaleNutrients(food, food.servingMode, food.defaultAmount)
         : { calories: 0, carbsG: 0, proteinG: 0, fibreG: 0 }),
       eatenAt: toLocalInput(Date.now()),
+      saveForLater: false,
     });
   };
 
@@ -433,6 +435,7 @@ export function TodayPage({ onOpenFoods }: { onOpenFoods: () => void }) {
       proteinG: entry.proteinG,
       fibreG: entry.fibreG,
       eatenAt: toLocalInput(entry.eatenAt),
+      saveForLater: false,
     });
   };
 
@@ -476,6 +479,7 @@ export function TodayPage({ onOpenFoods }: { onOpenFoods: () => void }) {
             foodName: food?.name ?? current.foodName,
             unitLabel:
               food?.servingMode === 'per_100g' ? 'g' : (food?.unitLabel ?? current.unitLabel),
+            saveForLater: false,
             ...nutrients,
           };
         }
@@ -490,6 +494,7 @@ export function TodayPage({ onOpenFoods }: { onOpenFoods: () => void }) {
           carbsG: 0,
           proteinG: 0,
           fibreG: 0,
+          saveForLater: false,
         };
       }
 
@@ -498,6 +503,7 @@ export function TodayPage({ onOpenFoods }: { onOpenFoods: () => void }) {
       return {
         ...current,
         mode,
+        saveForLater: false,
         foodId: food.id,
         foodName: food.name,
         amount: food.defaultAmount,
@@ -525,7 +531,7 @@ export function TodayPage({ onOpenFoods }: { onOpenFoods: () => void }) {
     }
 
     const id = entryDraft.entryId ?? crypto.randomUUID();
-    const optimistic: FoodEntry =
+    const directEntry: FoodEntry =
       entryDraft.mode === 'saved' && food
         ? {
             id,
@@ -548,19 +554,34 @@ export function TodayPage({ onOpenFoods }: { onOpenFoods: () => void }) {
             fibreG: entryDraft.fibreG,
             eatenAt,
           };
-    const directError = optimistic.foodId === null ? directEntryError(optimistic) : null;
+    const directError = directEntry.foodId === null ? directEntryError(directEntry) : null;
     if (directError) {
       setEntryError(directError);
       return;
     }
 
+    const reusableFood =
+      directEntry.foodId === null && entryDraft.saveForLater
+        ? foodFromDirectEntry(directEntry, crypto.randomUUID())
+        : null;
+    const optimistic: FoodEntry = reusableFood
+      ? { ...directEntry, foodId: reusableFood.id, foodName: reusableFood.name }
+      : directEntry;
     const previous = dashboard;
     const nextEntries = entryDraft.entryId
       ? dashboard.entries.map((entry) => (entry.id === id ? optimistic : entry))
       : [optimistic, ...dashboard.entries];
+    let savedFood: Food | null = null;
     setPendingId(`entry-${id}`);
-    setDashboard(withEntries(dashboard, nextEntries, dashboard.waterEntries));
     try {
+      savedFood = reusableFood ? await createFood(reusableFood) : null;
+      setDashboard(
+        withEntries(
+          { ...dashboard, foods: savedFood ? [savedFood, ...dashboard.foods] : dashboard.foods },
+          nextEntries,
+          dashboard.waterEntries
+        )
+      );
       const saved = entryDraft.entryId
         ? await updateFoodEntry({
             ...optimistic,
@@ -580,12 +601,32 @@ export function TodayPage({ onOpenFoods }: { onOpenFoods: () => void }) {
           : current
       );
       if (!entryDraft.entryId) {
-        setUndo({ kind: 'food', id, label: `${optimistic.foodName} logged` });
+        setUndo({
+          kind: 'food',
+          id,
+          label: savedFood
+            ? `${optimistic.foodName} saved and logged`
+            : `${optimistic.foodName} logged`,
+        });
       }
       setEntryDraft(null);
     } catch (caught) {
-      setDashboard(previous);
-      setEntryError(caught instanceof Error ? caught.message : 'Entry could not be saved.');
+      setDashboard(
+        savedFood
+          ? withEntries(
+              { ...previous, foods: [savedFood, ...previous.foods] },
+              previous.entries,
+              previous.waterEntries
+            )
+          : previous
+      );
+      setEntryError(
+        savedFood
+          ? 'Food was saved, but this entry could not be logged. Try logging it again.'
+          : caught instanceof Error
+            ? caught.message
+            : 'Entry could not be saved.'
+      );
     } finally {
       setPendingId(null);
     }
@@ -738,12 +779,11 @@ export function TodayPage({ onOpenFoods }: { onOpenFoods: () => void }) {
           <div className="summary-topline-right">
             {rating ? (
               <span
-                className="daily-rating"
-                title={`Based on ${rating.factors.map((f) => f.label).join(', ')} completion`}
+                className="daily-status"
+                title={`Based on ${rating.factors.map((factor) => factor.label).join(', ')} completion`}
               >
-                <Star aria-hidden="true" />
-                <strong>{rating.rating.toFixed(1)}</strong>
-                <small>{rating.label}</small>
+                <small>Today</small>
+                <strong>{rating.label}</strong>
               </span>
             ) : null}
             <span>{target ? `${Math.round(calorieProgress)}%` : '—'}</span>
@@ -843,15 +883,26 @@ export function TodayPage({ onOpenFoods }: { onOpenFoods: () => void }) {
         </section>
       ) : null}
 
-      <section className="quick-section" aria-labelledby="quick-food-title">
+      <section className="quick-section logging-launchpad" aria-labelledby="quick-food-title">
         <div className="section-heading">
           <div>
-            <h2 id="quick-food-title">Tap to log</h2>
-            <p>Your usual amount, right now.</p>
+            <p className="launchpad-kicker">Your journal</p>
+            <h2 id="quick-food-title">Log food now</h2>
+            <p>Start with a usual food, or add anything else.</p>
           </div>
-          <button className="text-button" type="button" onClick={onOpenFoods}>
-            Manage foods
-          </button>
+          <div className="launchpad-actions">
+            <button
+              className="button button-primary button-compact"
+              type="button"
+              onClick={openNewEntry}
+            >
+              <Plus size={18} aria-hidden="true" />
+              Log food
+            </button>
+            <button className="text-button" type="button" onClick={onOpenFoods}>
+              Manage
+            </button>
+          </div>
         </div>
         <div className="quick-foods">
           {quickFoods.slice(0, 4).map((food) => (
@@ -1198,19 +1249,52 @@ export function TodayPage({ onOpenFoods }: { onOpenFoods: () => void }) {
               <fieldset className="segmented entry-source-toggle">
                 <legend className="sr-only">Entry source</legend>
                 <button
-                  className={entryDraft.mode === 'saved' ? 'is-selected' : ''}
+                  className={
+                    entryDraft.mode === 'saved' ||
+                    (dashboard.foods.length === 0 && entryDraft.saveForLater)
+                      ? 'is-selected'
+                      : ''
+                  }
                   type="button"
-                  disabled={dashboard.foods.length === 0}
-                  aria-pressed={entryDraft.mode === 'saved'}
-                  onClick={() => chooseEntryMode('saved')}
+                  aria-pressed={
+                    entryDraft.mode === 'saved' ||
+                    (dashboard.foods.length === 0 && entryDraft.saveForLater)
+                  }
+                  onClick={() => {
+                    if (dashboard.foods.length) {
+                      chooseEntryMode('saved');
+                      return;
+                    }
+                    setEntryError(null);
+                    setEntryDraft((current) =>
+                      current
+                        ? { ...current, mode: 'direct', foodId: null, saveForLater: true }
+                        : current
+                    );
+                  }}
                 >
-                  Saved food
+                  {dashboard.foods.length ? 'Saved food' : 'Save new food'}
                 </button>
                 <button
-                  className={entryDraft.mode === 'direct' ? 'is-selected' : ''}
+                  className={
+                    entryDraft.mode === 'direct' &&
+                    (dashboard.foods.length > 0 || !entryDraft.saveForLater)
+                      ? 'is-selected'
+                      : ''
+                  }
                   type="button"
-                  aria-pressed={entryDraft.mode === 'direct'}
-                  onClick={() => chooseEntryMode('direct')}
+                  aria-pressed={
+                    entryDraft.mode === 'direct' &&
+                    (dashboard.foods.length > 0 || !entryDraft.saveForLater)
+                  }
+                  onClick={() => {
+                    chooseEntryMode('direct');
+                    setEntryDraft((current) =>
+                      current && current.mode === 'direct'
+                        ? { ...current, saveForLater: false }
+                        : current
+                    );
+                  }}
                 >
                   Just this entry
                 </button>
@@ -1302,8 +1386,32 @@ export function TodayPage({ onOpenFoods }: { onOpenFoods: () => void }) {
               ) : (
                 <>
                   <p className="direct-entry-note">
-                    Add the totals once. This won’t create a saved food.
+                    {entryDraft.saveForLater
+                      ? 'This serving will be saved for future one-tap logging.'
+                      : 'Add the totals once. This won’t create a saved food.'}
                   </p>
+                  <button
+                    className={`save-food-toggle${entryDraft.saveForLater ? ' is-selected' : ''}`}
+                    type="button"
+                    aria-pressed={entryDraft.saveForLater}
+                    onClick={() =>
+                      setEntryDraft((current) =>
+                        current ? { ...current, saveForLater: !current.saveForLater } : current
+                      )
+                    }
+                  >
+                    <span>
+                      {entryDraft.saveForLater ? (
+                        <Check size={18} aria-hidden="true" />
+                      ) : (
+                        <Plus size={18} aria-hidden="true" />
+                      )}
+                    </span>
+                    <span>
+                      <strong>Save this food for next time</strong>
+                      <small>Its current serving and nutrients become a reusable shortcut.</small>
+                    </span>
+                  </button>
                   <label className="field">
                     <span>Food name</span>
                     <input

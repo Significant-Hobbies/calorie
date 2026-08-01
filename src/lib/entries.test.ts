@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { directEntryError, normalizeDirectEntry } from './entries';
+import { directEntryError, foodFromDirectEntry, normalizeDirectEntry } from './entries';
 import type { FoodEntry } from './types';
 
 const entry = (overrides: Partial<FoodEntry> = {}): FoodEntry => ({
@@ -33,5 +33,21 @@ describe('direct entries', () => {
     expect(directEntryError(entry({ amount: 0 }))).toContain('amount');
     expect(directEntryError(entry({ proteinG: -1 }))).toContain('Nutrients');
     expect(directEntryError(entry({ foodId: 'saved-food' }))).toContain('saved food');
+  });
+
+  it('creates a reusable food scaled to the direct-entry serving', () => {
+    vi.setSystemTime(1_700_000_000_000);
+    expect(
+      foodFromDirectEntry(entry({ amount: 2, calories: 420, proteinG: 22 }), 'food-1')
+    ).toMatchObject({
+      id: 'food-1',
+      name: 'Lunch special',
+      servingMode: 'per_unit',
+      unitLabel: 'serving',
+      defaultAmount: 2,
+      calories: 210,
+      proteinG: 11,
+    });
+    vi.useRealTimers();
   });
 });

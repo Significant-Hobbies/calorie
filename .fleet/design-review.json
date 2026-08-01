@@ -2,7 +2,7 @@
   "$schema": "fleet.design-review.v1",
   "version": 1,
   "project": "calorie",
-  "target": "Owned product changelog",
+  "target": "Mobile Today and Insights",
   "mode": "preserve",
   "register": "product",
   "context": {
@@ -32,15 +32,15 @@
       }
     ],
     "projectCheck": {
-      "command": "pnpm check && git diff --check",
-      "status": "pass"
+      "command": "replace-with-project-check",
+      "status": "pending"
     },
     "critique": {
-      "score": 36,
+      "score": 0,
       "maximum": 40
     },
     "audit": {
-      "score": 18,
+      "score": 0,
       "maximum": 20
     },
     "unresolved": {
@@ -49,13 +49,11 @@
     },
     "detector": {
       "posture": "advisory",
-      "findings": [
-        "No deterministic design-quality findings were introduced on the changelog surface."
-      ]
+      "findings": []
     }
   },
   "ownerFeedback": {
-    "decision": "delegated",
-    "note": "The owner explicitly delegated changelog implementation across all projects on 2026-07-29."
+    "decision": "pending",
+    "note": ""
   }
 }
