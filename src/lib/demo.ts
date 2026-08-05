@@ -370,6 +370,22 @@ function demoEntriesForDays(days: HistoryDay[]) {
   });
 }
 
+function applyDemoFastCount(
+  days: HistoryDay[],
+  entries: FoodEntry[],
+  threshold: number
+): HistoryDay[] {
+  const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  const byDate = new Map(days.map((day) => [day.date, { ...day, fastCount: 0 }]));
+  for (const fast of calculateCompletedFasts(entries, tz)) {
+    if (fast.durationHours < threshold) continue;
+    const key = new Intl.DateTimeFormat('en-CA', { timeZone: tz }).format(fast.endAt);
+    const day = byDate.get(key);
+    if (day) day.fastCount += 1;
+  }
+  return [...byDate.values()];
+}
+
 export function demoHistory(rangeDays: 7 | 30): HistoryResponse {
   const target = demoDashboard().target.calorieTarget ?? 2000;
   const days = Array.from({ length: rangeDays }, (_, index) => {
@@ -384,10 +400,17 @@ export function demoHistory(rangeDays: 7 | 30): HistoryResponse {
       proteinG: isToday ? totals().proteinG : round(102 + wave * 11),
       fibreG: isToday ? totals().fibreG : round(27 + wave * 4),
       waterMl: isToday ? totals().waterMl : round(1900 + wave * 280),
-      fastCount: index % 3 === 0 ? 1 : 0,
-    };
+      fastCount: 0,
+    } satisfies HistoryDay;
   });
-  return { days, weights: [...weights], entries: demoEntriesForDays(days), rangeDays };
+  const entries = demoEntriesForDays(days);
+  const threshold = profile.fastingThresholdHours;
+  return {
+    days: applyDemoFastCount(days, entries, threshold),
+    weights: [...weights],
+    entries,
+    rangeDays,
+  };
 }
 
 export function demoCalendarHistory(dateKeys: string[]): HistoryResponse {
@@ -409,7 +432,7 @@ export function demoCalendarHistory(dateKeys: string[]): HistoryResponse {
         fibreG: 0,
         waterMl: 0,
         fastCount: 0,
-      };
+      } satisfies HistoryDay;
     }
     return {
       date: dateKey,
@@ -418,16 +441,18 @@ export function demoCalendarHistory(dateKeys: string[]): HistoryResponse {
       proteinG: isToday ? totals().proteinG : round(102 + wave * 11),
       fibreG: isToday ? totals().fibreG : round(27 + wave * 4),
       waterMl: isToday ? totals().waterMl : round(1900 + wave * 280),
-      fastCount: dayNumber % 3 === 0 ? 1 : 0,
-    };
+      fastCount: 0,
+    } satisfies HistoryDay;
   });
   const cells = dateKeys.map((date) => ({ date, day: 0, inMonth: true }));
   const bounds = calendarHistoryBounds(cells);
+  const entries = entriesWithinRange(demoEntriesForDays(days), bounds.start, bounds.end);
+  const threshold = profile.fastingThresholdHours;
   return {
-    days,
+    days: applyDemoFastCount(days, entries, threshold),
     weights: weights.filter(
       (entry) => entry.recordedAt >= bounds.start && entry.recordedAt < bounds.end
     ),
-    entries: entriesWithinRange(demoEntriesForDays(days), bounds.start, bounds.end),
+    entries,
   };
 }

@@ -38,6 +38,7 @@ import {
 import {
   cacheDashboard,
   cachePrivateValue,
+  dashboardCacheAge,
   deletePrivateValue,
   flushPendingWrites,
   queueWrite,
@@ -59,6 +60,20 @@ import type {
 
 const isDemo = () => Boolean(sessionStorage.getItem('calorie-demo'));
 export const isLocalMode = () => localStorage.getItem('calorie-local-mode') === 'true';
+
+/**
+ * In-flight request deduplication. If multiple callers request the same key
+ * before the first resolves, they all share the same promise.
+ */
+const inflight = new Map<string, Promise<unknown>>();
+
+function dedupe<T>(key: string, factory: () => Promise<T>): Promise<T> {
+  const existing = inflight.get(key);
+  if (existing) return existing as Promise<T>;
+  const promise = factory().finally(() => inflight.delete(key));
+  inflight.set(key, promise);
+  return promise as Promise<T>;
+}
 
 type AppBootstrap = {
   session: NonNullable<AppSession>;
@@ -230,18 +245,32 @@ export async function getDashboard(): Promise<Dashboard> {
     date: range.date,
     timezone: range.timezone,
   });
-  try {
-    const dashboard = normalizeDashboard(await readJson<Dashboard>(`/api/app/dashboard?${params}`));
-    await cacheDashboard(dashboard);
-    return dashboard;
-  } catch (error) {
+  return dedupe(`dashboard:${range.date}`, async () => {
+    // Stale-while-revalidate: if we have a cache fresher than 30s, serve it
+    // immediately and skip the network. The service worker + ETag handle
+    // longer staleness transparently.
     const profile = await getProfile().catch(() => null);
     if (profile) {
-      const cached = await readCachedDashboard(profile.userId);
-      if (cached) return normalizeDashboard(cached);
+      const age = await dashboardCacheAge(profile.userId);
+      if (age !== null && age < 30_000) {
+        const cached = await readCachedDashboard(profile.userId);
+        if (cached) return normalizeDashboard(cached);
+      }
     }
-    throw error;
-  }
+    try {
+      const dashboard = normalizeDashboard(
+        await readJson<Dashboard>(`/api/app/dashboard?${params}`)
+      );
+      await cacheDashboard(dashboard);
+      return dashboard;
+    } catch (error) {
+      if (profile) {
+        const cached = await readCachedDashboard(profile.userId);
+        if (cached) return normalizeDashboard(cached);
+      }
+      throw error;
+    }
+  });
 }
 
 export async function saveFood(food: Food): Promise<Food> {
@@ -414,7 +443,9 @@ export async function getHistory(rangeDays: 7 | 30): Promise<HistoryResponse> {
     days: String(rangeDays),
     timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
   });
-  return readJson(`/api/app/history?${params}`);
+  return dedupe(`history:${rangeDays}:${end.toDateString()}`, () =>
+    readJson<HistoryResponse>(`/api/app/history?${params}`)
+  );
 }
 
 export async function getCalendarHistory(dateKeys: string[]): Promise<HistoryResponse> {

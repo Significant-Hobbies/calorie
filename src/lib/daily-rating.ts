@@ -26,7 +26,13 @@ export function computeDailyRating(input: DailyRatingInput): DailyRating | null 
 
   const factors: Array<{ label: string; share: number }> = [];
   if (calorieTarget) {
-    factors.push({ label: 'Calories', share: clamp01(input.totals.calories / calorieTarget) });
+    // Calories are a limit, not a target to finish. Being at or under the
+    // limit counts as fully met (share = 1). Only going over reduces the share.
+    factors.push({
+      label: 'Calories',
+      share:
+        input.totals.calories <= calorieTarget ? 1 : clamp01(calorieTarget / input.totals.calories),
+    });
   }
   if (proteinTarget) {
     factors.push({ label: 'Protein', share: clamp01(input.totals.proteinG / proteinTarget) });
@@ -46,7 +52,9 @@ export function computeDailyRating(input: DailyRatingInput): DailyRating | null 
   const label =
     completeCount === factors.length
       ? `All ${factors.length} target${factors.length === 1 ? '' : 's'} in view`
-      : `${completeCount} of ${factors.length} target${factors.length === 1 ? '' : 's'} in view`;
+      : completeCount === 0
+        ? 'Targets in view'
+        : `${completeCount} of ${factors.length} target${factors.length === 1 ? '' : 's'} in view`;
 
   return { rating, label, factors };
 }

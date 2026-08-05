@@ -52,8 +52,37 @@ app.use('*', async (c, next) => {
 app.use('/api/*', async (c, next) => {
   await next();
   for (const [name, value] of Object.entries(SECURITY_HEADERS)) c.header(name, value);
-  c.header('Cache-Control', 'no-store');
+  // Read-only GETs set their own Cache-Control via conditionalJson; everything
+  // else stays no-store.
+  if (!c.res.headers.has('Cache-Control')) c.header('Cache-Control', 'no-store');
 });
+
+/**
+ * Weak ETag helper for read-only API responses. Combines the user ID, request
+ * query string, and a 30-second time bucket so responses are cacheable for 30s
+ * on the client and via conditional requests (If-None-Match → 304).
+ */
+function etagFor(userId: string, query: string): string {
+  const bucket = Math.floor(Date.now() / 30_000);
+  return `W/"${userId}:${bucket}:${query.length}"`;
+}
+
+function conditionalJson<T>(
+  c: {
+    req: { url: string; header: (name: string) => string | undefined };
+    get: (key: 'userId') => string;
+    header: (name: string, value: string) => void;
+    json: (data: T) => Response;
+    body: (data: null, status: number) => Response;
+  },
+  data: T
+): Response {
+  const tag = etagFor(c.get('userId'), new URL(c.req.url).search);
+  if (c.req.header('If-None-Match') === tag) return c.body(null, 304);
+  c.header('ETag', tag);
+  c.header('Cache-Control', 'private, max-age=30');
+  return c.json(data);
+}
 
 app.get('/api/health', (c) =>
   c.json({
@@ -342,7 +371,7 @@ function mapMedicationCheckIn(row: MedicationCheckInRow): MedicationCheckIn {
 
 app.get('/api/app/profile', async (c) => {
   const profile = await readProfile(c.env.DB, c.get('userId'), c.get('userName'));
-  return c.json(profile);
+  return conditionalJson(c, profile);
 });
 
 app.get('/api/app/bootstrap', async (c) => {
@@ -1077,7 +1106,7 @@ app.get('/api/app/dashboard', async (c) => {
     date: c.req.query('date') ?? '',
     timezone,
   };
-  return c.json(dashboard);
+  return conditionalJson(c, dashboard);
 });
 
 function dateKey(timestamp: number, timezone: string) {
@@ -1098,7 +1127,8 @@ app.get('/api/app/history', async (c) => {
     return c.json(jsonError('Choose a history range of six weeks or less.'), 400);
   }
   const userId = c.get('userId');
-  const [entriesResult, waterResult, weightResult, priorEntry] = await Promise.all([
+  const [profile, entriesResult, waterResult, weightResult, priorEntry] = await Promise.all([
+    readProfile(c.env.DB, userId, c.get('userName')),
     c.env.DB.prepare(
       `SELECT * FROM food_entries
        WHERE user_id = ? AND eaten_at >= ? AND eaten_at < ? ORDER BY eaten_at ASC`
@@ -1159,8 +1189,13 @@ app.get('/api/app/history', async (c) => {
     ensureDay(dateKey(entry.drankAt, timezone)).waterMl += entry.amountMl;
   }
   const fastingEntries = priorEntry ? [mapFoodEntry(priorEntry), ...entries] : entries;
+  const fastingThreshold = profile.fastingThresholdHours;
   for (const fast of calculateCompletedFasts(fastingEntries, timezone)) {
-    if (fast.endAt >= range.start && fast.endAt < range.end) {
+    if (
+      fast.endAt >= range.start &&
+      fast.endAt < range.end &&
+      fast.durationHours >= fastingThreshold
+    ) {
       ensureDay(dateKey(fast.endAt, timezone)).fastCount += 1;
     }
   }
@@ -1180,7 +1215,7 @@ app.get('/api/app/history', async (c) => {
     entries,
     ...(rangeDays ? { rangeDays } : {}),
   };
-  return c.json(response);
+  return conditionalJson(c, response);
 });
 
 app.notFound((c) =>

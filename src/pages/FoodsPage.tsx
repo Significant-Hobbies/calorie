@@ -3,6 +3,31 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { createFood, deleteFood, getDashboard, saveFood } from '../lib/api';
 import type { Food, ServingMode } from '../lib/types';
 
+type SortKey =
+  | 'recent'
+  | 'protein_density'
+  | 'fibre_density'
+  | 'calorie_per_protein'
+  | 'calorie_per_fibre'
+  | 'protein_per_calorie'
+  | 'fibre_per_calorie';
+
+type SortOption = { key: SortKey; label: string; hint: string };
+
+const SORT_OPTIONS: SortOption[] = [
+  { key: 'recent', label: 'Recent', hint: 'Last used first' },
+  { key: 'protein_density', label: 'Protein dense', hint: 'Most protein per serving' },
+  { key: 'fibre_density', label: 'Fibre dense', hint: 'Most fibre per serving' },
+  {
+    key: 'calorie_per_protein',
+    label: 'Cal / protein',
+    hint: 'Fewest calories per gram of protein',
+  },
+  { key: 'calorie_per_fibre', label: 'Cal / fibre', hint: 'Fewest calories per gram of fibre' },
+  { key: 'protein_per_calorie', label: 'Protein / cal', hint: 'Most protein per calorie' },
+  { key: 'fibre_per_calorie', label: 'Fibre / cal', hint: 'Most fibre per calorie' },
+];
+
 const emptyFood = (): Food => ({
   id: crypto.randomUUID(),
   name: '',
@@ -22,9 +47,42 @@ function nutrientSummary(food: Food) {
   return `${Math.round(food.calories)} kcal · ${Math.round(food.carbsG)}C · ${Math.round(food.proteinG)}P · ${Math.round(food.fibreG)}F · ${basis}`;
 }
 
+function sortFoods(foods: Food[], sort: SortKey): Food[] {
+  const safeDiv = (a: number, b: number) => (b > 0 ? a / b : a > 0 ? Infinity : 0);
+  const byName = (a: Food, b: Food) => a.name.localeCompare(b.name);
+
+  switch (sort) {
+    case 'recent':
+      return [...foods].sort((a, b) => (b.lastUsedAt ?? 0) - (a.lastUsedAt ?? 0) || byName(a, b));
+    case 'protein_density':
+      return [...foods].sort((a, b) => b.proteinG - a.proteinG || byName(a, b));
+    case 'fibre_density':
+      return [...foods].sort((a, b) => b.fibreG - a.fibreG || byName(a, b));
+    case 'calorie_per_protein':
+      // Lower cal/g protein = better (more protein-efficient)
+      return [...foods].sort(
+        (a, b) => safeDiv(a.calories, a.proteinG) - safeDiv(b.calories, b.proteinG) || byName(a, b)
+      );
+    case 'calorie_per_fibre':
+      return [...foods].sort(
+        (a, b) => safeDiv(a.calories, a.fibreG) - safeDiv(b.calories, b.fibreG) || byName(a, b)
+      );
+    case 'protein_per_calorie':
+      // Higher g protein / cal = better
+      return [...foods].sort(
+        (a, b) => safeDiv(b.proteinG, b.calories) - safeDiv(a.proteinG, a.calories) || byName(a, b)
+      );
+    case 'fibre_per_calorie':
+      return [...foods].sort(
+        (a, b) => safeDiv(b.fibreG, b.calories) - safeDiv(a.fibreG, a.calories) || byName(a, b)
+      );
+  }
+}
+
 export function FoodsPage() {
   const [foods, setFoods] = useState<Food[]>([]);
   const [query, setQuery] = useState('');
+  const [sort, setSort] = useState<SortKey>('recent');
   const [draft, setDraft] = useState<Food | null>(null);
   const [isNew, setIsNew] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -50,10 +108,9 @@ export function FoodsPage() {
 
   const filtered = useMemo(() => {
     const term = query.trim().toLocaleLowerCase();
-    return [...foods]
-      .filter((food) => !term || food.name.toLocaleLowerCase().includes(term))
-      .sort((a, b) => (b.lastUsedAt ?? 0) - (a.lastUsedAt ?? 0) || a.name.localeCompare(b.name));
-  }, [foods, query]);
+    const matched = foods.filter((food) => !term || food.name.toLocaleLowerCase().includes(term));
+    return sortFoods(matched, sort);
+  }, [foods, query, sort]);
 
   const openNew = () => {
     setIsNew(true);
@@ -153,6 +210,21 @@ export function FoodsPage() {
           </button>
         ) : null}
       </label>
+
+      <fieldset className="sort-bar" aria-label="Sort foods">
+        {SORT_OPTIONS.map((option) => (
+          <button
+            key={option.key}
+            type="button"
+            className={sort === option.key ? 'is-selected' : ''}
+            aria-pressed={sort === option.key}
+            title={option.hint}
+            onClick={() => setSort(option.key)}
+          >
+            {option.label}
+          </button>
+        ))}
+      </fieldset>
 
       {error && !draft ? (
         <div className="inline-error" role="alert">

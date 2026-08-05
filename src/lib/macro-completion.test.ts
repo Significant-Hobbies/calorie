@@ -46,9 +46,9 @@ describe('computeMacroCompletion', () => {
     ).toBeNull();
   });
 
-  it('marks complete and suggests nothing when every tracked macro is met', () => {
+  it('marks complete when protein and fibre are met and calories are under limit', () => {
     const result = computeMacroCompletion({
-      totals: { calories: 2100, proteinG: 130, fibreG: 30 },
+      totals: { calories: 1800, proteinG: 130, fibreG: 30 },
       target: target(),
       foods: [food()],
     });
@@ -57,13 +57,31 @@ describe('computeMacroCompletion', () => {
     expect(result?.leadingMacro).toBeNull();
   });
 
-  it('leads with calories and ranks foods by calorie coverage', () => {
+  it('marks complete when calories are exactly at target and other macros are met', () => {
     const result = computeMacroCompletion({
-      totals: { calories: 1400, proteinG: 130, fibreG: 30 },
+      totals: { calories: 2000, proteinG: 130, fibreG: 30 },
       target: target(),
-      foods: [food({ id: 'low', calories: 150 }), food({ id: 'high', calories: 500 })],
+      foods: [food()],
     });
-    expect(result?.leadingMacro).toBe('calories');
+    expect(result?.complete).toBe(true);
+  });
+
+  it('marks incomplete when calories exceed the limit even if other macros are met', () => {
+    const result = computeMacroCompletion({
+      totals: { calories: 2500, proteinG: 130, fibreG: 30 },
+      target: target(),
+      foods: [food()],
+    });
+    expect(result?.complete).toBe(false);
+  });
+
+  it('does not lead with calories even when under target — protein leads instead', () => {
+    const result = computeMacroCompletion({
+      totals: { calories: 1400, proteinG: 60, fibreG: 30 },
+      target: target(),
+      foods: [food({ id: 'low', proteinG: 8 }), food({ id: 'high', proteinG: 25 })],
+    });
+    expect(result?.leadingMacro).toBe('protein');
     expect(result?.remainingCalories).toBe(600);
     expect(result?.suggestions[0].food.id).toBe('high');
   });
@@ -111,10 +129,10 @@ describe('computeMacroCompletion', () => {
 
   it('caps suggestions to four foods', () => {
     const result = computeMacroCompletion({
-      totals: { calories: 1000, proteinG: 130, fibreG: 30 },
+      totals: { calories: 1000, proteinG: 30, fibreG: 30 },
       target: target(),
       foods: Array.from({ length: 8 }, (_, index) =>
-        food({ id: `f${index}`, calories: 200 + index })
+        food({ id: `f${index}`, proteinG: 5 + index })
       ),
     });
     expect(result?.suggestions.length).toBeLessThanOrEqual(4);

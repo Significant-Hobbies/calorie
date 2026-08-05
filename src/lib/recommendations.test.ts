@@ -163,6 +163,30 @@ describe('timing calculations', () => {
     ]);
   });
 
+  it('call sites can filter by minimum duration to exclude short overnight gaps', () => {
+    const hour = 60 * 60 * 1000;
+    const day = 24 * hour;
+    const windows = calculateCompletedFasts(
+      [
+        entry('dinner', 22 * hour, 20),
+        entry('breakfast', day + 8 * hour, 30),
+        entry('dinner', day + 20 * hour, 20),
+        entry('breakfast', 2 * day + 7 * hour, 30),
+      ],
+      'UTC'
+    );
+    // First gap: 22h → 8h next day = 10h (below 12h threshold)
+    // Second gap: 20h → 7h next day = 11h (below 12h threshold)
+    expect(windows).toEqual([
+      { startAt: 22 * hour, endAt: day + 8 * hour, durationHours: 10 },
+      { startAt: day + 20 * hour, endAt: 2 * day + 7 * hour, durationHours: 11 },
+    ]);
+    // Call sites filter: only windows >= threshold count toward fastCount
+    const threshold = 12;
+    const qualifying = windows.filter((fast) => fast.durationHours >= threshold);
+    expect(qualifying).toEqual([]);
+  });
+
   it('uses recent carbs to provide a broad exercise window', () => {
     const now = Date.UTC(2026, 6, 25, 12);
     const result = calculateGymGuidance([entry('Oats', now - 30 * 60 * 1000, 45)], now);

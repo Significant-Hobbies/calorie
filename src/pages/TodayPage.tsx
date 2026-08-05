@@ -820,11 +820,9 @@ export function TodayPage({ onOpenFoods }: { onOpenFoods: () => void }) {
               <p>
                 {completion.complete
                   ? 'You’ve hit your tracked targets.'
-                  : completion.leadingMacro === 'calories'
-                    ? 'Calories are your widest gap.'
-                    : completion.leadingMacro === 'protein'
-                      ? 'Protein is your widest gap.'
-                      : 'Fibre is your widest gap.'}
+                  : completion.leadingMacro === 'protein'
+                    ? 'Protein is your widest gap.'
+                    : 'Fibre is your widest gap.'}
               </p>
             </div>
           </div>
@@ -838,7 +836,7 @@ export function TodayPage({ onOpenFoods }: { onOpenFoods: () => void }) {
               <div className="remaining-totals">
                 <div>
                   <strong>{completion.remainingCalories.toLocaleString()}</strong>
-                  <small>kcal left</small>
+                  <small>kcal remaining</small>
                 </div>
                 <div>
                   <strong>{completion.remainingProteinG.toLocaleString()}</strong>

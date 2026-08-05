@@ -13,9 +13,6 @@ import { TodayPage } from './pages/TodayPage';
 const FoodsPage = lazy(() =>
   import('./pages/FoodsPage').then((module) => ({ default: module.FoodsPage }))
 );
-const InsightsPage = lazy(() =>
-  import('./pages/InsightsPage').then((module) => ({ default: module.InsightsPage }))
-);
 const ProgressPage = lazy(() =>
   import('./pages/ProgressPage').then((module) => ({ default: module.ProgressPage }))
 );
@@ -113,9 +110,6 @@ export default function App() {
       break;
     case 'progress':
       content = <ProgressPage />;
-      break;
-    case 'insights':
-      content = <InsightsPage />;
       break;
     case 'foods':
       content = <FoodsPage />;

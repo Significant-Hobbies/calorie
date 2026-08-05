@@ -13,7 +13,7 @@ export type MacroCompletion = {
   remainingCalories: number;
   remainingProteinG: number;
   remainingFibreG: number;
-  leadingMacro: 'calories' | 'protein' | 'fibre' | null;
+  leadingMacro: 'protein' | 'fibre' | null;
   suggestions: MacroCompletionSuggestion[];
   complete: boolean;
 };
@@ -33,29 +33,29 @@ export function computeMacroCompletion(input: {
     return null;
   }
 
+  // Calories are a limit (ceiling), not a target to finish. Headroom is
+  // reported for display but does not count as a gap to fill.
   const remainingCalories =
     calorieTarget !== null ? Math.max(0, round(calorieTarget - input.totals.calories)) : 0;
+  const caloriesMet = calorieTarget === null || input.totals.calories <= calorieTarget;
+
   const remainingProteinG =
     proteinTarget !== null ? Math.max(0, round(proteinTarget - input.totals.proteinG, 1)) : 0;
   const remainingFibreG =
     fibreTarget !== null ? Math.max(0, round(fibreTarget - input.totals.fibreG, 1)) : 0;
 
-  const tracked: Array<{ macro: 'calories' | 'protein' | 'fibre'; remaining: number }> = [];
-  if (calorieTarget !== null) tracked.push({ macro: 'calories', remaining: remainingCalories });
+  // Only protein and fibre are targets to chase — calories are a limit, so
+  // they never become the leading macro for suggestions.
+  const tracked: Array<{ macro: 'protein' | 'fibre'; remaining: number }> = [];
   if (proteinTarget !== null) tracked.push({ macro: 'protein', remaining: remainingProteinG });
   if (fibreTarget !== null) tracked.push({ macro: 'fibre', remaining: remainingFibreG });
 
-  const complete = tracked.every((item) => item.remaining <= 0);
+  const complete = caloriesMet && tracked.every((item) => item.remaining <= 0);
   const fraction = (item: { remaining: number; target: number }) =>
     item.target > 0 ? item.remaining / item.target : 0;
   const trackedWithTarget = tracked.map((item) => ({
     ...item,
-    target:
-      item.macro === 'calories'
-        ? (calorieTarget ?? 0)
-        : item.macro === 'protein'
-          ? (proteinTarget ?? 0)
-          : (fibreTarget ?? 0),
+    target: item.macro === 'protein' ? (proteinTarget ?? 0) : (fibreTarget ?? 0),
   }));
   type TrackedItem = (typeof trackedWithTarget)[number];
   const leading = trackedWithTarget.reduce<TrackedItem | null>(
@@ -71,12 +71,7 @@ export function computeMacroCompletion(input: {
       ...input.foods
         .map((food) => {
           const serving = scaleNutrients(food, food.servingMode, food.defaultAmount);
-          const servingLeading =
-            leading.macro === 'calories'
-              ? serving.calories
-              : leading.macro === 'protein'
-                ? serving.proteinG
-                : serving.fibreG;
+          const servingLeading = leading.macro === 'protein' ? serving.proteinG : serving.fibreG;
           return {
             food,
             calories: serving.calories,
@@ -86,27 +81,12 @@ export function computeMacroCompletion(input: {
           };
         })
         .filter((item) => {
-          const servingLeading =
-            leading.macro === 'calories'
-              ? item.calories
-              : leading.macro === 'protein'
-                ? item.proteinG
-                : item.fibreG;
+          const servingLeading = leading.macro === 'protein' ? item.proteinG : item.fibreG;
           return servingLeading > 0;
         })
         .sort((a, b) => {
-          const aLeading =
-            leading.macro === 'calories'
-              ? a.calories
-              : leading.macro === 'protein'
-                ? a.proteinG
-                : a.fibreG;
-          const bLeading =
-            leading.macro === 'calories'
-              ? b.calories
-              : leading.macro === 'protein'
-                ? b.proteinG
-                : b.fibreG;
+          const aLeading = leading.macro === 'protein' ? a.proteinG : a.fibreG;
+          const bLeading = leading.macro === 'protein' ? b.proteinG : b.fibreG;
           return bLeading - aLeading;
         })
         .slice(0, MAX_SUGGESTIONS)

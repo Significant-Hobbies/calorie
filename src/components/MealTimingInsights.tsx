@@ -1,5 +1,5 @@
 import { Clock3, MoonStar, Sprout, Sunrise, Utensils } from 'lucide-react';
-import type { CSSProperties } from 'react';
+import { type CSSProperties, memo } from 'react';
 import type { MealTimingAnalysis, MealTimingBandKey } from '../lib/types';
 
 const BAND_LABELS: Record<MealTimingBandKey, string> = {
@@ -30,7 +30,7 @@ function markerPosition(minutes: number | null) {
   return `${Math.max(2, Math.min(98, (minutes / (24 * 60)) * 100))}%`;
 }
 
-export function MealTimingInsights({
+export const MealTimingInsights = memo(function MealTimingInsights({
   analysis,
   rangeDays,
 }: {
@@ -209,4 +209,4 @@ export function MealTimingInsights({
       </p>
     </section>
   );
-}
+});

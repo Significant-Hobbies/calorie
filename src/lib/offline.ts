@@ -8,14 +8,40 @@ const dbPromise = openDB('calorie-local', 1, {
   },
 });
 
+type CachedDashboard = { data: Dashboard; cachedAt: number };
+
 export async function cacheDashboard(dashboard: Dashboard) {
   const db = await dbPromise;
-  await db.put('cache', dashboard, `dashboard:${dashboard.profile.userId}`);
+  const entry: CachedDashboard = { data: dashboard, cachedAt: Date.now() };
+  await db.put('cache', entry, `dashboard:${dashboard.profile.userId}`);
 }
 
 export async function readCachedDashboard(userId: string): Promise<Dashboard | null> {
   const db = await dbPromise;
-  return (await db.get('cache', `dashboard:${userId}`)) ?? null;
+  const entry = (await db.get('cache', `dashboard:${userId}`)) as
+    | CachedDashboard
+    | Dashboard
+    | null;
+  if (!entry) return null;
+  // New format with TTL wrapper; fall back to raw Dashboard for old caches.
+  if ('data' in entry && 'cachedAt' in entry) return entry.data;
+  return entry as Dashboard;
+}
+
+/**
+ * Returns a stale dashboard cache if one exists, regardless of age. Used for
+ * stale-while-revalidate: serve immediately, refresh in background.
+ */
+export async function readStaleDashboard(userId: string): Promise<Dashboard | null> {
+  return readCachedDashboard(userId);
+}
+
+/** Returns the cached dashboard age in ms, or null if not cached. */
+export async function dashboardCacheAge(userId: string): Promise<number | null> {
+  const db = await dbPromise;
+  const entry = (await db.get('cache', `dashboard:${userId}`)) as CachedDashboard | null;
+  if (!entry || !('cachedAt' in entry)) return null;
+  return Date.now() - entry.cachedAt;
 }
 
 export async function cachePrivateValue<T>(key: string, value: T) {

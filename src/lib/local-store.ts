@@ -343,10 +343,12 @@ function buildLocalHistory(
   const prior = [...state.entries]
     .filter((entry) => entry.eatenAt < startAt)
     .sort((a, b) => b.eatenAt - a.eatenAt)[0];
+  const fastingThreshold = state.profile.fastingThresholdHours;
   for (const fast of calculateCompletedFasts(
     prior ? [prior, ...entries] : entries,
     Intl.DateTimeFormat().resolvedOptions().timeZone
   )) {
+    if (fast.durationHours < fastingThreshold) continue;
     const day = days.get(dateKey(fast.endAt));
     if (day) day.fastCount += 1;
   }

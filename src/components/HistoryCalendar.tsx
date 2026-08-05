@@ -7,6 +7,7 @@ import {
   Sprout,
   Utensils,
 } from 'lucide-react';
+import { memo } from 'react';
 import { dateFromKey, isSameMonth, localDateKey } from '../lib/calendar';
 import { entriesForLocalDate } from '../lib/history';
 import type { HistoryDay, HistoryResponse, NutritionTarget, WeightEntry } from '../lib/types';
@@ -75,7 +76,7 @@ function cellLabel(day: HistoryDay, weights: WeightEntry[], hasFoodEntry: boolea
   return parts.join(', ');
 }
 
-export function HistoryCalendar({
+export const HistoryCalendar = memo(function HistoryCalendar({
   month,
   history,
   selectedDate,
@@ -320,4 +321,4 @@ export function HistoryCalendar({
       </article>
     </section>
   );
-}
+});
