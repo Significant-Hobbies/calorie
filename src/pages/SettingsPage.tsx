@@ -1,4 +1,6 @@
 import {
+  ArrowDown,
+  ArrowUp,
   BookOpen,
   ChevronRight,
   Download,
@@ -8,18 +10,37 @@ import {
   Moon,
   Palette,
   Save,
+  SlidersHorizontal,
   Target,
   UserRound,
 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
-import { getDashboard, isLocalMode, saveProfile } from '../lib/api';
+import {
+  getCycleHistory,
+  getDashboard,
+  getJournalExport,
+  isLocalMode,
+  saveProfile,
+  updateCycleStart,
+} from '../lib/api';
 import { signOut } from '../lib/auth-client';
+import { DEFAULT_DAILY_ACTION_ORDER, moveDailyAction } from '../lib/daily-action-preferences';
+import {
+  CUT_INTENSITY_DETAILS,
+  type CutIntensity,
+  CYCLE_DETAILS,
+  cutIntensityFromGoal,
+  cycleFromGoal,
+  type GoalCycle,
+  goalFromCycle,
+} from '../lib/goal-cycles';
 import {
   canPromptInstall,
   isInstalledApp,
   promptInstall,
   subscribeToInstallPrompt,
 } from '../lib/install';
+import { journalExportFileName, serializeJournalExport } from '../lib/journal-export';
 import {
   calculateNutritionTarget,
   calculateTargetWeightProgress,
@@ -30,11 +51,19 @@ import {
 import { getThemePreference, setThemePreference } from '../lib/theme';
 import type {
   ActivityLevel,
+  CycleHistoryResponse,
+  DailyActionKey,
   EquationProfile,
-  Goal,
   ThemePreference,
   UserProfile,
 } from '../lib/types';
+
+const DAILY_ACTION_LABELS: Record<DailyActionKey, string> = {
+  weight: 'Weight check-in',
+  creatine: 'Creatine',
+  food: 'Food',
+  water: 'Water',
+};
 
 const displayWeight = (kg: number | null, imperial: boolean) =>
   kg === null ? '' : imperial ? Math.round(kg * 2.20462 * 10) / 10 : kg;
@@ -52,16 +81,25 @@ export function SettingsPage({
   onProfileChange: (profile: UserProfile) => void;
 }) {
   const [draft, setDraft] = useState(profile);
-  const [openSection, setOpenSection] = useState<'profile' | 'targets' | 'rhythm' | null>(null);
+  const [openSection, setOpenSection] = useState<
+    'profile' | 'targets' | 'rhythm' | 'prompts' | null
+  >(null);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [latestWeightKg, setLatestWeightKg] = useState<number | null>(null);
   const [theme, setTheme] = useState<ThemePreference>(() => getThemePreference());
   const [installAvailable, setInstallAvailable] = useState(() => canPromptInstall());
+  const [cycleHistory, setCycleHistory] = useState<CycleHistoryResponse | null>(null);
+  const [cycleStartOn, setCycleStartOn] = useState('');
+  const [exporting, setExporting] = useState(false);
 
   useEffect(() => {
-    void getDashboard()
-      .then((dashboard) => setLatestWeightKg(dashboard.latestWeight?.weightKg ?? null))
+    void Promise.all([getDashboard(), getCycleHistory()])
+      .then(([dashboard, history]) => {
+        setLatestWeightKg(dashboard.latestWeight?.weightKg ?? null);
+        setCycleHistory(history);
+        setCycleStartOn(history.active.session.startOn);
+      })
       .catch(() => undefined);
   }, []);
 
@@ -91,6 +129,8 @@ export function SettingsPage({
     latestWeightKg && draft.targetWeightKg
       ? calculateTargetWeightProgress(latestWeightKg, draft.targetWeightKg)
       : null;
+  const cycle = cycleFromGoal(draft.goal);
+  const cutIntensity = cutIntensityFromGoal(draft.goal);
 
   const save = async () => {
     setSaving(true);
@@ -100,8 +140,14 @@ export function SettingsPage({
         ? [Math.min(...draft.manualCalorieRange), Math.max(...draft.manualCalorieRange)]
         : null;
       const saved = await saveProfile({ ...draft, manualCalorieRange });
+      if (cycleStartOn && cycleStartOn !== cycleHistory?.active.session.startOn) {
+        await updateCycleStart(cycleStartOn);
+      }
       onProfileChange(saved);
       setDraft(saved);
+      const refreshedHistory = await getCycleHistory();
+      setCycleHistory(refreshedHistory);
+      setCycleStartOn(refreshedHistory.active.session.startOn);
       setMessage('Changes saved.');
       setOpenSection(null);
     } catch (caught) {
@@ -113,6 +159,27 @@ export function SettingsPage({
 
   const toggle = (section: typeof openSection) =>
     setOpenSection((current) => (current === section ? null : section));
+
+  const downloadBackup = async () => {
+    setExporting(true);
+    setMessage(null);
+    try {
+      const backup = await getJournalExport();
+      const url = URL.createObjectURL(
+        new Blob([serializeJournalExport(backup)], { type: 'application/json' })
+      );
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = journalExportFileName(new Date(backup.generatedAt));
+      link.click();
+      URL.revokeObjectURL(url);
+      setMessage('Backup downloaded. Keep it somewhere private.');
+    } catch (caught) {
+      setMessage(caught instanceof Error ? caught.message : 'Backup could not be downloaded.');
+    } finally {
+      setExporting(false);
+    }
+  };
 
   return (
     <div className="page-stack">
@@ -127,8 +194,7 @@ export function SettingsPage({
         <div>
           <h2>{draft.displayName}</h2>
           <p>
-            {GOAL_DETAILS[draft.goal].shortLabel} ·{' '}
-            {draft.units === 'metric' ? 'Metric' : 'Imperial'}
+            {CYCLE_DETAILS[cycle].shortLabel} · {draft.units === 'metric' ? 'Metric' : 'Imperial'}
           </p>
         </div>
         <span className="profile-leaf" aria-hidden="true" />
@@ -141,7 +207,13 @@ export function SettingsPage({
       ) : null}
 
       <section className="settings-group" aria-label="Profile settings">
-        <button className="settings-row" type="button" onClick={() => toggle('profile')}>
+        <button
+          className="settings-row"
+          type="button"
+          aria-expanded={openSection === 'profile'}
+          aria-controls="profile-settings-editor"
+          onClick={() => toggle('profile')}
+        >
           <span className="settings-icon">
             <UserRound aria-hidden="true" />
           </span>
@@ -152,7 +224,7 @@ export function SettingsPage({
           <ChevronRight className={openSection === 'profile' ? 'is-open' : ''} aria-hidden="true" />
         </button>
         {openSection === 'profile' ? (
-          <div className="settings-editor">
+          <div className="settings-editor" id="profile-settings-editor">
             <label className="field">
               <span>Name</span>
               <input
@@ -215,7 +287,13 @@ export function SettingsPage({
           </div>
         ) : null}
 
-        <button className="settings-row" type="button" onClick={() => toggle('targets')}>
+        <button
+          className="settings-row"
+          type="button"
+          aria-expanded={openSection === 'targets'}
+          aria-controls="target-settings-editor"
+          onClick={() => toggle('targets')}
+        >
           <span className="settings-icon amber">
             <Target aria-hidden="true" />
           </span>
@@ -230,7 +308,7 @@ export function SettingsPage({
           <ChevronRight className={openSection === 'targets' ? 'is-open' : ''} aria-hidden="true" />
         </button>
         {openSection === 'targets' ? (
-          <div className="settings-editor">
+          <div className="settings-editor" id="target-settings-editor">
             <label className="field">
               <span>Activity level</span>
               <select
@@ -249,28 +327,56 @@ export function SettingsPage({
               </select>
               <small>Scales resting energy into estimated maintenance calories.</small>
             </label>
-            <label className="field">
-              <span>Goal</span>
-              <select
-                value={draft.goal}
-                onChange={(event) =>
-                  setDraft((current) => ({
-                    ...current,
-                    goal: event.target.value as Goal,
-                    targetWeightKg:
-                      event.target.value === 'maintain' ? null : current.targetWeightKg,
-                  }))
-                }
-              >
-                {(Object.keys(GOAL_DETAILS) as Goal[]).map((goal) => (
-                  <option value={goal} key={goal}>
-                    {GOAL_DETAILS[goal].label}
-                  </option>
+            <fieldset className="field">
+              <legend>Current cycle</legend>
+              <div className="cycle-grid">
+                {(Object.keys(CYCLE_DETAILS) as GoalCycle[]).map((option) => (
+                  <button
+                    className={cycle === option ? 'cycle-option is-selected' : 'cycle-option'}
+                    type="button"
+                    key={option}
+                    aria-pressed={cycle === option}
+                    onClick={() =>
+                      setDraft((current) => ({
+                        ...current,
+                        goal: goalFromCycle(option, cutIntensityFromGoal(current.goal)),
+                        targetWeightKg: option === 'recomposition' ? null : current.targetWeightKg,
+                      }))
+                    }
+                  >
+                    <strong>{CYCLE_DETAILS[option].label}</strong>
+                    <small>{CYCLE_DETAILS[option].description}</small>
+                  </button>
                 ))}
-              </select>
-              <small>{GOAL_DETAILS[draft.goal].explanation}.</small>
-            </label>
-            {draft.goal !== 'maintain' ? (
+              </div>
+            </fieldset>
+            {cycle === 'cut' ? (
+              <fieldset className="field">
+                <legend>Cut intensity</legend>
+                <div className="segmented">
+                  {(Object.keys(CUT_INTENSITY_DETAILS) as CutIntensity[]).map((intensity) => (
+                    <button
+                      className={cutIntensity === intensity ? 'is-selected' : ''}
+                      type="button"
+                      key={intensity}
+                      aria-pressed={cutIntensity === intensity}
+                      onClick={() =>
+                        setDraft((current) => ({
+                          ...current,
+                          goal: goalFromCycle('cut', intensity),
+                        }))
+                      }
+                    >
+                      {CUT_INTENSITY_DETAILS[intensity].label}
+                    </button>
+                  ))}
+                </div>
+                <small>{CUT_INTENSITY_DETAILS[cutIntensity].description}.</small>
+              </fieldset>
+            ) : (
+              <p className="cycle-explanation">{GOAL_DETAILS[draft.goal].explanation}.</p>
+            )}
+            {cycle !== 'recomposition' ? (
               <label className="field">
                 <span>Target weight</span>
                 <div className="input-with-unit">
@@ -342,8 +448,42 @@ export function SettingsPage({
                   }
                 />
               </div>
-              <small>Leave both blank to use the automatic range.</small>
+              <small>
+                Leave both blank to use the automatic cycle range. This override stays in place if
+                you switch cycles.
+              </small>
             </fieldset>
+            {cycleHistory ? (
+              <div className="cycle-history-settings">
+                <label className="field">
+                  <span>Current cycle started</span>
+                  <input
+                    type="date"
+                    max={cycleHistory.today}
+                    value={cycleStartOn}
+                    onChange={(event) => setCycleStartOn(event.target.value)}
+                  />
+                  <small>
+                    Backdate this only to the day you actually began. It changes cycle analytics,
+                    not your journal entries.
+                  </small>
+                </label>
+                {cycleHistory.previous ? (
+                  <details className="cycle-history-disclosure">
+                    <summary>Previous cycle</summary>
+                    <p>
+                      {CYCLE_DETAILS[cycleHistory.previous.session.cycle].label} ·{' '}
+                      {cycleHistory.previous.session.startOn} to{' '}
+                      {cycleHistory.previous.session.endOn}
+                    </p>
+                  </details>
+                ) : (
+                  <p className="cycle-explanation">
+                    Your first completed cycle will appear here when you switch direction.
+                  </p>
+                )}
+              </div>
+            ) : null}
             <div className="target-math">
               <span>How your range is built</span>
               {target.maintenanceCalories ? (
@@ -361,14 +501,20 @@ export function SettingsPage({
                 </strong>
               )}
               <small>
-                Automatic ranges use your goal’s share of maintenance and do not go below 1,200
+                Automatic ranges use your cycle’s share of maintenance and do not go below 1,200
                 kcal.
               </small>
             </div>
           </div>
         ) : null}
 
-        <button className="settings-row" type="button" onClick={() => toggle('rhythm')}>
+        <button
+          className="settings-row"
+          type="button"
+          aria-expanded={openSection === 'rhythm'}
+          aria-controls="rhythm-settings-editor"
+          onClick={() => toggle('rhythm')}
+        >
           <span className="settings-icon plum">
             <Moon aria-hidden="true" />
           </span>
@@ -381,7 +527,7 @@ export function SettingsPage({
           <ChevronRight className={openSection === 'rhythm' ? 'is-open' : ''} aria-hidden="true" />
         </button>
         {openSection === 'rhythm' ? (
-          <div className="settings-editor">
+          <div className="settings-editor" id="rhythm-settings-editor">
             <div className="field-row">
               <label className="field">
                 <span>Wake time</span>
@@ -431,6 +577,91 @@ export function SettingsPage({
                 <b>ml</b>
               </div>
             </label>
+          </div>
+        ) : null}
+
+        <button
+          className="settings-row"
+          type="button"
+          aria-expanded={openSection === 'prompts'}
+          aria-controls="prompt-settings-editor"
+          onClick={() => toggle('prompts')}
+        >
+          <span className="settings-icon amber">
+            <SlidersHorizontal aria-hidden="true" />
+          </span>
+          <span>
+            <strong>Daily prompts</strong>
+            <small>
+              {DEFAULT_DAILY_ACTION_ORDER.length - draft.dailyActionHidden.length} shown · choose
+              their order
+            </small>
+          </span>
+          <ChevronRight className={openSection === 'prompts' ? 'is-open' : ''} aria-hidden="true" />
+        </button>
+        {openSection === 'prompts' ? (
+          <div className="settings-editor" id="prompt-settings-editor">
+            <p className="cycle-explanation">
+              Today shows these prompts in your order, then removes each one after it is done.
+            </p>
+            <ol className="prompt-preference-list">
+              {draft.dailyActionOrder.map((action, index) => {
+                const hidden = draft.dailyActionHidden.includes(action);
+                return (
+                  <li key={action}>
+                    <div>
+                      <strong>{DAILY_ACTION_LABELS[action]}</strong>
+                      <small>{hidden ? 'Hidden from Today' : `Position ${index + 1}`}</small>
+                    </div>
+                    <div className="prompt-preference-actions">
+                      <button
+                        type="button"
+                        className="button button-quiet"
+                        aria-label={`Move ${DAILY_ACTION_LABELS[action]} up`}
+                        disabled={index === 0}
+                        onClick={() =>
+                          setDraft((current) => ({
+                            ...current,
+                            dailyActionOrder: moveDailyAction(current.dailyActionOrder, action, -1),
+                          }))
+                        }
+                      >
+                        <ArrowUp aria-hidden="true" />
+                      </button>
+                      <button
+                        type="button"
+                        className="button button-quiet"
+                        aria-label={`Move ${DAILY_ACTION_LABELS[action]} down`}
+                        disabled={index === draft.dailyActionOrder.length - 1}
+                        onClick={() =>
+                          setDraft((current) => ({
+                            ...current,
+                            dailyActionOrder: moveDailyAction(current.dailyActionOrder, action, 1),
+                          }))
+                        }
+                      >
+                        <ArrowDown aria-hidden="true" />
+                      </button>
+                      <button
+                        type="button"
+                        className="button button-secondary prompt-visibility-button"
+                        aria-pressed={!hidden}
+                        onClick={() =>
+                          setDraft((current) => ({
+                            ...current,
+                            dailyActionHidden: hidden
+                              ? current.dailyActionHidden.filter((key) => key !== action)
+                              : [...current.dailyActionHidden, action],
+                          }))
+                        }
+                      >
+                        {hidden ? 'Show' : 'Hide'}
+                      </button>
+                    </div>
+                  </li>
+                );
+              })}
+            </ol>
           </div>
         ) : null}
       </section>
@@ -483,6 +714,21 @@ export function SettingsPage({
                 ? 'Add a fast, full-screen shortcut to this device'
                 : 'Available from supported browser menus'}
             </small>
+          </span>
+          <ChevronRight aria-hidden="true" />
+        </button>
+        <button
+          className="settings-row"
+          type="button"
+          disabled={exporting}
+          onClick={() => void downloadBackup()}
+        >
+          <span className="settings-icon amber">
+            <Download aria-hidden="true" />
+          </span>
+          <span>
+            <strong>{exporting ? 'Preparing backup…' : 'Download data backup'}</strong>
+            <small>Profile, foods, logs, weights and cycle history as private JSON</small>
           </span>
           <ChevronRight aria-hidden="true" />
         </button>

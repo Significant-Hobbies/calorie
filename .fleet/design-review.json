@@ -2,7 +2,7 @@
   "$schema": "fleet.design-review.v1",
   "version": 1,
   "project": "calorie",
-  "target": "Mobile Today and Insights",
+  "target": "Cycle history, corrections, prompts, food classification, and mobile tuning",
   "mode": "preserve",
   "register": "product",
   "context": {
@@ -14,33 +14,33 @@
     "probes": [],
     "selected": "existing-design",
     "approval": "not-required",
-    "before": "artifacts/design/before.png"
+    "before": "artifacts/design/cycle-history-data-control/before-settings-390.png"
   },
   "evidence": {
     "screenshots": [
       {
         "width": 390,
-        "path": "artifacts/design/after-390.png"
+        "path": "artifacts/design/cycle-history-data-control/after-390.png"
       },
       {
         "width": 768,
-        "path": "artifacts/design/after-768.png"
+        "path": "artifacts/design/cycle-history-data-control/after-768.png"
       },
       {
         "width": 1440,
-        "path": "artifacts/design/after-1440.png"
+        "path": "artifacts/design/cycle-history-data-control/after-1440.png"
       }
     ],
     "projectCheck": {
-      "command": "replace-with-project-check",
-      "status": "pending"
+      "command": "pnpm check",
+      "status": "pass"
     },
     "critique": {
-      "score": 0,
+      "score": 35,
       "maximum": 40
     },
     "audit": {
-      "score": 0,
+      "score": 18,
       "maximum": 20
     },
     "unresolved": {
@@ -53,7 +53,7 @@
     }
   },
   "ownerFeedback": {
-    "decision": "pending",
-    "note": ""
+    "decision": "keep",
+    "note": "Owner approved the final implementation and visual tuning on 2026-08-09."
   }
 }

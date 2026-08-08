@@ -26,6 +26,7 @@ const food = (overrides: Partial<Food> = {}): Food => ({
   fibreG: 5,
   favourite: true,
   lastUsedAt: null,
+  archivedAt: null,
   ...overrides,
 });
 

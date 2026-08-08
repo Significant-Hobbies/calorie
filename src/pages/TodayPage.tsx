@@ -14,6 +14,7 @@ import {
   Plus,
   RotateCcw,
   Save,
+  Scale,
   Sprout,
   Trash2,
   Wheat,
@@ -24,6 +25,7 @@ import {
   addFoodEntry,
   addMedicationCheckIn,
   addWater,
+  addWeight,
   archiveMedication,
   createFood,
   deleteFoodEntry,
@@ -33,9 +35,14 @@ import {
   saveMedication,
   updateFoodEntry,
   updateMedication,
+  updateWater,
 } from '../lib/api';
+import { enabledDailyActions } from '../lib/daily-action-preferences';
+import { type DailyActionKey, getDailyActionState } from '../lib/daily-actions';
 import { computeDailyRating } from '../lib/daily-rating';
 import { directEntryError, foodFromDirectEntry } from '../lib/entries';
+import { FOOD_KIND_LABELS, normalizeFoodLabels } from '../lib/food-context';
+import { waterTotal } from '../lib/log-corrections';
 import { computeMacroCompletion } from '../lib/macro-completion';
 import {
   calculateGymGuidance,
@@ -48,9 +55,11 @@ import type {
   Dashboard,
   Food,
   FoodEntry,
+  FoodKind,
   Medication,
   MedicationSchedule,
   WaterEntry,
+  WeightEntry,
 } from '../lib/types';
 
 function formatTime(timestamp: number) {
@@ -70,9 +79,15 @@ function formatDuration(hours: number) {
 
 function greeting() {
   const hour = new Date().getHours();
-  if (hour < 12) return 'Good morning';
-  if (hour < 18) return 'Good afternoon';
-  return 'Good evening';
+  if (hour < 5) {
+    return {
+      title: 'Rest well',
+      subtitle: 'It’s late—your journal will still be here after sleep.',
+    };
+  }
+  if (hour < 12) return { title: 'Good morning', subtitle: 'Here’s your day at a glance.' };
+  if (hour < 18) return { title: 'Good afternoon', subtitle: 'Here’s your day at a glance.' };
+  return { title: 'Good evening', subtitle: 'Here’s your day at a glance.' };
 }
 
 function withEntries(
@@ -95,7 +110,7 @@ function withEntries(
     waterEntries: [...waterEntries].sort((a, b) => b.drankAt - a.drankAt),
     totals: {
       ...nutrients,
-      waterMl: waterEntries.reduce((sum, entry) => sum + entry.amountMl, 0),
+      waterMl: waterTotal(waterEntries),
     },
   };
 }
@@ -103,6 +118,7 @@ function withEntries(
 type UndoAction =
   | { kind: 'food'; id: string; label: string }
   | { kind: 'water'; id: string; label: string }
+  | { kind: 'delete-water'; entry: WaterEntry; label: string }
   | { kind: 'delete-entry'; entry: FoodEntry; label: string };
 
 type EntryDraft = {
@@ -118,6 +134,8 @@ type EntryDraft = {
   fibreG: number;
   eatenAt: string;
   saveForLater: boolean;
+  foodKind: FoodKind;
+  labels: string[];
 };
 
 function toLocalInput(timestamp: number) {
@@ -126,7 +144,13 @@ function toLocalInput(timestamp: number) {
   return local.toISOString().slice(0, 16);
 }
 
-export function TodayPage({ onOpenFoods }: { onOpenFoods: () => void }) {
+export function TodayPage({
+  onOpenFoods,
+  onOpenSettings,
+}: {
+  onOpenFoods: () => void;
+  onOpenSettings: () => void;
+}) {
   const [dashboard, setDashboard] = useState<Dashboard | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pendingId, setPendingId] = useState<string | null>(null);
@@ -137,8 +161,17 @@ export function TodayPage({ onOpenFoods }: { onOpenFoods: () => void }) {
   const [medicationName, setMedicationName] = useState('');
   const [medicationSchedule, setMedicationSchedule] = useState<MedicationSchedule>('morning');
   const [editingMedicationId, setEditingMedicationId] = useState<string | null>(null);
+  const [weightEditorOpen, setWeightEditorOpen] = useState(false);
+  const [weightValue, setWeightValue] = useState('');
+  const [dailyAnnouncement, setDailyAnnouncement] = useState('');
+  const [editingWaterId, setEditingWaterId] = useState<string | null>(null);
+  const [waterAmount, setWaterAmount] = useState('');
+  const [waterTime, setWaterTime] = useState('');
   const entryFoodSelectRef = useRef<HTMLSelectElement>(null);
   const entryNameInputRef = useRef<HTMLInputElement>(null);
+  const weightInputRef = useRef<HTMLInputElement>(null);
+  const dailyActionsRef = useRef<HTMLElement>(null);
+  const previousIncompleteRef = useRef<DailyActionKey[] | null>(null);
   const entrySheetOpen = entryDraft !== null;
 
   const load = useCallback(async () => {
@@ -166,6 +199,11 @@ export function TodayPage({ onOpenFoods }: { onOpenFoods: () => void }) {
     else entryFoodSelectRef.current?.focus();
   }, [entryDraft?.mode, entrySheetOpen]);
 
+  useEffect(() => {
+    if (!weightEditorOpen) return;
+    window.requestAnimationFrame(() => weightInputRef.current?.focus());
+  }, [weightEditorOpen]);
+
   const gym = useMemo(
     () => (dashboard ? calculateGymGuidance(dashboard.entries) : null),
     [dashboard]
@@ -184,7 +222,7 @@ export function TodayPage({ onOpenFoods }: { onOpenFoods: () => void }) {
   const latestFast = useMemo(() => dashboard?.completedFasts.at(-1) ?? null, [dashboard]);
   const completion = useMemo(
     () =>
-      dashboard
+      dashboard?.target.calorieTarget
         ? computeMacroCompletion({
             totals: dashboard.totals,
             target: dashboard.target,
@@ -213,6 +251,40 @@ export function TodayPage({ onOpenFoods }: { onOpenFoods: () => void }) {
         : null,
     [dashboard]
   );
+  const dailyActionState = useMemo(
+    () =>
+      dashboard
+        ? getDailyActionState({
+            date: dashboard.date,
+            timezone: dashboard.timezone,
+            entries: dashboard.entries,
+            waterEntries: dashboard.waterEntries,
+            medications: dashboard.medications,
+            medicationCheckIns: dashboard.medicationCheckIns,
+            latestWeight: dashboard.latestWeight,
+          })
+        : null,
+    [dashboard]
+  );
+  const incompleteActions = useMemo(
+    () =>
+      (dashboard ? enabledDailyActions(dashboard.profile) : []).filter(
+        (key) => !dailyActionState?.completed[key]
+      ),
+    [dailyActionState, dashboard]
+  );
+
+  useEffect(() => {
+    const previous = previousIncompleteRef.current;
+    previousIncompleteRef.current = incompleteActions;
+    if (!previous || incompleteActions.length >= previous.length) return;
+    window.requestAnimationFrame(() => {
+      const next = dailyActionsRef.current?.querySelector<HTMLElement>(
+        'button:not([disabled]), input:not([disabled])'
+      );
+      next?.focus();
+    });
+  }, [incompleteActions]);
 
   const quickAdd = async (food: Food) => {
     if (!dashboard || pendingId) return;
@@ -246,6 +318,7 @@ export function TodayPage({ onOpenFoods }: { onOpenFoods: () => void }) {
           : current
       );
       setUndo({ kind: 'food', id, label: `${food.name} logged` });
+      setDailyAnnouncement(`Food logged. ${food.name} is in today’s journal.`);
     } catch (caught) {
       setDashboard(dashboard);
       setError(caught instanceof Error ? caught.message : 'Food could not be logged.');
@@ -266,11 +339,71 @@ export function TodayPage({ onOpenFoods }: { onOpenFoods: () => void }) {
     try {
       await addWater(entry);
       setUndo({ kind: 'water', id: entry.id, label: `${amountMl} ml water logged` });
+      setDailyAnnouncement(`${amountMl} ml water logged.`);
     } catch (caught) {
       setDashboard(dashboard);
       setError(caught instanceof Error ? caught.message : 'Water could not be logged.');
     } finally {
       setPendingId(null);
+    }
+  };
+
+  const beginWaterEdit = (entry: WaterEntry) => {
+    setEditingWaterId(entry.id);
+    setWaterAmount(String(entry.amountMl));
+    setWaterTime(toLocalInput(entry.drankAt));
+  };
+
+  const saveWaterEdit = async () => {
+    if (!dashboard || !editingWaterId) return;
+    const amountMl = Number(waterAmount);
+    const drankAt = new Date(waterTime).getTime();
+    if (
+      !Number.isFinite(amountMl) ||
+      amountMl < 1 ||
+      amountMl > 5000 ||
+      !Number.isFinite(drankAt)
+    ) {
+      setError('Enter water between 1 and 5,000 ml and choose a valid time.');
+      return;
+    }
+    const prior = dashboard;
+    const updated: WaterEntry = { id: editingWaterId, amountMl: Math.round(amountMl), drankAt };
+    setDashboard(
+      withEntries(
+        dashboard,
+        dashboard.entries,
+        dashboard.waterEntries.map((entry) => (entry.id === updated.id ? updated : entry))
+      )
+    );
+    setEditingWaterId(null);
+    try {
+      await updateWater(updated);
+      setDailyAnnouncement(`${updated.amountMl} ml water check-in updated.`);
+    } catch (caught) {
+      setDashboard(prior);
+      setError(caught instanceof Error ? caught.message : 'Water check-in could not be updated.');
+    }
+  };
+
+  const removeWater = async (entry: WaterEntry) => {
+    if (!dashboard) return;
+    const prior = dashboard;
+    setDashboard(
+      withEntries(
+        dashboard,
+        dashboard.entries,
+        dashboard.waterEntries.filter((item) => item.id !== entry.id)
+      )
+    );
+    setUndo({ kind: 'delete-water', entry, label: `${entry.amountMl} ml water removed` });
+    try {
+      await deleteWater(entry.id);
+      setDailyAnnouncement('Water check-in removed.');
+    } catch (caught) {
+      setDashboard(prior);
+      setUndo(null);
+      setError(caught instanceof Error ? caught.message : 'Water check-in could not be removed.');
     }
   };
 
@@ -297,6 +430,9 @@ export function TodayPage({ onOpenFoods }: { onOpenFoods: () => void }) {
     try {
       if (editing) await updateMedication(medication);
       else await saveMedication(medication);
+      if (/^creatine(?:\s|$)/i.test(medication.name)) {
+        setDailyAnnouncement('Creatine routine is ready to check in.');
+      }
       setMedicationName('');
       setMedicationSchedule('morning');
       setEditingMedicationId(null);
@@ -340,6 +476,7 @@ export function TodayPage({ onOpenFoods }: { onOpenFoods: () => void }) {
       });
       try {
         await deleteMedicationCheckIn(existing.id);
+        setDailyAnnouncement(`${medication.name} check-in removed.`);
       } catch (caught) {
         setDashboard(dashboard);
         setError(caught instanceof Error ? caught.message : 'Check-off could not be updated.');
@@ -361,6 +498,7 @@ export function TodayPage({ onOpenFoods }: { onOpenFoods: () => void }) {
     });
     try {
       await addMedicationCheckIn(checkIn);
+      setDailyAnnouncement(`${medication.name} checked in for today.`);
     } catch (caught) {
       setDashboard(dashboard);
       setError(caught instanceof Error ? caught.message : 'Check-off could not be updated.');
@@ -391,13 +529,17 @@ export function TodayPage({ onOpenFoods }: { onOpenFoods: () => void }) {
         )
       );
       await deleteWater(action.id).catch(() => void load());
-    } else {
+    } else if (action.kind === 'delete-entry') {
       const entry = action.entry;
       setDashboard(withEntries(dashboard, [entry, ...dashboard.entries], dashboard.waterEntries));
       await addFoodEntry({
         ...entry,
         optimistic: entry,
       }).catch(() => void load());
+    } else {
+      const entry = action.entry;
+      setDashboard(withEntries(dashboard, dashboard.entries, [entry, ...dashboard.waterEntries]));
+      await addWater(entry).catch(() => void load());
     }
   };
 
@@ -417,6 +559,8 @@ export function TodayPage({ onOpenFoods }: { onOpenFoods: () => void }) {
         : { calories: 0, carbsG: 0, proteinG: 0, fibreG: 0 }),
       eatenAt: toLocalInput(Date.now()),
       saveForLater: false,
+      foodKind: food?.foodKind ?? 'prepared',
+      labels: food?.labels ?? [],
     });
   };
 
@@ -436,6 +580,8 @@ export function TodayPage({ onOpenFoods }: { onOpenFoods: () => void }) {
       fibreG: entry.fibreG,
       eatenAt: toLocalInput(entry.eatenAt),
       saveForLater: false,
+      foodKind: entry.foodKind ?? 'prepared',
+      labels: entry.labels ?? [],
     });
   };
 
@@ -451,6 +597,8 @@ export function TodayPage({ onOpenFoods }: { onOpenFoods: () => void }) {
             amount: food.defaultAmount,
             unitLabel: food.servingMode === 'per_100g' ? 'g' : food.unitLabel,
             ...scaleNutrients(food, food.servingMode, food.defaultAmount),
+            foodKind: food.foodKind ?? 'prepared',
+            labels: food.labels ?? [],
           }
         : current
     );
@@ -495,6 +643,8 @@ export function TodayPage({ onOpenFoods }: { onOpenFoods: () => void }) {
           proteinG: 0,
           fibreG: 0,
           saveForLater: false,
+          foodKind: 'prepared',
+          labels: [],
         };
       }
 
@@ -509,6 +659,8 @@ export function TodayPage({ onOpenFoods }: { onOpenFoods: () => void }) {
         amount: food.defaultAmount,
         unitLabel: food.servingMode === 'per_100g' ? 'g' : food.unitLabel,
         ...scaleNutrients(food, food.servingMode, food.defaultAmount),
+        foodKind: food.foodKind ?? 'prepared',
+        labels: food.labels ?? [],
       };
     });
   };
@@ -541,6 +693,8 @@ export function TodayPage({ onOpenFoods }: { onOpenFoods: () => void }) {
             unitLabel: food.servingMode === 'per_100g' ? 'g' : food.unitLabel,
             ...scaleNutrients(food, food.servingMode, entryDraft.amount),
             eatenAt,
+            foodKind: food.foodKind,
+            labels: food.labels,
           }
         : {
             id,
@@ -553,6 +707,8 @@ export function TodayPage({ onOpenFoods }: { onOpenFoods: () => void }) {
             proteinG: entryDraft.proteinG,
             fibreG: entryDraft.fibreG,
             eatenAt,
+            foodKind: entryDraft.foodKind,
+            labels: normalizeFoodLabels(entryDraft.labels),
           };
     const directError = directEntry.foodId === null ? directEntryError(directEntry) : null;
     if (directError) {
@@ -608,6 +764,7 @@ export function TodayPage({ onOpenFoods }: { onOpenFoods: () => void }) {
             ? `${optimistic.foodName} saved and logged`
             : `${optimistic.foodName} logged`,
         });
+        setDailyAnnouncement(`${optimistic.foodName} logged.`);
       }
       setEntryDraft(null);
     } catch (caught) {
@@ -655,6 +812,71 @@ export function TodayPage({ onOpenFoods }: { onOpenFoods: () => void }) {
     } finally {
       setPendingId(null);
     }
+  };
+
+  const saveWeightCheckIn = async () => {
+    if (!dashboard || pendingId) return;
+    let weightKg = Number(weightValue);
+    if (dashboard.profile.units === 'imperial') weightKg /= 2.20462;
+    if (!Number.isFinite(weightKg) || weightKg < 30 || weightKg > 400) {
+      setError('Enter a weight between 30 and 400 kg (66 and 882 lb).');
+      return;
+    }
+    const entry: WeightEntry = {
+      id: crypto.randomUUID(),
+      weightKg: Math.round(weightKg * 10) / 10,
+      recordedAt: Date.now(),
+    };
+    const previous = dashboard;
+    setPendingId('weight-check-in');
+    setDashboard({ ...dashboard, latestWeight: entry });
+    try {
+      await addWeight(entry);
+      setWeightEditorOpen(false);
+      setWeightValue('');
+      setDailyAnnouncement('Weight checked in for today.');
+    } catch (caught) {
+      setDashboard(previous);
+      setError(caught instanceof Error ? caught.message : 'Weight could not be logged.');
+    } finally {
+      setPendingId(null);
+    }
+  };
+
+  const handleDailyAction = (action: DailyActionKey) => {
+    if (!dashboard || pendingId) return;
+    if (action === 'weight') {
+      const latest = dashboard.latestWeight?.weightKg ?? null;
+      const display =
+        latest === null
+          ? ''
+          : dashboard.profile.units === 'imperial'
+            ? String(Math.round(latest * 2.20462 * 10) / 10)
+            : String(latest);
+      setWeightValue(display);
+      setWeightEditorOpen(true);
+      return;
+    }
+    if (action === 'food') {
+      openNewEntry();
+      return;
+    }
+    if (action === 'water') {
+      void quickWater(250);
+      return;
+    }
+    if (dailyActionState?.creatineRoutine) {
+      void toggleMedication(dailyActionState.creatineRoutine);
+      return;
+    }
+    setMedicationEditorOpen(true);
+    setEditingMedicationId(null);
+    setMedicationName('Creatine');
+    setMedicationSchedule('either');
+    setDailyAnnouncement('Creatine setup opened below.');
+    window.requestAnimationFrame(() =>
+      document.getElementById('medication-editor')?.scrollIntoView({ block: 'center' })
+    );
   };
 
   if (!dashboard && !error) {
@@ -739,9 +961,9 @@ export function TodayPage({ onOpenFoods }: { onOpenFoods: () => void }) {
             }).format(new Date())}
           </p>
           <h1>
-            {greeting()}, {dashboard.profile.displayName}
+            {greeting().title}, {dashboard.profile.displayName}
           </h1>
-          <span>Here’s your day at a glance.</span>
+          <span>{greeting().subtitle}</span>
         </div>
         <div className="botanical-motif" aria-hidden="true">
           <i />
@@ -759,6 +981,104 @@ export function TodayPage({ onOpenFoods }: { onOpenFoods: () => void }) {
         </div>
       ) : null}
 
+      <section
+        className="daily-actions"
+        aria-labelledby="daily-actions-title"
+        ref={dailyActionsRef}
+      >
+        <div className="daily-actions-heading">
+          <div>
+            <p>Daily basics</p>
+            <h2 id="daily-actions-title">Up next</h2>
+          </div>
+          <span>Hides when logged</span>
+        </div>
+
+        {incompleteActions.length ? (
+          <div className="daily-action-grid">
+            {incompleteActions.map((action) => {
+              const details = {
+                weight: { label: 'Check in weight', hint: 'Today’s measurement', Icon: Scale },
+                creatine: {
+                  label: dailyActionState?.creatineRoutine ? 'Log creatine' : 'Set up creatine',
+                  hint: dailyActionState?.creatineRoutine
+                    ? 'One-tap check-in'
+                    : 'Create the routine',
+                  Icon: Pill,
+                },
+                food: { label: 'Log food', hint: 'Add your first meal', Icon: Apple },
+                water: { label: 'Add water', hint: '+250 ml', Icon: Droplets },
+              }[action];
+              const Icon = details.Icon;
+              return (
+                <button
+                  className={`daily-action daily-action-${action}`}
+                  type="button"
+                  key={action}
+                  disabled={Boolean(pendingId)}
+                  onClick={() => handleDailyAction(action)}
+                >
+                  <span>
+                    <Icon size={21} aria-hidden="true" />
+                  </span>
+                  <span>
+                    <strong>{details.label}</strong>
+                    <small>{details.hint}</small>
+                  </span>
+                  <ChevronRight size={18} aria-hidden="true" />
+                </button>
+              );
+            })}
+          </div>
+        ) : (
+          <div className="daily-actions-complete">
+            <Check size={19} aria-hidden="true" />
+            <span>Daily basics logged. Add more whenever you need.</span>
+          </div>
+        )}
+
+        {weightEditorOpen ? (
+          <form
+            className="weight-quick-form"
+            onSubmit={(event) => {
+              event.preventDefault();
+              void saveWeightCheckIn();
+            }}
+          >
+            <label className="field">
+              <span>Today’s weight</span>
+              <div className="input-with-unit">
+                <input
+                  ref={weightInputRef}
+                  type="number"
+                  inputMode="decimal"
+                  step="0.1"
+                  value={weightValue}
+                  onChange={(event) => setWeightValue(event.target.value)}
+                />
+                <b>{dashboard.profile.units === 'imperial' ? 'lb' : 'kg'}</b>
+              </div>
+            </label>
+            <div>
+              <button
+                className="button button-secondary"
+                type="button"
+                onClick={() => setWeightEditorOpen(false)}
+              >
+                Cancel
+              </button>
+              <button className="button button-primary" type="submit" disabled={Boolean(pendingId)}>
+                Check in
+              </button>
+            </div>
+          </form>
+        ) : null}
+
+        <p className="sr-only" aria-live="polite">
+          {dailyAnnouncement}
+        </p>
+      </section>
+
       <section className="daily-summary" aria-labelledby="daily-summary-title">
         <div className="summary-topline">
           <div>
@@ -766,8 +1086,13 @@ export function TodayPage({ onOpenFoods }: { onOpenFoods: () => void }) {
             <strong>
               {target
                 ? `${dashboard.target.calorieRange?.[0].toLocaleString()}–${dashboard.target.calorieRange?.[1].toLocaleString()} kcal`
-                : 'Set a target'}
+                : 'Targets not set'}
             </strong>
+            {!target ? (
+              <button className="summary-target-button" type="button" onClick={onOpenSettings}>
+                Set your targets
+              </button>
+            ) : null}
             {dashboard.target.maintenanceCalories ? (
               <small className="goal-context">
                 {dashboard.target.maintenanceCalories.toLocaleString()} maintenance{' '}
@@ -968,6 +1293,79 @@ export function TodayPage({ onOpenFoods }: { onOpenFoods: () => void }) {
             </button>
           ))}
         </fieldset>
+        <section className="water-log" aria-label="Today’s water check-ins">
+          <div className="water-log-heading">
+            <strong>Today’s check-ins</strong>
+            <small>{dashboard.waterEntries.length} logged</small>
+          </div>
+          {dashboard.waterEntries.length ? (
+            dashboard.waterEntries.map((entry) =>
+              editingWaterId === entry.id ? (
+                <div className="water-log-editor" key={entry.id}>
+                  <label>
+                    <span className="sr-only">Water amount in millilitres</span>
+                    <input
+                      type="number"
+                      min="1"
+                      max="5000"
+                      value={waterAmount}
+                      onChange={(event) => setWaterAmount(event.target.value)}
+                    />
+                  </label>
+                  <label>
+                    <span className="sr-only">Water check-in time</span>
+                    <input
+                      type="datetime-local"
+                      value={waterTime}
+                      onChange={(event) => setWaterTime(event.target.value)}
+                    />
+                  </label>
+                  <button
+                    className="button button-primary button-compact"
+                    type="button"
+                    onClick={() => void saveWaterEdit()}
+                  >
+                    Save
+                  </button>
+                  <button
+                    className="button button-quiet"
+                    type="button"
+                    onClick={() => setEditingWaterId(null)}
+                  >
+                    Cancel
+                  </button>
+                </div>
+              ) : (
+                <div className="water-log-row" key={entry.id}>
+                  <span>
+                    <strong>{entry.amountMl.toLocaleString()} ml</strong>
+                    <small>{formatTime(entry.drankAt)}</small>
+                  </span>
+                  <button
+                    className="button button-quiet"
+                    type="button"
+                    aria-label={`Edit ${entry.amountMl} ml water check-in`}
+                    onClick={() => beginWaterEdit(entry)}
+                  >
+                    <Pencil aria-hidden="true" />
+                  </button>
+                  <button
+                    className="button button-quiet danger-button"
+                    type="button"
+                    aria-label={`Remove ${entry.amountMl} ml water check-in`}
+                    onClick={() => void removeWater(entry)}
+                  >
+                    <Trash2 aria-hidden="true" />
+                  </button>
+                </div>
+              )
+            )
+          ) : (
+            <p className="water-log-empty">
+              No water yet. A quick amount above is the fastest start.
+            </p>
+          )}
+        </section>
       </section>
 
       <section className="medication-panel" aria-labelledby="medication-title">
@@ -1051,6 +1449,7 @@ export function TodayPage({ onOpenFoods }: { onOpenFoods: () => void }) {
 
         {medicationEditorOpen ? (
           <form
+            id="medication-editor"
             className="medication-form"
             onSubmit={(event) => {
               event.preventDefault();
@@ -1130,7 +1529,9 @@ export function TodayPage({ onOpenFoods }: { onOpenFoods: () => void }) {
             </span>
             <b>
               {gym?.startAt && gym.endAt
-                ? `${formatTime(gym.startAt)}–${formatTime(gym.endAt)}`
+                ? gym.phase === 'active'
+                  ? `Now–${formatTime(gym.endAt)}`
+                  : `${formatTime(gym.startAt)}–${formatTime(gym.endAt)}`
                 : 'Any time'}
             </b>
             <ChevronRight aria-hidden="true" />
@@ -1424,6 +1825,44 @@ export function TodayPage({ onOpenFoods }: { onOpenFoods: () => void }) {
                       }
                     />
                   </label>
+
+                  <div className="field-row">
+                    <label className="field">
+                      <span>Food kind</span>
+                      <select
+                        value={entryDraft.foodKind}
+                        onChange={(event) =>
+                          setEntryDraft((current) =>
+                            current
+                              ? { ...current, foodKind: event.target.value as FoodKind }
+                              : current
+                          )
+                        }
+                      >
+                        {(Object.keys(FOOD_KIND_LABELS) as FoodKind[]).map((kind) => (
+                          <option value={kind} key={kind}>
+                            {FOOD_KIND_LABELS[kind]}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <label className="field">
+                      <span>
+                        Labels <small>Optional</small>
+                      </span>
+                      <input
+                        value={entryDraft.labels.join(', ')}
+                        placeholder="late snack, protein"
+                        onChange={(event) =>
+                          setEntryDraft((current) =>
+                            current
+                              ? { ...current, labels: event.target.value.split(',') }
+                              : current
+                          )
+                        }
+                      />
+                    </label>
+                  </div>
 
                   <div className="field-row">
                     <label className="field">

@@ -7,16 +7,25 @@ import {
   demoAddWeight,
   demoArchiveMedication,
   demoCalendarHistory,
+  demoCycleHistory,
   demoDashboard,
   demoDeleteEntry,
   demoDeleteFood,
   demoDeleteMedicationCheckIn,
   demoDeleteWater,
+  demoDeleteWeight,
   demoHistory,
+  demoJournalExport,
+  demoListFoods,
   demoSaveFood,
   demoSaveMedication,
   demoSaveProfile,
+  demoSetFoodArchived,
+  demoUpdateCycleStart,
+  demoUpdateWater,
+  demoUpdateWeight,
 } from './demo';
+import { type FoodLifecycle, foodsByLifecycle, normalizeFood } from './food-library';
 import {
   localAddEntry,
   localAddMedicationCheckIn,
@@ -24,33 +33,46 @@ import {
   localAddWeight,
   localArchiveMedication,
   localCalendarHistory,
+  localCycleHistory,
   localDashboard,
   localDeleteEntry,
   localDeleteFood,
   localDeleteMedicationCheckIn,
   localDeleteWater,
+  localDeleteWeight,
   localHistory,
+  localJournalExport,
+  localListFoods,
   localProfile,
   localSaveFood,
   localSaveMedication,
   localSaveProfile,
+  localSetFoodArchived,
+  localUpdateCycleStart,
+  localUpdateWater,
+  localUpdateWeight,
 } from './local-store';
 import {
   cacheDashboard,
   cachePrivateValue,
   dashboardCacheAge,
+  deleteDashboardCache,
   deletePrivateValue,
   flushPendingWrites,
   queueWrite,
   readCachedDashboard,
   readPrivateValue,
 } from './offline';
+import { normalizeProfile } from './profile';
 import type {
+  CycleHistoryResponse,
   Dashboard,
   Food,
   FoodEntry,
   FoodEntryWrite,
+  GoalCycleSession,
   HistoryResponse,
+  JournalExport,
   Medication,
   MedicationCheckIn,
   UserProfile,
@@ -80,23 +102,19 @@ type AppBootstrap = {
   profile: UserProfile;
 };
 
-function normalizeProfile(profile: UserProfile): UserProfile {
-  const legacyTarget = profile.manualCalorieTarget;
-  return {
-    ...profile,
-    manualCalorieRange:
-      profile.manualCalorieRange ??
-      (legacyTarget ? [Math.max(800, legacyTarget - 100), legacyTarget + 100] : null),
-  };
-}
-
 function normalizeDashboard(dashboard: Dashboard): Dashboard {
   return {
     ...dashboard,
     profile: normalizeProfile(dashboard.profile),
+    foods: foodsByLifecycle(dashboard.foods ?? [], 'active'),
     medications: dashboard.medications ?? [],
     medicationCheckIns: dashboard.medicationCheckIns ?? [],
   };
+}
+
+async function invalidateDashboardCache() {
+  const profile = await getProfile().catch(() => null);
+  if (profile) await deleteDashboardCache(profile.userId);
 }
 
 async function readJson<T>(path: string): Promise<T> {
@@ -217,7 +235,12 @@ export async function saveProfile(
 ) {
   if (isDemo()) return demoSaveProfile(profile);
   if (isLocalMode()) return localSaveProfile(profile);
-  const saved = await writeJson<UserProfile>('/api/app/profile', 'PUT', profile);
+  const saved = normalizeProfile(
+    await writeJson<UserProfile>('/api/app/profile', 'PUT', {
+      ...profile,
+      cycleDate: localDayRange().date,
+    })
+  );
   await cachePrivateValue('profile', saved);
   return saved;
 }
@@ -276,23 +299,50 @@ export async function getDashboard(): Promise<Dashboard> {
 export async function saveFood(food: Food): Promise<Food> {
   if (isDemo()) return demoSaveFood(food);
   if (isLocalMode()) return localSaveFood(food);
-  return writeJson<Food>(
+  const saved = await writeJson<Food>(
     `/api/app/foods${food.id ? `/${food.id}` : ''}`,
     food.id ? 'PUT' : 'POST',
     food
   );
+  await invalidateDashboardCache();
+  return normalizeFood(saved);
 }
 
 export async function createFood(food: Food): Promise<Food> {
   if (isDemo()) return demoSaveFood(food);
   if (isLocalMode()) return localSaveFood(food);
-  return writeJson<Food>('/api/app/foods', 'POST', food);
+  const saved = await writeJson<Food>('/api/app/foods', 'POST', food);
+  await invalidateDashboardCache();
+  return normalizeFood(saved);
+}
+
+export async function getFoods(lifecycle: FoodLifecycle): Promise<Food[]> {
+  if (isDemo()) return demoListFoods(lifecycle);
+  if (isLocalMode()) return localListFoods(lifecycle);
+  const foods = await readJson<Food[]>(`/api/app/foods?status=${lifecycle}`);
+  return foods.map(normalizeFood);
+}
+
+export async function setFoodArchived(food: Food, archivedAt: number | null): Promise<Food> {
+  if (isDemo()) return demoSetFoodArchived(food.id, archivedAt);
+  if (isLocalMode()) return localSetFoodArchived(food.id, archivedAt);
+  const optimistic = { ...food, archivedAt };
+  const saved = await writeOffline<Food>({
+    id: `food-lifecycle:${food.id}:${archivedAt ?? 'active'}:${Date.now()}`,
+    path: `/api/app/foods/${food.id}`,
+    method: 'PATCH',
+    body: { archivedAt },
+    optimistic,
+  });
+  await invalidateDashboardCache();
+  return normalizeFood(saved);
 }
 
 export async function deleteFood(id: string) {
   if (isDemo()) return demoDeleteFood(id);
   if (isLocalMode()) return localDeleteFood(id);
-  return writeJson<void>(`/api/app/foods/${id}`, 'DELETE');
+  await writeJson<void>(`/api/app/foods/${id}`, 'DELETE');
+  await invalidateDashboardCache();
 }
 
 export async function addFoodEntry(input: FoodEntryWrite) {
@@ -338,24 +388,42 @@ export async function updateFoodEntry(input: FoodEntryWrite) {
 export async function addWater(input: WaterEntry) {
   if (isDemo()) return demoAddWater(input);
   if (isLocalMode()) return localAddWater(input);
-  return writeOffline<WaterEntry>({
+  const saved = await writeOffline<WaterEntry>({
     id: `water:${input.id}`,
     path: '/api/app/water',
     method: 'POST',
     body: input,
     optimistic: input,
   });
+  await invalidateDashboardCache();
+  return saved;
+}
+
+export async function updateWater(input: WaterEntry) {
+  if (isDemo()) return demoUpdateWater(input);
+  if (isLocalMode()) return localUpdateWater(input);
+  const saved = await writeOffline<WaterEntry>({
+    id: `update-water:${input.id}:${Date.now()}`,
+    path: `/api/app/water/${input.id}`,
+    method: 'PATCH',
+    body: input,
+    optimistic: input,
+  });
+  await invalidateDashboardCache();
+  return saved;
 }
 
 export async function deleteWater(id: string) {
   if (isDemo()) return demoDeleteWater(id);
   if (isLocalMode()) return localDeleteWater(id);
-  return writeOffline<void>({
+  const result = await writeOffline<void>({
     id: `delete-water:${id}`,
     path: `/api/app/water/${id}`,
     method: 'DELETE',
     optimistic: undefined,
   });
+  await invalidateDashboardCache();
+  return result;
 }
 
 export async function saveMedication(input: Medication) {
@@ -421,13 +489,104 @@ export async function deleteMedicationCheckIn(id: string) {
 export async function addWeight(input: WeightEntry) {
   if (isDemo()) return demoAddWeight(input);
   if (isLocalMode()) return localAddWeight(input);
-  return writeOffline<WeightEntry>({
+  const saved = await writeOffline<WeightEntry>({
     id: `weight:${input.id}`,
     path: '/api/app/weights',
     method: 'POST',
     body: input,
     optimistic: input,
   });
+  await invalidateDashboardCache();
+  return saved;
+}
+
+export async function updateWeight(input: WeightEntry) {
+  if (isDemo()) return demoUpdateWeight(input);
+  if (isLocalMode()) return localUpdateWeight(input);
+  const saved = await writeOffline<WeightEntry>({
+    id: `update-weight:${input.id}:${Date.now()}`,
+    path: `/api/app/weights/${input.id}`,
+    method: 'PATCH',
+    body: input,
+    optimistic: input,
+  });
+  await invalidateDashboardCache();
+  return saved;
+}
+
+export async function deleteWeight(id: string) {
+  if (isDemo()) return demoDeleteWeight(id);
+  if (isLocalMode()) return localDeleteWeight(id);
+  const result = await writeOffline<void>({
+    id: `delete-weight:${id}:${Date.now()}`,
+    path: `/api/app/weights/${id}`,
+    method: 'DELETE',
+    optimistic: undefined,
+  });
+  await invalidateDashboardCache();
+  return result;
+}
+
+function historyBounds(startOn: string, endOn: string | null, today: string) {
+  const start = new Date(`${startOn}T12:00:00`);
+  start.setHours(0, 0, 0, 0);
+  const end = new Date(`${endOn ?? today}T12:00:00`);
+  end.setHours(0, 0, 0, 0);
+  if (!endOn) end.setDate(end.getDate() + 1);
+  const cappedStart = new Date(
+    Math.max(start.getTime(), end.getTime() - 366 * 24 * 60 * 60 * 1000)
+  );
+  return { start: cappedStart.getTime(), end: end.getTime() };
+}
+
+async function readCyclePeriod(session: GoalCycleSession, today: string) {
+  const bounds = historyBounds(session.startOn, session.endOn, today);
+  const params = new URLSearchParams({
+    start: String(bounds.start),
+    end: String(bounds.end),
+    timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+  });
+  const history = await readJson<HistoryResponse>(`/api/app/history?${params}`);
+  return { session, days: history.days, weights: history.weights };
+}
+
+export async function getCycleHistory(): Promise<CycleHistoryResponse> {
+  if (isDemo()) return demoCycleHistory();
+  if (isLocalMode()) return localCycleHistory();
+  const range = localDayRange();
+  const sessions = await readJson<GoalCycleSession[]>(
+    `/api/app/cycles?date=${encodeURIComponent(range.date)}`
+  );
+  const active = sessions.find((session) => session.endOn === null);
+  if (!active) throw new Error('Active cycle not found.');
+  const previous = sessions
+    .filter((session) => session.endOn !== null)
+    .sort((a, b) => (b.endOn ?? '').localeCompare(a.endOn ?? ''))[0];
+  const [activePeriod, previousPeriod] = await Promise.all([
+    readCyclePeriod(active, range.date),
+    previous ? readCyclePeriod(previous, range.date) : Promise.resolve(null),
+  ]);
+  return {
+    active: activePeriod,
+    previous: previousPeriod,
+    today: range.date,
+    timezone: range.timezone,
+  };
+}
+
+export async function updateCycleStart(startOn: string) {
+  if (isDemo()) return demoUpdateCycleStart(startOn);
+  if (isLocalMode()) return localUpdateCycleStart(startOn);
+  return writeJson<GoalCycleSession>('/api/app/cycles/active', 'PATCH', {
+    startOn,
+    today: localDayRange().date,
+  });
+}
+
+export async function getJournalExport(): Promise<JournalExport> {
+  if (isDemo()) return demoJournalExport();
+  if (isLocalMode()) return localJournalExport();
+  return readJson<JournalExport>('/api/app/export');
 }
 
 export async function getHistory(rangeDays: 7 | 30): Promise<HistoryResponse> {

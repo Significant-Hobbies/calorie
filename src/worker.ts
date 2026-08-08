@@ -1,6 +1,13 @@
 import { Hono } from 'hono';
 import { handleAgentEdge } from './agent-edge.mjs';
+import {
+  normalizeDailyActionHidden,
+  normalizeDailyActionOrder,
+} from './lib/daily-action-preferences';
 import { normalizeDirectEntry } from './lib/entries';
+import { normalizeFoodKind, normalizeFoodLabels } from './lib/food-context';
+import { cycleFromGoal } from './lib/goal-cycles';
+import { createJournalExport } from './lib/journal-export';
 import {
   calculateCompletedFasts,
   calculateNutritionTarget,
@@ -14,6 +21,8 @@ import type {
   Food,
   FoodEntry,
   Goal,
+  GoalCycle,
+  GoalCycleSession,
   HistoryDay,
   HistoryResponse,
   Medication,
@@ -183,6 +192,8 @@ function directEntryFromBody(
     proteinG,
     fibreG,
     eatenAt,
+    foodKind: normalizeFoodKind(body.foodKind),
+    labels: normalizeFoodLabels(body.labels),
   });
 }
 
@@ -200,6 +211,8 @@ type ProfileRow = {
   manual_calorie_target: number | null;
   manual_calorie_min: number | null;
   manual_calorie_max: number | null;
+  daily_action_order: string;
+  daily_action_hidden: string;
   wake_time: string;
   sleep_hours: number;
   fasting_threshold_hours: 12 | 14 | 16;
@@ -230,6 +243,8 @@ function mapProfile(row: ProfileRow): UserProfile {
     sleepHours: row.sleep_hours,
     fastingThresholdHours: row.fasting_threshold_hours,
     waterTargetMl: row.water_target_ml,
+    dailyActionOrder: normalizeDailyActionOrder(row.daily_action_order?.split(',') ?? []),
+    dailyActionHidden: normalizeDailyActionHidden(row.daily_action_hidden?.split(',') ?? []),
     onboardingComplete: Boolean(row.onboarding_complete),
   };
 }
@@ -252,6 +267,8 @@ function defaultProfile(userId: string, name: string): UserProfile {
     sleepHours: 8,
     fastingThresholdHours: 12,
     waterTargetMl: 2000,
+    dailyActionOrder: normalizeDailyActionOrder([]),
+    dailyActionHidden: [],
     onboardingComplete: false,
   };
 }
@@ -280,6 +297,9 @@ type FoodRow = {
   fibre_g: number;
   favourite: number;
   last_used_at: number | null;
+  archived_at: number | null;
+  food_kind: string;
+  labels_json: string;
 };
 
 function mapFood(row: FoodRow): Food {
@@ -295,6 +315,9 @@ function mapFood(row: FoodRow): Food {
     fibreG: row.fibre_g,
     favourite: Boolean(row.favourite),
     lastUsedAt: row.last_used_at,
+    archivedAt: row.archived_at ?? null,
+    foodKind: normalizeFoodKind(row.food_kind),
+    labels: normalizeFoodLabels(JSON.parse(row.labels_json || '[]')),
   };
 }
 
@@ -309,6 +332,8 @@ type FoodEntryRow = {
   protein_g: number;
   fibre_g: number;
   eaten_at: number;
+  food_kind: string;
+  labels_json: string;
 };
 
 function mapFoodEntry(row: FoodEntryRow): FoodEntry {
@@ -323,11 +348,27 @@ function mapFoodEntry(row: FoodEntryRow): FoodEntry {
     proteinG: row.protein_g,
     fibreG: row.fibre_g,
     eatenAt: row.eaten_at,
+    foodKind: normalizeFoodKind(row.food_kind),
+    labels: normalizeFoodLabels(JSON.parse(row.labels_json || '[]')),
   };
 }
 
 type WaterRow = { id: string; amount_ml: number; drank_at: number };
 type WeightRow = { id: string; weight_kg: number; recorded_at: number };
+type GoalCycleRow = {
+  id: string;
+  user_id: string;
+  cycle: GoalCycle;
+  goal: Goal;
+  start_on: string;
+  end_on: string | null;
+  calorie_range_low: number | null;
+  calorie_range_high: number | null;
+  protein_range_low: number | null;
+  protein_range_high: number | null;
+  created_at: number;
+  updated_at: number;
+};
 type MedicationRow = {
   id: string;
   name: string;
@@ -348,6 +389,85 @@ function mapWater(row: WaterRow): WaterEntry {
 
 function mapWeight(row: WeightRow): WeightEntry {
   return { id: row.id, weightKg: row.weight_kg, recordedAt: row.recorded_at };
+}
+
+function mapGoalCycle(row: GoalCycleRow): GoalCycleSession {
+  return {
+    id: row.id,
+    userId: row.user_id,
+    cycle: row.cycle,
+    goal: row.goal,
+    startOn: row.start_on,
+    endOn: row.end_on,
+    calorieRange:
+      row.calorie_range_low !== null && row.calorie_range_high !== null
+        ? [row.calorie_range_low, row.calorie_range_high]
+        : null,
+    proteinRangeG:
+      row.protein_range_low !== null && row.protein_range_high !== null
+        ? [row.protein_range_low, row.protein_range_high]
+        : null,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+function validDateKey(value: unknown) {
+  return typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value) ? value : null;
+}
+
+async function currentTarget(db: D1Database, profile: UserProfile, userId: string) {
+  const latestWeight = await db
+    .prepare(
+      'SELECT id, weight_kg, recorded_at FROM weight_entries WHERE user_id = ? ORDER BY recorded_at DESC LIMIT 1'
+    )
+    .bind(userId)
+    .first<WeightRow>();
+  return calculateNutritionTarget({
+    weightKg: latestWeight?.weight_kg ?? null,
+    heightCm: profile.heightCm,
+    ageYears: profile.ageYears,
+    equationProfile: profile.equationProfile,
+    activityLevel: profile.activityLevel,
+    goal: profile.goal,
+    manualCalorieTarget: profile.manualCalorieTarget,
+    manualCalorieRange: profile.manualCalorieRange,
+  });
+}
+
+function cycleInsertStatement(
+  db: D1Database,
+  input: {
+    id: string;
+    userId: string;
+    goal: Goal;
+    startOn: string;
+    calorieRange: [number, number] | null;
+    proteinRangeG: [number, number] | null;
+    now: number;
+  }
+) {
+  return db
+    .prepare(
+      `INSERT INTO goal_cycles (
+        id, user_id, cycle, goal, start_on, end_on,
+        calorie_range_low, calorie_range_high, protein_range_low, protein_range_high,
+        created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, NULL, ?, ?, ?, ?, ?, ?)`
+    )
+    .bind(
+      input.id,
+      input.userId,
+      cycleFromGoal(input.goal),
+      input.goal,
+      input.startOn,
+      input.calorieRange?.[0] ?? null,
+      input.calorieRange?.[1] ?? null,
+      input.proteinRangeG?.[0] ?? null,
+      input.proteinRangeG?.[1] ?? null,
+      input.now,
+      input.now
+    );
 }
 
 function mapMedication(row: MedicationRow): Medication {
@@ -432,6 +552,13 @@ app.put('/api/app/profile', async (c) => {
     typeof body.wakeTime === 'string' && /^([01]\d|2[0-3]):[0-5]\d$/.test(body.wakeTime)
       ? body.wakeTime
       : null;
+  const dailyActionOrder = normalizeDailyActionOrder(
+    Array.isArray(body.dailyActionOrder) ? body.dailyActionOrder : []
+  );
+  const dailyActionHidden = normalizeDailyActionHidden(
+    Array.isArray(body.dailyActionHidden) ? body.dailyActionHidden : []
+  );
+  const cycleDate = validDateKey(body.cycleDate) ?? dateKey(Date.now(), 'UTC');
 
   if (
     !displayName ||
@@ -466,8 +593,8 @@ app.put('/api/app/profile', async (c) => {
         height_cm, activity_level, goal, target_weight_kg, manual_calorie_target,
         manual_calorie_min, manual_calorie_max,
         wake_time, sleep_hours, fasting_threshold_hours, water_target_ml,
-        onboarding_complete, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        daily_action_order, daily_action_hidden, onboarding_complete, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT(user_id) DO UPDATE SET
         display_name = excluded.display_name,
         units = excluded.units,
@@ -485,6 +612,8 @@ app.put('/api/app/profile', async (c) => {
         sleep_hours = excluded.sleep_hours,
         fasting_threshold_hours = excluded.fasting_threshold_hours,
         water_target_ml = excluded.water_target_ml,
+        daily_action_order = excluded.daily_action_order,
+        daily_action_hidden = excluded.daily_action_hidden,
         onboarding_complete = excluded.onboarding_complete,
         updated_at = excluded.updated_at`
     ).bind(
@@ -505,6 +634,8 @@ app.put('/api/app/profile', async (c) => {
       sleepHours,
       fastingThreshold,
       Math.round(waterTargetMl),
+      dailyActionOrder.join(','),
+      dailyActionHidden.join(','),
       onboardingComplete,
       now,
       now
@@ -521,22 +652,180 @@ app.put('/api/app/profile', async (c) => {
       ).bind(initialWeightId, userId, initialWeightKg, now, now)
     );
   }
+
+  const nextProfile: UserProfile = {
+    userId,
+    displayName,
+    units,
+    ageYears,
+    genderIdentity,
+    equationProfile,
+    heightCm,
+    activityLevel,
+    goal,
+    targetWeightKg,
+    manualCalorieTarget: manualRange
+      ? Math.round((manualRange[0] + manualRange[1]) / 2)
+      : manualTarget,
+    manualCalorieRange: manualRange ? [manualRange[0], manualRange[1]] : null,
+    wakeTime,
+    sleepHours,
+    fastingThresholdHours: fastingThreshold as 12 | 14 | 16,
+    waterTargetMl: Math.round(waterTargetMl),
+    dailyActionOrder,
+    dailyActionHidden,
+    onboardingComplete: Boolean(onboardingComplete),
+  };
+  const target = initialWeightKg
+    ? calculateNutritionTarget({
+        weightKg: initialWeightKg,
+        heightCm,
+        ageYears,
+        equationProfile,
+        activityLevel,
+        goal,
+        manualCalorieTarget: nextProfile.manualCalorieTarget,
+        manualCalorieRange: nextProfile.manualCalorieRange,
+      })
+    : await currentTarget(c.env.DB, nextProfile, userId);
+  const activeCycle = await c.env.DB.prepare(
+    'SELECT * FROM goal_cycles WHERE user_id = ? AND end_on IS NULL'
+  )
+    .bind(userId)
+    .first<GoalCycleRow>();
+  if (!activeCycle) {
+    statements.push(
+      cycleInsertStatement(c.env.DB, {
+        id: crypto.randomUUID(),
+        userId,
+        goal,
+        startOn: cycleDate,
+        calorieRange: target.calorieRange,
+        proteinRangeG: target.proteinRangeG,
+        now,
+      })
+    );
+  } else if (activeCycle.cycle === cycleFromGoal(goal)) {
+    statements.push(
+      c.env.DB.prepare(
+        `UPDATE goal_cycles SET goal = ?, calorie_range_low = ?, calorie_range_high = ?,
+            protein_range_low = ?, protein_range_high = ?, updated_at = ?
+           WHERE id = ? AND user_id = ? AND end_on IS NULL`
+      ).bind(
+        goal,
+        target.calorieRange?.[0] ?? null,
+        target.calorieRange?.[1] ?? null,
+        target.proteinRangeG?.[0] ?? null,
+        target.proteinRangeG?.[1] ?? null,
+        now,
+        activeCycle.id,
+        userId
+      )
+    );
+  } else {
+    statements.push(
+      c.env.DB.prepare(
+        'UPDATE goal_cycles SET end_on = ?, updated_at = ? WHERE id = ? AND user_id = ? AND end_on IS NULL'
+      ).bind(cycleDate, now, activeCycle.id, userId),
+      cycleInsertStatement(c.env.DB, {
+        id: crypto.randomUUID(),
+        userId,
+        goal,
+        startOn: cycleDate,
+        calorieRange: target.calorieRange,
+        proteinRangeG: target.proteinRangeG,
+        now,
+      })
+    );
+  }
   await c.env.DB.batch(statements);
   return c.json(await readProfile(c.env.DB, userId, displayName));
 });
 
+app.get('/api/app/cycles', async (c) => {
+  const userId = c.get('userId');
+  const today = validDateKey(c.req.query('date'));
+  if (!today) return c.json(jsonError('Choose a valid local date.'), 400);
+  let result = await c.env.DB.prepare(
+    'SELECT * FROM goal_cycles WHERE user_id = ? ORDER BY start_on DESC LIMIT 20'
+  )
+    .bind(userId)
+    .all<GoalCycleRow>();
+  if (!result.results.some((row) => row.end_on === null)) {
+    const profile = await readProfile(c.env.DB, userId, c.get('userName'));
+    const target = await currentTarget(c.env.DB, profile, userId);
+    await cycleInsertStatement(c.env.DB, {
+      id: crypto.randomUUID(),
+      userId,
+      goal: profile.goal,
+      startOn: today,
+      calorieRange: target.calorieRange,
+      proteinRangeG: target.proteinRangeG,
+      now: Date.now(),
+    }).run();
+    result = await c.env.DB.prepare(
+      'SELECT * FROM goal_cycles WHERE user_id = ? ORDER BY start_on DESC LIMIT 20'
+    )
+      .bind(userId)
+      .all<GoalCycleRow>();
+  }
+  return conditionalJson(c, result.results.map(mapGoalCycle));
+});
+
+app.patch('/api/app/cycles/active', async (c) => {
+  const body = await c.req.json<Record<string, unknown>>().catch(() => null);
+  const startOn = validDateKey(body?.startOn);
+  const today = validDateKey(body?.today);
+  if (!startOn || !today || startOn > today) {
+    return c.json(jsonError('Choose a cycle start date that is not in the future.'), 400);
+  }
+  const userId = c.get('userId');
+  const active = await c.env.DB.prepare(
+    'SELECT * FROM goal_cycles WHERE user_id = ? AND end_on IS NULL'
+  )
+    .bind(userId)
+    .first<GoalCycleRow>();
+  if (!active) return c.json({ message: 'Active cycle not found.' }, 404);
+  const previous = await c.env.DB.prepare(
+    `SELECT * FROM goal_cycles WHERE user_id = ? AND end_on IS NOT NULL
+       ORDER BY end_on DESC LIMIT 1`
+  )
+    .bind(userId)
+    .first<GoalCycleRow>();
+  if (previous?.end_on && startOn < previous.end_on) {
+    return c.json(
+      jsonError(`Cycle start must be on or after ${previous.end_on}.`, {
+        startOn: 'Overlaps the previous cycle.',
+      }),
+      400
+    );
+  }
+  await c.env.DB.prepare(
+    'UPDATE goal_cycles SET start_on = ?, updated_at = ? WHERE id = ? AND user_id = ? AND end_on IS NULL'
+  )
+    .bind(startOn, Date.now(), active.id, userId)
+    .run();
+  const updated = await c.env.DB.prepare('SELECT * FROM goal_cycles WHERE id = ? AND user_id = ?')
+    .bind(active.id, userId)
+    .first<GoalCycleRow>();
+  if (!updated) return c.json({ message: 'The cycle could not be read back.' }, 500);
+  return c.json(mapGoalCycle(updated));
+});
+
 app.get('/api/app/foods', async (c) => {
   const search = c.req.query('q')?.trim().slice(0, 60);
+  const lifecycleWhere =
+    c.req.query('status') === 'archived' ? 'archived_at IS NOT NULL' : 'archived_at IS NULL';
   const result = search
     ? await c.env.DB.prepare(
         `SELECT * FROM foods
-         WHERE user_id = ? AND name LIKE ? ESCAPE '\\'
+         WHERE user_id = ? AND ${lifecycleWhere} AND name LIKE ? ESCAPE '\\'
          ORDER BY last_used_at DESC, name ASC LIMIT 50`
       )
         .bind(c.get('userId'), `%${search.replaceAll('%', '\\%').replaceAll('_', '\\_')}%`)
         .all<FoodRow>()
     : await c.env.DB.prepare(
-        `SELECT * FROM foods WHERE user_id = ?
+        `SELECT * FROM foods WHERE user_id = ? AND ${lifecycleWhere}
          ORDER BY last_used_at DESC, name ASC LIMIT 100`
       )
         .bind(c.get('userId'))
@@ -577,6 +866,8 @@ function parseFoodBody(body: Record<string, unknown>) {
     proteinG,
     fibreG,
     favourite: body.favourite === true ? 1 : 0,
+    foodKind: normalizeFoodKind(body.foodKind),
+    labels: normalizeFoodLabels(body.labels),
   };
 }
 
@@ -590,8 +881,8 @@ app.post('/api/app/foods', async (c) => {
     await c.env.DB.prepare(
       `INSERT INTO foods (
         id, user_id, name, serving_mode, unit_label, default_amount,
-        calories, carbs_g, protein_g, fibre_g, favourite, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+        calories, carbs_g, protein_g, fibre_g, favourite, food_kind, labels_json, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     )
       .bind(
         id,
@@ -605,6 +896,8 @@ app.post('/api/app/foods', async (c) => {
         parsed.proteinG,
         parsed.fibreG,
         parsed.favourite,
+        parsed.foodKind,
+        JSON.stringify(parsed.labels),
         now,
         now
       )
@@ -629,7 +922,7 @@ app.put('/api/app/foods/:id', async (c) => {
   if (!parsed) return c.json(jsonError('Complete all four nutrient values.'), 400);
   const result = await c.env.DB.prepare(
     `UPDATE foods SET name = ?, serving_mode = ?, unit_label = ?, default_amount = ?,
-      calories = ?, carbs_g = ?, protein_g = ?, fibre_g = ?, favourite = ?, updated_at = ?
+      calories = ?, carbs_g = ?, protein_g = ?, fibre_g = ?, favourite = ?, food_kind = ?, labels_json = ?, updated_at = ?
      WHERE id = ? AND user_id = ?`
   )
     .bind(
@@ -642,10 +935,34 @@ app.put('/api/app/foods/:id', async (c) => {
       parsed.proteinG,
       parsed.fibreG,
       parsed.favourite,
+      parsed.foodKind,
+      JSON.stringify(parsed.labels),
       Date.now(),
       c.req.param('id'),
       c.get('userId')
     )
+    .run();
+  if (!result.meta.changes) return c.json({ message: 'Food not found.' }, 404);
+  const row = await c.env.DB.prepare('SELECT * FROM foods WHERE id = ? AND user_id = ?')
+    .bind(c.req.param('id'), c.get('userId'))
+    .first<FoodRow>();
+  if (!row) return c.json({ message: 'The saved food could not be read back.' }, 500);
+  return c.json(mapFood(row));
+});
+
+app.patch('/api/app/foods/:id', async (c) => {
+  const body = await c.req.json<Record<string, unknown>>().catch(() => null);
+  if (!body || !('archivedAt' in body)) {
+    return c.json(jsonError('Choose whether this food is active or archived.'), 400);
+  }
+  const archivedAt = body.archivedAt === null ? null : validTimestamp(body.archivedAt);
+  if (body.archivedAt !== null && archivedAt === null) {
+    return c.json(jsonError('Choose a valid archive time.'), 400);
+  }
+  const result = await c.env.DB.prepare(
+    'UPDATE foods SET archived_at = ?, updated_at = ? WHERE id = ? AND user_id = ?'
+  )
+    .bind(archivedAt, Date.now(), c.req.param('id'), c.get('userId'))
     .run();
   if (!result.meta.changes) return c.json({ message: 'Food not found.' }, 404);
   const row = await c.env.DB.prepare('SELECT * FROM foods WHERE id = ? AND user_id = ?')
@@ -676,7 +993,9 @@ app.post('/api/app/entries', async (c) => {
   const now = Date.now();
 
   if (foodId) {
-    const foodRow = await c.env.DB.prepare('SELECT * FROM foods WHERE id = ? AND user_id = ?')
+    const foodRow = await c.env.DB.prepare(
+      'SELECT * FROM foods WHERE id = ? AND user_id = ? AND archived_at IS NULL'
+    )
       .bind(foodId, c.get('userId'))
       .first<FoodRow>();
     if (!foodRow) return c.json({ message: 'Food not found.' }, 404);
@@ -689,6 +1008,8 @@ app.post('/api/app/entries', async (c) => {
       unitLabel: food.servingMode === 'per_100g' ? 'g' : food.unitLabel,
       ...scaleNutrients(food, food.servingMode, amount),
       eatenAt,
+      foodKind: food.foodKind,
+      labels: food.labels,
     };
     foodUpdate = c.env.DB.prepare(
       'UPDATE foods SET last_used_at = ?, updated_at = ? WHERE id = ? AND user_id = ?'
@@ -704,8 +1025,8 @@ app.post('/api/app/entries', async (c) => {
   const insert = c.env.DB.prepare(
     `INSERT OR IGNORE INTO food_entries (
       id, user_id, food_id, food_name, amount, unit_label, calories,
-      carbs_g, protein_g, fibre_g, eaten_at, created_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      carbs_g, protein_g, fibre_g, food_kind, labels_json, eaten_at, created_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
   ).bind(
     entry.id,
     c.get('userId'),
@@ -717,6 +1038,8 @@ app.post('/api/app/entries', async (c) => {
     entry.carbsG,
     entry.proteinG,
     entry.fibreG,
+    normalizeFoodKind(entry.foodKind),
+    JSON.stringify(normalizeFoodLabels(entry.labels)),
     entry.eatenAt,
     now
   );
@@ -742,7 +1065,9 @@ app.patch('/api/app/entries/:id', async (c) => {
 
   let entry: FoodEntry;
   if (foodId) {
-    const foodRow = await c.env.DB.prepare('SELECT * FROM foods WHERE id = ? AND user_id = ?')
+    const foodRow = await c.env.DB.prepare(
+      'SELECT * FROM foods WHERE id = ? AND user_id = ? AND archived_at IS NULL'
+    )
       .bind(foodId, c.get('userId'))
       .first<FoodRow>();
     if (!foodRow) return c.json({ message: 'Saved food not found.' }, 404);
@@ -755,6 +1080,8 @@ app.patch('/api/app/entries/:id', async (c) => {
       unitLabel: food.servingMode === 'per_100g' ? 'g' : food.unitLabel,
       ...scaleNutrients(food, food.servingMode, amount),
       eatenAt,
+      foodKind: food.foodKind,
+      labels: food.labels,
     };
   } else {
     const directEntry = directEntryFromBody(body, c.req.param('id'), amount, eatenAt);
@@ -766,7 +1093,7 @@ app.patch('/api/app/entries/:id', async (c) => {
 
   const result = await c.env.DB.prepare(
     `UPDATE food_entries SET food_id = ?, food_name = ?, amount = ?, unit_label = ?,
-      calories = ?, carbs_g = ?, protein_g = ?, fibre_g = ?, eaten_at = ?
+      calories = ?, carbs_g = ?, protein_g = ?, fibre_g = ?, food_kind = ?, labels_json = ?, eaten_at = ?
      WHERE id = ? AND user_id = ?`
   )
     .bind(
@@ -778,6 +1105,8 @@ app.patch('/api/app/entries/:id', async (c) => {
       entry.carbsG,
       entry.proteinG,
       entry.fibreG,
+      normalizeFoodKind(entry.foodKind),
+      JSON.stringify(normalizeFoodLabels(entry.labels)),
       entry.eatenAt,
       entry.id,
       c.get('userId')
@@ -820,6 +1149,28 @@ app.post('/api/app/water', async (c) => {
     .first<WaterRow>();
   if (!row) return c.json({ message: 'The water entry could not be read back.' }, 500);
   return c.json(mapWater(row), 201);
+});
+
+app.patch('/api/app/water/:id', async (c) => {
+  const body = await c.req.json<Record<string, unknown>>().catch(() => null);
+  const amountMl = body ? finiteNumber(body.amountMl, 1, 5000) : null;
+  const drankAt = body ? validTimestamp(body.drankAt) : null;
+  if (amountMl === null || drankAt === null) {
+    return c.json(jsonError('Choose a water amount and time.'), 400);
+  }
+  const result = await c.env.DB.prepare(
+    'UPDATE water_entries SET amount_ml = ?, drank_at = ? WHERE id = ? AND user_id = ?'
+  )
+    .bind(Math.round(amountMl), drankAt, c.req.param('id'), c.get('userId'))
+    .run();
+  if (!result.meta.changes) return c.json({ message: 'Water entry not found.' }, 404);
+  const row = await c.env.DB.prepare(
+    'SELECT id, amount_ml, drank_at FROM water_entries WHERE id = ? AND user_id = ?'
+  )
+    .bind(c.req.param('id'), c.get('userId'))
+    .first<WaterRow>();
+  if (!row) return c.json({ message: 'The water entry could not be read back.' }, 500);
+  return c.json(mapWater(row));
 });
 
 app.delete('/api/app/water/:id', async (c) => {
@@ -965,6 +1316,28 @@ app.post('/api/app/weights', async (c) => {
   return c.json(mapWeight(row), 201);
 });
 
+app.patch('/api/app/weights/:id', async (c) => {
+  const body = await c.req.json<Record<string, unknown>>().catch(() => null);
+  const weightKg = body ? finiteNumber(body.weightKg, 30, 400) : null;
+  const recordedAt = body ? validTimestamp(body.recordedAt) : null;
+  if (weightKg === null || recordedAt === null) {
+    return c.json(jsonError('Enter a valid weight and date.'), 400);
+  }
+  const result = await c.env.DB.prepare(
+    'UPDATE weight_entries SET weight_kg = ?, recorded_at = ? WHERE id = ? AND user_id = ?'
+  )
+    .bind(weightKg, recordedAt, c.req.param('id'), c.get('userId'))
+    .run();
+  if (!result.meta.changes) return c.json({ message: 'Weight entry not found.' }, 404);
+  const row = await c.env.DB.prepare(
+    'SELECT id, weight_kg, recorded_at FROM weight_entries WHERE id = ? AND user_id = ?'
+  )
+    .bind(c.req.param('id'), c.get('userId'))
+    .first<WeightRow>();
+  if (!row) return c.json({ message: 'The weight entry could not be read back.' }, 500);
+  return c.json(mapWeight(row));
+});
+
 app.delete('/api/app/weights/:id', async (c) => {
   const result = await c.env.DB.prepare('DELETE FROM weight_entries WHERE id = ? AND user_id = ?')
     .bind(c.req.param('id'), c.get('userId'))
@@ -974,12 +1347,61 @@ app.delete('/api/app/weights/:id', async (c) => {
     : c.json({ message: 'Weight entry not found.' }, 404);
 });
 
+app.get('/api/app/export', async (c) => {
+  const userId = c.get('userId');
+  const [profile, foods, entries, water, medications, checkIns, weights, cycles] =
+    await Promise.all([
+      readProfile(c.env.DB, userId, c.get('userName')),
+      c.env.DB.prepare('SELECT * FROM foods WHERE user_id = ? ORDER BY created_at ASC')
+        .bind(userId)
+        .all<FoodRow>(),
+      c.env.DB.prepare('SELECT * FROM food_entries WHERE user_id = ? ORDER BY eaten_at ASC')
+        .bind(userId)
+        .all<FoodEntryRow>(),
+      c.env.DB.prepare(
+        'SELECT id, amount_ml, drank_at FROM water_entries WHERE user_id = ? ORDER BY drank_at ASC'
+      )
+        .bind(userId)
+        .all<WaterRow>(),
+      c.env.DB.prepare(
+        'SELECT id, name, schedule, created_at, archived_at FROM medications WHERE user_id = ? ORDER BY created_at ASC'
+      )
+        .bind(userId)
+        .all<MedicationRow>(),
+      c.env.DB.prepare(
+        'SELECT id, medication_id, taken_on, taken_at FROM medication_check_ins WHERE user_id = ? ORDER BY taken_at ASC'
+      )
+        .bind(userId)
+        .all<MedicationCheckInRow>(),
+      c.env.DB.prepare(
+        'SELECT id, weight_kg, recorded_at FROM weight_entries WHERE user_id = ? ORDER BY recorded_at ASC'
+      )
+        .bind(userId)
+        .all<WeightRow>(),
+      c.env.DB.prepare('SELECT * FROM goal_cycles WHERE user_id = ? ORDER BY start_on ASC')
+        .bind(userId)
+        .all<GoalCycleRow>(),
+    ]);
+  return c.json(
+    createJournalExport({
+      profile,
+      foods: foods.results.map(mapFood),
+      entries: entries.results.map(mapFoodEntry),
+      waterEntries: water.results.map(mapWater),
+      medications: medications.results.map(mapMedication),
+      medicationCheckIns: checkIns.results.map(mapMedicationCheckIn),
+      weights: weights.results.map(mapWeight),
+      cycleSessions: cycles.results.map(mapGoalCycle),
+    })
+  );
+});
+
 function parseRange(c: {
   req: { query: (name: string) => string | undefined };
 }): { start: number; end: number } | null {
   const start = finiteNumber(c.req.query('start'), 0, Date.now() + 24 * 60 * 60 * 1000);
   const end = finiteNumber(c.req.query('end'), 0, Date.now() + 48 * 60 * 60 * 1000);
-  if (start === null || end === null || end <= start || end - start > 43 * 24 * 60 * 60 * 1000) {
+  if (start === null || end === null || end <= start || end - start > 366 * 24 * 60 * 60 * 1000) {
     return null;
   }
   return { start, end };
@@ -1003,7 +1425,7 @@ app.get('/api/app/dashboard', async (c) => {
   ] = await Promise.all([
     readProfile(c.env.DB, userId, c.get('userName')),
     c.env.DB.prepare(
-      `SELECT * FROM foods WHERE user_id = ?
+      `SELECT * FROM foods WHERE user_id = ? AND archived_at IS NULL
          ORDER BY last_used_at DESC, name ASC LIMIT 20`
     )
       .bind(userId)
@@ -1123,8 +1545,8 @@ app.get('/api/app/history', async (c) => {
   const requestedDays = Number(c.req.query('days'));
   const rangeDays = requestedDays === 30 ? 30 : requestedDays === 7 ? 7 : undefined;
   const timezone = c.req.query('timezone') || 'UTC';
-  if (!range || range.end - range.start > 43 * 24 * 60 * 60 * 1000) {
-    return c.json(jsonError('Choose a history range of six weeks or less.'), 400);
+  if (!range || range.end - range.start > 366 * 24 * 60 * 60 * 1000) {
+    return c.json(jsonError('Choose a history range of one year or less.'), 400);
   }
   const userId = c.get('userId');
   const [profile, entriesResult, waterResult, weightResult, priorEntry] = await Promise.all([

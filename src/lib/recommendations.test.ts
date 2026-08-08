@@ -90,6 +90,28 @@ describe('nutrition calculations', () => {
     ]);
   });
 
+  it('keeps a manual calorie range while cycle-mapped goals change protein guidance', () => {
+    const input = {
+      weightKg: 70,
+      heightCm: 175,
+      ageYears: 30,
+      equationProfile: 'male' as const,
+      activityLevel: 'moderate' as const,
+      manualCalorieRange: [1950, 2050] as [number, number],
+    };
+
+    expect(calculateNutritionTarget({ ...input, goal: 'lose_gentle' })).toMatchObject({
+      calorieRange: [1950, 2050],
+      proteinRangeG: [112, 140],
+      method: 'manual',
+    });
+    expect(calculateNutritionTarget({ ...input, goal: 'maintain' })).toMatchObject({
+      calorieRange: [1950, 2050],
+      proteinRangeG: [98, 126],
+      method: 'manual',
+    });
+  });
+
   it('limits automatic loss targets and reports the adjustment actually applied', () => {
     const target = calculateNutritionTarget({
       weightKg: 60,
@@ -193,6 +215,24 @@ describe('timing calculations', () => {
     expect(result.state).toBe('window');
     expect(result.startAt).toBe(now + 30 * 60 * 1000);
     expect(result.endAt).toBe(now + 120 * 60 * 1000);
+    expect(result.phase).toBe('upcoming');
+  });
+
+  it('rejects trivial carbs and exercise windows that already passed', () => {
+    const now = Date.UTC(2026, 6, 25, 12);
+    expect(calculateGymGuidance([entry('Tea', now - 10 * 60 * 1000, 3)], now).state).toBe(
+      'no-recent-carbs'
+    );
+    expect(calculateGymGuidance([entry('Oats', now - 4 * 60 * 60 * 1000, 45)], now).state).toBe(
+      'no-recent-carbs'
+    );
+  });
+
+  it('marks a currently open exercise window as active', () => {
+    const now = Date.UTC(2026, 6, 25, 12);
+    const result = calculateGymGuidance([entry('Banana', now - 90 * 60 * 1000, 30)], now);
+    expect(result.state).toBe('window');
+    expect(result.phase).toBe('active');
   });
 
   it('pushes sleep later after a heavy late meal', () => {

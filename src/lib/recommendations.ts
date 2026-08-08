@@ -253,9 +253,18 @@ export function calculateCompletedFasts(
 
 export function calculateGymGuidance(entries: FoodEntry[], now = Date.now()): GymGuidance {
   const recent = [...entries]
-    .filter((entry) => entry.carbsG > 0 && entry.eatenAt <= now)
+    .filter((entry) => entry.carbsG >= 10 && entry.eatenAt <= now)
     .sort((a, b) => b.eatenAt - a.eatenAt)
-    .find((entry) => now - entry.eatenAt <= 6 * 60 * 60 * 1000);
+    .map((entry) => {
+      const minutes = entry.carbsG <= 20 ? [30, 90] : entry.carbsG <= 50 ? [60, 150] : [90, 240];
+      return {
+        entry,
+        startAt: entry.eatenAt + minutes[0] * 60 * 1000,
+        endAt: entry.eatenAt + minutes[1] * 60 * 1000,
+        minutes,
+      };
+    })
+    .find((candidate) => candidate.endAt >= now);
 
   if (!recent) {
     return {
@@ -264,20 +273,22 @@ export function calculateGymGuidance(entries: FoodEntry[], now = Date.now()): Gy
       endAt: null,
       carbsG: null,
       sourceEntry: null,
-      explanation: 'No recent carb-containing entry points to a specific training window.',
+      explanation:
+        'No qualifying meal-based window is still open. Train when it suits your energy and routine.',
     };
   }
 
-  const [startMinutes, endMinutes] =
-    recent.carbsG <= 20 ? [30, 90] : recent.carbsG <= 50 ? [60, 150] : [90, 240];
+  const [startMinutes, endMinutes] = recent.minutes;
+  const phase = now >= recent.startAt ? 'active' : 'upcoming';
 
   return {
     state: 'window',
-    startAt: recent.eatenAt + startMinutes * 60 * 1000,
-    endAt: recent.eatenAt + endMinutes * 60 * 1000,
-    carbsG: round(recent.carbsG, 1),
-    sourceEntry: recent.foodName,
-    explanation: `${round(recent.carbsG)} g carbs in ${recent.foodName} suggests a broad ${startMinutes}–${endMinutes} minute post-meal window.`,
+    startAt: recent.startAt,
+    endAt: recent.endAt,
+    carbsG: round(recent.entry.carbsG, 1),
+    sourceEntry: recent.entry.foodName,
+    phase,
+    explanation: `${round(recent.entry.carbsG)} g carbs in ${recent.entry.foodName} suggests a broad ${startMinutes}–${endMinutes} minute post-meal window${phase === 'active' ? ' that is active now' : ''}.`,
   };
 }
 

@@ -44,6 +44,11 @@ export async function dashboardCacheAge(userId: string): Promise<number | null> 
   return Date.now() - entry.cachedAt;
 }
 
+export async function deleteDashboardCache(userId: string) {
+  const db = await dbPromise;
+  await db.delete('cache', `dashboard:${userId}`);
+}
+
 export async function cachePrivateValue<T>(key: string, value: T) {
   const db = await dbPromise;
   await db.put('cache', value, `private:${key}`);

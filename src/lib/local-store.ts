@@ -1,6 +1,14 @@
-import { calendarHistoryBounds } from './calendar';
+import { calendarHistoryBounds, dateFromKey, localDateKey } from './calendar';
+import { transitionCycleSessions, updateActiveCycleStart } from './cycle-sessions';
 import { normalizeDirectEntry } from './entries';
+import {
+  detachFoodDefinition,
+  type FoodLifecycle,
+  foodsByLifecycle,
+  normalizeFood,
+} from './food-library';
 import { entriesWithinRange } from './history';
+import { createJournalExport } from './journal-export';
 import { activeMedications, upsertMedicationCheckIn } from './medications';
 import {
   calculateCompletedFasts,
@@ -9,10 +17,12 @@ import {
   scaleNutrients,
 } from './recommendations';
 import type {
+  CycleHistoryResponse,
   Dashboard,
   Food,
   FoodEntry,
   FoodEntryWrite,
+  GoalCycleSession,
   HistoryDay,
   HistoryResponse,
   Medication,
@@ -25,7 +35,7 @@ import type {
 const LOCAL_STATE_KEY = 'calorie-local-state-v1';
 
 type LocalState = {
-  version: 2;
+  version: 4;
   profile: UserProfile;
   foods: Food[];
   entries: FoodEntry[];
@@ -33,11 +43,12 @@ type LocalState = {
   medications: Medication[];
   medicationCheckIns: MedicationCheckIn[];
   weights: WeightEntry[];
+  cycleSessions: GoalCycleSession[];
 };
 
 function initialState(): LocalState {
   return {
-    version: 2,
+    version: 4,
     profile: {
       userId: 'local-user',
       displayName: '',
@@ -55,6 +66,8 @@ function initialState(): LocalState {
       sleepHours: 8,
       fastingThresholdHours: 12,
       waterTargetMl: 2000,
+      dailyActionOrder: ['weight', 'creatine', 'food', 'water'],
+      dailyActionHidden: [],
       onboardingComplete: false,
     },
     foods: [],
@@ -63,6 +76,7 @@ function initialState(): LocalState {
     medications: [],
     medicationCheckIns: [],
     weights: [],
+    cycleSessions: [],
   };
 }
 
@@ -75,13 +89,13 @@ function readState(): LocalState {
       version?: number;
       profile?: Partial<UserProfile>;
     };
-    if (parsed.version === 1 || parsed.version === 2) {
+    if ([1, 2, 3, 4].includes(parsed.version ?? 0)) {
       const fallback = initialState();
       const legacyManualTarget = parsed.profile?.manualCalorieTarget ?? null;
       return {
         ...fallback,
         ...parsed,
-        version: 2,
+        version: 4,
         profile: {
           ...fallback.profile,
           ...parsed.profile,
@@ -91,12 +105,13 @@ function readState(): LocalState {
               ? [Math.max(800, legacyManualTarget - 100), legacyManualTarget + 100]
               : null),
         },
-        foods: parsed.foods ?? [],
+        foods: (parsed.foods ?? []).map(normalizeFood),
         entries: parsed.entries ?? [],
         waterEntries: parsed.waterEntries ?? [],
         medications: parsed.medications ?? [],
         medicationCheckIns: parsed.medicationCheckIns ?? [],
         weights: parsed.weights ?? [],
+        cycleSessions: parsed.cycleSessions ?? [],
       };
     }
   } catch {
@@ -131,6 +146,28 @@ export function localSaveProfile(
   next: UserProfile & { initialWeightKg?: number; initialWeightId?: string }
 ) {
   const state = readState();
+  const today = localDateKey(new Date());
+  const now = Date.now();
+  const latestWeight = [...state.weights].sort((a, b) => b.recordedAt - a.recordedAt)[0];
+  const target = calculateNutritionTarget({
+    weightKg: next.initialWeightKg ?? latestWeight?.weightKg ?? null,
+    heightCm: next.heightCm,
+    ageYears: next.ageYears,
+    equationProfile: next.equationProfile,
+    activityLevel: next.activityLevel,
+    goal: next.goal,
+    manualCalorieTarget: next.manualCalorieTarget,
+    manualCalorieRange: next.manualCalorieRange,
+  });
+  state.cycleSessions = transitionCycleSessions({
+    sessions: state.cycleSessions,
+    nextProfile: next,
+    target,
+    today,
+    now,
+    id: crypto.randomUUID(),
+    userId: 'local-user',
+  });
   state.profile = {
     ...next,
     userId: 'local-user',
@@ -149,9 +186,25 @@ export function localSaveProfile(
 
 export function localSaveFood(food: Food) {
   const state = readState();
-  const index = state.foods.findIndex((item) => item.id === food.id);
-  if (index >= 0) state.foods[index] = food;
-  else state.foods.unshift(food);
+  const normalized = normalizeFood(food);
+  const index = state.foods.findIndex((item) => item.id === normalized.id);
+  if (index >= 0) state.foods[index] = normalized;
+  else state.foods.unshift(normalized);
+  writeState(state);
+  return normalized;
+}
+
+export function localListFoods(lifecycle: FoodLifecycle) {
+  return foodsByLifecycle(readState().foods, lifecycle).sort(
+    (a, b) => (b.lastUsedAt ?? 0) - (a.lastUsedAt ?? 0) || a.name.localeCompare(b.name)
+  );
+}
+
+export function localSetFoodArchived(id: string, archivedAt: number | null) {
+  const state = readState();
+  const food = state.foods.find((item) => item.id === id);
+  if (!food) throw new Error('Food not found.');
+  food.archivedAt = archivedAt;
   writeState(state);
   return food;
 }
@@ -159,9 +212,7 @@ export function localSaveFood(food: Food) {
 export function localDeleteFood(id: string) {
   const state = readState();
   state.foods = state.foods.filter((food) => food.id !== id);
-  state.entries = state.entries.map((entry) =>
-    entry.foodId === id ? { ...entry, foodId: null } : entry
-  );
+  state.entries = detachFoodDefinition(state.entries, id);
   writeState(state);
 }
 
@@ -174,7 +225,7 @@ export function localAddEntry(input: FoodEntryWrite) {
     writeState(state);
     return entry;
   }
-  const food = state.foods.find((item) => item.id === input.foodId);
+  const food = state.foods.find((item) => item.id === input.foodId && item.archivedAt === null);
   if (!food) throw new Error('Saved food not found.');
   const entry: FoodEntry = {
     id: input.id,
@@ -184,6 +235,8 @@ export function localAddEntry(input: FoodEntryWrite) {
     unitLabel: food.servingMode === 'per_100g' ? 'g' : food.unitLabel,
     ...scaleNutrients(food, food.servingMode, input.amount),
     eatenAt: input.eatenAt,
+    foodKind: food.foodKind,
+    labels: food.labels,
   };
   state.entries = [entry, ...state.entries.filter((item) => item.id !== entry.id)];
   food.lastUsedAt = input.eatenAt;
@@ -251,6 +304,15 @@ export function localAddWeight(input: WeightEntry) {
   return input;
 }
 
+export const localUpdateWater = localAddWater;
+export const localUpdateWeight = localAddWeight;
+
+export function localDeleteWeight(id: string) {
+  const state = readState();
+  state.weights = state.weights.filter((entry) => entry.id !== id);
+  writeState(state);
+}
+
 export function localDashboard(): Dashboard {
   const state = readState();
   const range = dayRange();
@@ -272,7 +334,7 @@ export function localDashboard(): Dashboard {
   );
   return {
     profile: state.profile,
-    foods: [...state.foods].sort(
+    foods: foodsByLifecycle(state.foods, 'active').sort(
       (a, b) => (b.lastUsedAt ?? 0) - (a.lastUsedAt ?? 0) || a.name.localeCompare(b.name)
     ),
     entries,
@@ -384,4 +446,101 @@ export function localCalendarHistory(dateKeys: string[]): HistoryResponse {
   const cells = dateKeys.map((date) => ({ date, day: 0, inMonth: true }));
   const { start, end } = calendarHistoryBounds(cells);
   return buildLocalHistory(dateKeys, start, Math.min(end, dayRange().end));
+}
+
+function cycleDateKeys(startOn: string, endOn: string) {
+  const start = dateFromKey(startOn);
+  start.setHours(0, 0, 0, 0);
+  const end = dateFromKey(endOn);
+  end.setHours(0, 0, 0, 0);
+  const keys: string[] = [];
+  for (
+    const cursor = new Date(start);
+    cursor < end && keys.length < 366;
+    cursor.setDate(cursor.getDate() + 1)
+  ) {
+    keys.push(localDateKey(cursor));
+  }
+  return { keys, start: start.getTime(), end: end.getTime() };
+}
+
+function nextDateKey(key: string) {
+  const date = dateFromKey(key);
+  date.setDate(date.getDate() + 1);
+  return localDateKey(date);
+}
+
+function ensureLocalCycle(state: LocalState, today: string) {
+  if (state.cycleSessions.some((session) => session.endOn === null)) return;
+  const latestWeight = [...state.weights].sort((a, b) => b.recordedAt - a.recordedAt)[0];
+  state.cycleSessions = transitionCycleSessions({
+    sessions: state.cycleSessions,
+    nextProfile: state.profile,
+    target: calculateNutritionTarget({
+      weightKg: latestWeight?.weightKg ?? null,
+      heightCm: state.profile.heightCm,
+      ageYears: state.profile.ageYears,
+      equationProfile: state.profile.equationProfile,
+      activityLevel: state.profile.activityLevel,
+      goal: state.profile.goal,
+      manualCalorieTarget: state.profile.manualCalorieTarget,
+      manualCalorieRange: state.profile.manualCalorieRange,
+    }),
+    today,
+    now: Date.now(),
+    id: crypto.randomUUID(),
+    userId: state.profile.userId,
+  });
+}
+
+function localCyclePeriod(session: GoalCycleSession, today: string) {
+  const exclusiveEnd = session.endOn ?? nextDateKey(today);
+  const bounds = cycleDateKeys(session.startOn, exclusiveEnd);
+  const history = buildLocalHistory(bounds.keys, bounds.start, bounds.end);
+  return { session, days: history.days, weights: history.weights };
+}
+
+export function localCycleHistory(): CycleHistoryResponse {
+  const state = readState();
+  const today = localDateKey(new Date());
+  ensureLocalCycle(state, today);
+  writeState(state);
+  const active = state.cycleSessions.find((session) => session.endOn === null);
+  if (!active) throw new Error('Active cycle not found.');
+  const previous = [...state.cycleSessions]
+    .filter((session) => session.endOn !== null)
+    .sort((a, b) => (b.endOn ?? '').localeCompare(a.endOn ?? ''))[0];
+  return {
+    active: localCyclePeriod(active, today),
+    previous: previous ? localCyclePeriod(previous, today) : null,
+    today,
+    timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+  };
+}
+
+export function localUpdateCycleStart(startOn: string) {
+  const state = readState();
+  const today = localDateKey(new Date());
+  ensureLocalCycle(state, today);
+  state.cycleSessions = updateActiveCycleStart(state.cycleSessions, startOn, today, Date.now());
+  writeState(state);
+  const active = state.cycleSessions.find((session) => session.endOn === null);
+  if (!active) throw new Error('Active cycle not found.');
+  return active;
+}
+
+export function localJournalExport() {
+  const state = readState();
+  ensureLocalCycle(state, localDateKey(new Date()));
+  writeState(state);
+  return createJournalExport({
+    profile: state.profile,
+    foods: state.foods,
+    entries: state.entries,
+    waterEntries: state.waterEntries,
+    medications: state.medications,
+    medicationCheckIns: state.medicationCheckIns,
+    weights: state.weights,
+    cycleSessions: state.cycleSessions,
+  });
 }

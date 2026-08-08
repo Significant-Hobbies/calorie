@@ -4,6 +4,15 @@ import { AppMark } from '../components/AppMark';
 import { saveProfile } from '../lib/api';
 import { signOut } from '../lib/auth-client';
 import {
+  CUT_INTENSITY_DETAILS,
+  type CutIntensity,
+  CYCLE_DETAILS,
+  cutIntensityFromGoal,
+  cycleFromGoal,
+  type GoalCycle,
+  goalFromCycle,
+} from '../lib/goal-cycles';
+import {
   clearOnboardingDraft,
   type OnboardingDraft,
   readOnboardingDraft,
@@ -15,7 +24,7 @@ import {
   formatCalorieAdjustmentRange,
   GOAL_DETAILS,
 } from '../lib/recommendations';
-import type { ActivityLevel, EquationProfile, Goal, Units, UserProfile } from '../lib/types';
+import type { ActivityLevel, EquationProfile, Units, UserProfile } from '../lib/types';
 
 const toDisplayWeight = (kg: number | null, units: Units) =>
   kg === null ? '' : units === 'metric' ? String(kg) : String(Math.round(kg * 2.20462 * 10) / 10);
@@ -86,12 +95,14 @@ export function OnboardingPage({
     draft.initialWeightKg && draft.targetWeightKg
       ? calculateTargetWeightProgress(draft.initialWeightKg, draft.targetWeightKg)
       : null;
+  const cycle = cycleFromGoal(draft.goal);
+  const cutIntensity = cutIntensityFromGoal(draft.goal);
 
   const validateStep = () => {
     if (step === 0) {
       if (!draft.displayName.trim()) return 'Tell us what to call you.';
-      if (draft.goal !== 'maintain' && !draft.targetWeightKg) {
-        return 'Add a target weight, or choose Maintain my weight.';
+      if (cycle !== 'recomposition' && !draft.targetWeightKg) {
+        return 'Add a target weight, or choose Recomposition.';
       }
     }
     if (step === 1) {
@@ -184,9 +195,9 @@ export function OnboardingPage({
             <div className="section-icon">
               <Sparkles aria-hidden="true" />
             </div>
-            <h1>What would you like to change?</h1>
+            <h1>What are you working toward?</h1>
             <p className="lede">
-              Your answer sets a real calorie adjustment and a progress destination.
+              Choose your current nutrition cycle. You can change it whenever your focus shifts.
             </p>
 
             <label className="field">
@@ -201,36 +212,61 @@ export function OnboardingPage({
             </label>
 
             <fieldset className="field">
-              <legend>Your goal</legend>
+              <legend>Current cycle</legend>
               <div className="choice-stack">
-                {(Object.keys(GOAL_DETAILS) as Goal[]).map((goal) => (
+                {(Object.keys(CYCLE_DETAILS) as GoalCycle[]).map((option) => (
                   <button
-                    key={goal}
+                    key={option}
                     type="button"
                     className={
-                      draft.goal === goal ? 'choice goal-choice is-selected' : 'choice goal-choice'
+                      cycle === option ? 'choice goal-choice is-selected' : 'choice goal-choice'
                     }
-                    aria-pressed={draft.goal === goal}
+                    aria-pressed={cycle === option}
                     onClick={() =>
                       setDraft((current) => ({
                         ...current,
-                        goal,
-                        targetWeightKg: goal === 'maintain' ? null : current.targetWeightKg,
+                        goal: goalFromCycle(option, cutIntensityFromGoal(current.goal)),
+                        targetWeightKg: option === 'recomposition' ? null : current.targetWeightKg,
                       }))
                     }
                   >
                     <span className="choice-dot" />
                     <span>
-                      <strong>{GOAL_DETAILS[goal].label}</strong>
-                      <small>{GOAL_DETAILS[goal].explanation}</small>
+                      <strong>{CYCLE_DETAILS[option].label}</strong>
+                      <small>{CYCLE_DETAILS[option].description}</small>
                     </span>
-                    {draft.goal === goal ? <Check size={18} /> : null}
+                    {cycle === option ? <Check size={18} /> : null}
                   </button>
                 ))}
               </div>
             </fieldset>
 
-            {draft.goal !== 'maintain' ? (
+            {cycle === 'cut' ? (
+              <fieldset className="field">
+                <legend>Cut intensity</legend>
+                <div className="segmented">
+                  {(Object.keys(CUT_INTENSITY_DETAILS) as CutIntensity[]).map((intensity) => (
+                    <button
+                      key={intensity}
+                      type="button"
+                      className={cutIntensity === intensity ? 'is-selected' : ''}
+                      aria-pressed={cutIntensity === intensity}
+                      onClick={() =>
+                        setDraft((current) => ({
+                          ...current,
+                          goal: goalFromCycle('cut', intensity),
+                        }))
+                      }
+                    >
+                      {CUT_INTENSITY_DETAILS[intensity].label}
+                    </button>
+                  ))}
+                </div>
+                <small>{CUT_INTENSITY_DETAILS[cutIntensity].description}.</small>
+              </fieldset>
+            ) : null}
+
+            {cycle !== 'recomposition' ? (
               <label className="field">
                 <span>Target weight</span>
                 <div className="input-with-unit">
@@ -388,7 +424,7 @@ export function OnboardingPage({
                 <p>
                   {target.maintenanceCalories.toLocaleString()} maintenance{' '}
                   {formatCalorieAdjustmentRange(target.goalAdjustmentRangeCalories)} for{' '}
-                  {GOAL_DETAILS[draft.goal].shortLabel.toLowerCase()}.
+                  {CYCLE_DETAILS[cycle].shortLabel.toLowerCase()}.
                 </p>
               ) : (
                 <p>You can add a manual calorie range later in Settings.</p>
@@ -468,8 +504,10 @@ export function OnboardingPage({
               <span>Your answers, put to work</span>
               <dl>
                 <div>
-                  <dt>Goal</dt>
-                  <dd>{GOAL_DETAILS[draft.goal].explanation}</dd>
+                  <dt>Cycle</dt>
+                  <dd>
+                    {CYCLE_DETAILS[cycle].label} · {GOAL_DETAILS[draft.goal].explanation}
+                  </dd>
                 </div>
                 <div>
                   <dt>Daily energy</dt>

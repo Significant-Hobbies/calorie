@@ -1,6 +1,14 @@
 import { calendarHistoryBounds, dateFromKey, localDateKey } from './calendar';
+import { transitionCycleSessions, updateActiveCycleStart } from './cycle-sessions';
 import { normalizeDirectEntry } from './entries';
+import {
+  detachFoodDefinition,
+  type FoodLifecycle,
+  foodsByLifecycle,
+  normalizeFood,
+} from './food-library';
 import { entriesWithinRange } from './history';
+import { createJournalExport } from './journal-export';
 import { activeMedications, upsertMedicationCheckIn } from './medications';
 import {
   calculateCompletedFasts,
@@ -9,10 +17,12 @@ import {
   scaleNutrients,
 } from './recommendations';
 import type {
+  CycleHistoryResponse,
   Dashboard,
   Food,
   FoodEntry,
   FoodEntryWrite,
+  GoalCycleSession,
   HistoryDay,
   HistoryResponse,
   Medication,
@@ -46,6 +56,8 @@ let profile: UserProfile = {
   sleepHours: 8,
   fastingThresholdHours: 12,
   waterTargetMl: 2200,
+  dailyActionOrder: ['weight', 'creatine', 'food', 'water'],
+  dailyActionHidden: [],
   onboardingComplete: sessionStorage.getItem('calorie-demo-onboarding') !== 'true',
 };
 
@@ -62,6 +74,7 @@ let foods: Food[] = [
     fibreG: 6,
     favourite: true,
     lastUsedAt: atToday(7, 30),
+    archivedAt: null,
   },
   {
     id: 'dal',
@@ -75,6 +88,7 @@ let foods: Food[] = [
     fibreG: 7,
     favourite: true,
     lastUsedAt: atToday(12, 45),
+    archivedAt: null,
   },
   {
     id: 'banana',
@@ -88,6 +102,7 @@ let foods: Food[] = [
     fibreG: 3.1,
     favourite: true,
     lastUsedAt: now - 24 * 60 * 60 * 1000,
+    archivedAt: null,
   },
   {
     id: 'paneer',
@@ -101,6 +116,7 @@ let foods: Food[] = [
     fibreG: 0,
     favourite: false,
     lastUsedAt: now - 2 * 24 * 60 * 60 * 1000,
+    archivedAt: null,
   },
 ];
 
@@ -154,6 +170,37 @@ let weights: WeightEntry[] = Array.from({ length: 7 }, (_, index) => ({
   recordedAt: now - (6 - index) * 7 * 24 * 60 * 60 * 1000,
 }));
 
+let cycleSessions: GoalCycleSession[] = [];
+
+function demoTarget(next = profile) {
+  const latestWeight = weights.at(-1);
+  return calculateNutritionTarget({
+    weightKg: latestWeight?.weightKg ?? null,
+    heightCm: next.heightCm,
+    ageYears: next.ageYears,
+    equationProfile: next.equationProfile,
+    activityLevel: next.activityLevel,
+    goal: next.goal,
+    manualCalorieTarget: next.manualCalorieTarget,
+    manualCalorieRange: next.manualCalorieRange,
+  });
+}
+
+function ensureDemoCycle() {
+  if (cycleSessions.some((session) => session.endOn === null)) return;
+  const start = new Date();
+  start.setDate(start.getDate() - 34);
+  cycleSessions = transitionCycleSessions({
+    sessions: cycleSessions,
+    nextProfile: profile,
+    target: demoTarget(),
+    today: localDateKey(start),
+    now: Date.now(),
+    id: crypto.randomUUID(),
+    userId: profile.userId,
+  });
+}
+
 function totals() {
   return entries.reduce(
     (sum, entry) => ({
@@ -177,7 +224,7 @@ export function demoDashboard(): Dashboard {
   const latestWeight = weights.at(-1) ?? null;
   return {
     profile: { ...profile },
-    foods: [...foods],
+    foods: foodsByLifecycle(foods, 'active'),
     entries: [...entries].sort((a, b) => b.eatenAt - a.eatenAt),
     waterEntries: [...waterEntries].sort((a, b) => b.drankAt - a.drankAt),
     medications: activeMedications(medications),
@@ -206,6 +253,16 @@ export function demoDashboard(): Dashboard {
 }
 
 export function demoSaveProfile(next: UserProfile & { initialWeightKg?: number }) {
+  ensureDemoCycle();
+  cycleSessions = transitionCycleSessions({
+    sessions: cycleSessions,
+    nextProfile: next,
+    target: demoTarget(next),
+    today: localDateKey(new Date()),
+    now: Date.now(),
+    id: crypto.randomUUID(),
+    userId: 'demo-user',
+  });
   profile = { ...next, userId: 'demo-user', onboardingComplete: true };
   if (next.initialWeightKg) {
     weights.push({
@@ -218,15 +275,29 @@ export function demoSaveProfile(next: UserProfile & { initialWeightKg?: number }
 }
 
 export function demoSaveFood(food: Food) {
-  const index = foods.findIndex((item) => item.id === food.id);
-  if (index >= 0) foods[index] = food;
-  else foods = [food, ...foods];
+  const normalized = normalizeFood(food);
+  const index = foods.findIndex((item) => item.id === normalized.id);
+  if (index >= 0) foods[index] = normalized;
+  else foods = [normalized, ...foods];
+  return normalized;
+}
+
+export function demoListFoods(lifecycle: FoodLifecycle) {
+  return foodsByLifecycle(foods, lifecycle).sort(
+    (a, b) => (b.lastUsedAt ?? 0) - (a.lastUsedAt ?? 0) || a.name.localeCompare(b.name)
+  );
+}
+
+export function demoSetFoodArchived(id: string, archivedAt: number | null) {
+  const food = foods.find((item) => item.id === id);
+  if (!food) throw new Error('Food not found.');
+  food.archivedAt = archivedAt;
   return food;
 }
 
 export function demoDeleteFood(id: string) {
   foods = foods.filter((food) => food.id !== id);
-  entries = entries.map((entry) => (entry.foodId === id ? { ...entry, foodId: null } : entry));
+  entries = detachFoodDefinition(entries, id);
 }
 
 export function demoAddEntry(input: FoodEntryWrite) {
@@ -236,7 +307,7 @@ export function demoAddEntry(input: FoodEntryWrite) {
     entries = [entry, ...entries.filter((item) => item.id !== entry.id)];
     return entry;
   }
-  const food = foods.find((item) => item.id === input.foodId);
+  const food = foods.find((item) => item.id === input.foodId && item.archivedAt === null);
   if (!food) throw new Error('Food not found.');
   const nutrients = scaleNutrients(food, food.servingMode, input.amount);
   const entry: FoodEntry = {
@@ -247,6 +318,8 @@ export function demoAddEntry(input: FoodEntryWrite) {
     unitLabel: food.servingMode === 'per_100g' ? 'g' : food.unitLabel,
     ...nutrients,
     eatenAt: input.eatenAt,
+    foodKind: food.foodKind,
+    labels: food.labels,
   };
   entries = [entry, ...entries.filter((item) => item.id !== entry.id)];
   food.lastUsedAt = input.eatenAt;
@@ -258,7 +331,7 @@ export function demoDeleteEntry(id: string) {
 }
 
 export function demoAddWater(input: WaterEntry) {
-  waterEntries = [input, ...waterEntries];
+  waterEntries = [input, ...waterEntries.filter((entry) => entry.id !== input.id)];
   return input;
 }
 
@@ -288,8 +361,17 @@ export function demoDeleteMedicationCheckIn(id: string) {
 }
 
 export function demoAddWeight(input: WeightEntry) {
-  weights = [...weights, input].sort((a, b) => a.recordedAt - b.recordedAt);
+  weights = [...weights.filter((entry) => entry.id !== input.id), input].sort(
+    (a, b) => a.recordedAt - b.recordedAt
+  );
   return input;
+}
+
+export const demoUpdateWater = demoAddWater;
+export const demoUpdateWeight = demoAddWeight;
+
+export function demoDeleteWeight(id: string) {
+  weights = weights.filter((entry) => entry.id !== id);
 }
 
 function demoTimingEntry(input: {
@@ -455,4 +537,72 @@ export function demoCalendarHistory(dateKeys: string[]): HistoryResponse {
     ),
     entries,
   };
+}
+
+function nextDateKey(key: string) {
+  const date = dateFromKey(key);
+  date.setDate(date.getDate() + 1);
+  return localDateKey(date);
+}
+
+function cycleKeys(startOn: string, exclusiveEnd: string) {
+  const keys: string[] = [];
+  for (
+    const cursor = dateFromKey(startOn);
+    localDateKey(cursor) < exclusiveEnd && keys.length < 366;
+    cursor.setDate(cursor.getDate() + 1)
+  ) {
+    keys.push(localDateKey(cursor));
+  }
+  return keys;
+}
+
+function demoCyclePeriod(session: GoalCycleSession, today: string) {
+  const history = demoCalendarHistory(
+    cycleKeys(session.startOn, session.endOn ?? nextDateKey(today))
+  );
+  return { session, days: history.days, weights: history.weights };
+}
+
+export function demoCycleHistory(): CycleHistoryResponse {
+  ensureDemoCycle();
+  const today = localDateKey(new Date());
+  const active = cycleSessions.find((session) => session.endOn === null);
+  if (!active) throw new Error('Active demo cycle not found.');
+  const previous = [...cycleSessions]
+    .filter((session) => session.endOn !== null)
+    .sort((a, b) => (b.endOn ?? '').localeCompare(a.endOn ?? ''))[0];
+  return {
+    active: demoCyclePeriod(active, today),
+    previous: previous ? demoCyclePeriod(previous, today) : null,
+    today,
+    timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+  };
+}
+
+export function demoUpdateCycleStart(startOn: string) {
+  ensureDemoCycle();
+  cycleSessions = updateActiveCycleStart(
+    cycleSessions,
+    startOn,
+    localDateKey(new Date()),
+    Date.now()
+  );
+  const active = cycleSessions.find((session) => session.endOn === null);
+  if (!active) throw new Error('Active demo cycle not found.');
+  return active;
+}
+
+export function demoJournalExport() {
+  ensureDemoCycle();
+  return createJournalExport({
+    profile,
+    foods,
+    entries,
+    waterEntries,
+    medications,
+    medicationCheckIns,
+    weights,
+    cycleSessions,
+  });
 }

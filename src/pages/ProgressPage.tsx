@@ -7,8 +7,10 @@ import {
   Droplets,
   Flame,
   Leaf,
+  Pencil,
   Scale,
   Sprout,
+  Trash2,
 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { MacroStackedChart } from '../components/charts/MacroStackedChart';
@@ -18,11 +20,29 @@ import { WeightChart } from '../components/charts/WeightChart';
 import { HistoryCalendar } from '../components/HistoryCalendar';
 import { MealTimingInsights } from '../components/MealTimingInsights';
 import { analyzeActionableInsights } from '../lib/actionable-insights';
-import { addWeight, getCalendarHistory, getDashboard, getHistory } from '../lib/api';
+import {
+  addWeight,
+  deleteWeight,
+  getCalendarHistory,
+  getCycleHistory,
+  getDashboard,
+  getHistory,
+  updateWeight,
+} from '../lib/api';
 import { calendarGrid, isSameMonth, localDateKey, shiftMonth } from '../lib/calendar';
+import { analyzeCyclePeriod, compareCycleAnalyses } from '../lib/cycle-analytics';
+import { summarizeCycleProgress } from '../lib/cycle-progress';
 import { analyzeFoodAnalytics, type FoodAnalyticsItem } from '../lib/food-analytics';
+import { CYCLE_DETAILS, cycleFromGoal } from '../lib/goal-cycles';
+import { displayWeightValue, storedWeightValue } from '../lib/log-corrections';
 import { analyzeMealTiming } from '../lib/meal-timing';
-import type { Dashboard, FoodEntry, HistoryResponse } from '../lib/types';
+import type {
+  CycleHistoryResponse,
+  Dashboard,
+  FoodEntry,
+  HistoryResponse,
+  WeightEntry,
+} from '../lib/types';
 
 function displayWeight(weightKg: number, units: 'metric' | 'imperial') {
   return units === 'metric' ? `${weightKg.toFixed(1)} kg` : `${(weightKg * 2.20462).toFixed(1)} lb`;
@@ -90,14 +110,23 @@ export function ProgressPage() {
   );
   const [selectedDate, setSelectedDate] = useState(() => localDateKey(today));
   const [dashboard, setDashboard] = useState<Dashboard | null>(null);
+  const [cycleHistory, setCycleHistory] = useState<CycleHistoryResponse | null>(null);
   const [weight, setWeight] = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [editingWeightId, setEditingWeightId] = useState<string | null>(null);
+  const [editingWeight, setEditingWeight] = useState('');
+  const [editingWeightDate, setEditingWeightDate] = useState('');
 
   const loadDashboard = useCallback(async () => {
     setError(null);
     try {
-      setDashboard(await getDashboard());
+      const [nextDashboard, nextCycleHistory] = await Promise.all([
+        getDashboard(),
+        getCycleHistory(),
+      ]);
+      setDashboard(nextDashboard);
+      setCycleHistory(nextCycleHistory);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : 'Progress could not load.');
     }
@@ -134,22 +163,30 @@ export function ProgressPage() {
     if (viewMode === 'calendar') void loadCalendar(calendarMonth);
   }, [viewMode, calendarMonth, loadCalendar]);
 
-  const summary = useMemo(() => {
-    if (!history) return null;
-    const logged = history.days.filter((day) => day.calories > 0);
-    return {
-      averageCalories: logged.length
-        ? Math.round(logged.reduce((sum, day) => sum + day.calories, 0) / logged.length)
-        : 0,
-      averageProtein: logged.length
-        ? Math.round(logged.reduce((sum, day) => sum + day.proteinG, 0) / logged.length)
-        : 0,
-      averageWater: logged.length
-        ? Math.round(logged.reduce((sum, day) => sum + day.waterMl, 0) / logged.length)
-        : 0,
-      fasts: history.days.reduce((sum, day) => sum + day.fastCount, 0),
-    };
-  }, [history]);
+  const summary = useMemo(
+    () =>
+      history && dashboard
+        ? summarizeCycleProgress(history.days, history.weights, dashboard.profile.units)
+        : null,
+    [dashboard, history]
+  );
+  const cycle = dashboard ? CYCLE_DETAILS[cycleFromGoal(dashboard.profile.goal)] : null;
+  const cycleAnalysis = useMemo(
+    () => (cycleHistory ? analyzeCyclePeriod(cycleHistory.active, cycleHistory.today) : null),
+    [cycleHistory]
+  );
+  const previousCycleAnalysis = useMemo(
+    () =>
+      cycleHistory?.previous ? analyzeCyclePeriod(cycleHistory.previous, cycleHistory.today) : null,
+    [cycleHistory]
+  );
+  const cycleComparison = useMemo(
+    () =>
+      cycleAnalysis && previousCycleAnalysis
+        ? compareCycleAnalyses(cycleAnalysis, previousCycleAnalysis)
+        : null,
+    [cycleAnalysis, previousCycleAnalysis]
+  );
 
   const mealTiming = useMemo(() => {
     if (!history || !dashboard) return null;
@@ -194,9 +231,8 @@ export function ProgressPage() {
 
   const saveWeight = async () => {
     if (!dashboard) return;
-    let kilograms = Number(weight);
-    if (dashboard.profile.units === 'imperial') kilograms /= 2.20462;
-    if (!Number.isFinite(kilograms) || kilograms < 25 || kilograms > 400) {
+    const kilograms = storedWeightValue(Number(weight), dashboard.profile.units);
+    if (kilograms === null || kilograms < 25 || kilograms > 400) {
       setError('Enter a weight between 25 and 400 kg (55 and 882 lb).');
       return;
     }
@@ -205,7 +241,7 @@ export function ProgressPage() {
     try {
       await addWeight({
         id: crypto.randomUUID(),
-        weightKg: Math.round(kilograms * 10) / 10,
+        weightKg: kilograms,
         recordedAt: Date.now(),
       });
       setWeight('');
@@ -215,6 +251,62 @@ export function ProgressPage() {
       ]);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : 'Weight could not be logged.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const beginWeightEdit = (entry: WeightEntry) => {
+    if (!dashboard) return;
+    setEditingWeightId(entry.id);
+    setEditingWeight(String(displayWeightValue(entry.weightKg, dashboard.profile.units)));
+    setEditingWeightDate(new Date(entry.recordedAt).toISOString().slice(0, 10));
+  };
+
+  const saveWeightEdit = async () => {
+    if (!dashboard || !editingWeightId) return;
+    const weightKg = storedWeightValue(Number(editingWeight), dashboard.profile.units);
+    const recordedAt = new Date(`${editingWeightDate}T12:00:00`).getTime();
+    if (weightKg === null || weightKg < 25 || weightKg > 400 || !Number.isFinite(recordedAt)) {
+      setError('Enter a valid weight and date.');
+      return;
+    }
+    setSaving(true);
+    try {
+      await updateWeight({
+        id: editingWeightId,
+        weightKg,
+        recordedAt,
+      });
+      setEditingWeightId(null);
+      await Promise.all([
+        loadDashboard(),
+        viewMode === 'calendar' ? loadCalendar(calendarMonth) : loadTrends(rangeDays),
+      ]);
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : 'Weight could not be updated.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const removeWeight = async (entry: WeightEntry) => {
+    if (!dashboard) return;
+    if (
+      !window.confirm(
+        `Remove the ${displayWeight(entry.weightKg, dashboard.profile.units)} check-in?`
+      )
+    )
+      return;
+    setSaving(true);
+    try {
+      await deleteWeight(entry.id);
+      await Promise.all([
+        loadDashboard(),
+        viewMode === 'calendar' ? loadCalendar(calendarMonth) : loadTrends(rangeDays),
+      ]);
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : 'Weight could not be removed.');
     } finally {
       setSaving(false);
     }
@@ -246,10 +338,14 @@ export function ProgressPage() {
       : 0;
   const visibleWeights =
     (viewMode === 'calendar' ? calendarHistory?.weights : history?.weights) ?? [];
+  const recentWeightEntries = cycleHistory?.active.weights ?? visibleWeights;
 
   const hasEntries = (analytics?.totalOccasions ?? 0) > 0;
   const loading =
-    !dashboard || (viewMode === 'trends' && (!history || !summary || !analytics || !insights));
+    !dashboard ||
+    !cycleHistory ||
+    !cycleAnalysis ||
+    (viewMode === 'trends' && (!history || !summary || !analytics || !insights));
 
   return (
     <div className="page-stack">
@@ -288,6 +384,81 @@ export function ProgressPage() {
         </div>
       ) : (
         <>
+          <section className="cycle-overview" aria-labelledby="cycle-overview-title">
+            <header>
+              <div>
+                <p>Current {CYCLE_DETAILS[cycleAnalysis.cycle].label}</p>
+                <h2 id="cycle-overview-title">
+                  {cycleAnalysis.elapsedDays} day{cycleAnalysis.elapsedDays === 1 ? '' : 's'} in
+                </h2>
+                <span>
+                  Since {cycleAnalysis.startOn} · {cycleAnalysis.loggedDays} food-logged days (
+                  {cycleAnalysis.coveragePercent}% coverage)
+                </span>
+              </div>
+              <span className={`cycle-status cycle-status-${cycleAnalysis.status}`}>
+                {cycleAnalysis.status === 'on_track'
+                  ? 'Signals aligned'
+                  : cycleAnalysis.status === 'review_target'
+                    ? 'Review target'
+                    : 'Building signal'}
+              </span>
+            </header>
+            <p className="cycle-status-reason">{cycleAnalysis.statusReason}</p>
+            <dl className="cycle-overview-metrics">
+              <div>
+                <dt>Average intake</dt>
+                <dd>
+                  {cycleAnalysis.averageCalories === null
+                    ? '—'
+                    : `${cycleAnalysis.averageCalories.toLocaleString()} kcal`}
+                </dd>
+                <small>
+                  {cycleAnalysis.calorieDeltaFromPlan === null
+                    ? 'No saved range comparison'
+                    : `${cycleAnalysis.calorieDeltaFromPlan >= 0 ? '+' : ''}${cycleAnalysis.calorieDeltaFromPlan} vs plan midpoint`}
+                </small>
+              </div>
+              <div>
+                <dt>Average protein</dt>
+                <dd>
+                  {cycleAnalysis.averageProteinG === null
+                    ? '—'
+                    : `${cycleAnalysis.averageProteinG} g`}
+                </dd>
+                <small>
+                  {cycleAnalysis.proteinCoveragePercent === null
+                    ? 'No saved protein floor'
+                    : `${cycleAnalysis.proteinCoveragePercent}% of plan floor`}
+                </small>
+              </div>
+              <div>
+                <dt>Measured weight</dt>
+                <dd>
+                  {cycleAnalysis.weightChangeKg === null
+                    ? '—'
+                    : `${cycleAnalysis.weightChangeKg >= 0 ? '+' : ''}${cycleAnalysis.weightChangeKg} kg`}
+                </dd>
+                <small>
+                  {cycleAnalysis.weeklyWeightRateKg === null
+                    ? `${cycleAnalysis.weightCount} check-ins; span 7 days for rate`
+                    : `${cycleAnalysis.weeklyWeightRateKg >= 0 ? '+' : ''}${cycleAnalysis.weeklyWeightRateKg} kg/week fitted rate`}
+                </small>
+              </div>
+            </dl>
+            {cycleComparison && previousCycleAnalysis ? (
+              <p className="cycle-comparison">
+                Versus the previous {CYCLE_DETAILS[previousCycleAnalysis.cycle].label}: average
+                intake {cycleComparison.caloriesDelta >= 0 ? '+' : ''}
+                {cycleComparison.caloriesDelta} kcal, protein{' '}
+                {cycleComparison.proteinDeltaG >= 0 ? '+' : ''}
+                {cycleComparison.proteinDeltaG} g, measured change{' '}
+                {cycleComparison.weightChangeDeltaKg >= 0 ? '+' : ''}
+                {cycleComparison.weightChangeDeltaKg} kg.
+              </p>
+            ) : null}
+          </section>
+
           {viewMode === 'calendar' && calendarHistory ? (
             <>
               <HistoryCalendar
@@ -354,88 +525,119 @@ export function ProgressPage() {
                 </fieldset>
               </div>
 
-              <section className="metric-grid" aria-label="Period summary">
-                <article>
-                  <Activity aria-hidden="true" />
-                  <span>Average intake</span>
-                  <strong>{summary.averageCalories.toLocaleString()} kcal</strong>
-                </article>
-                <article>
-                  <Sprout aria-hidden="true" />
-                  <span>Average protein</span>
-                  <strong>{summary.averageProtein} g</strong>
-                </article>
-                <article>
-                  <Droplets aria-hidden="true" />
-                  <span>Average water</span>
-                  <strong>{(summary.averageWater / 1000).toFixed(1)} L</strong>
-                </article>
-                <article>
-                  <CalendarDays aria-hidden="true" />
-                  <span>Fasting windows</span>
-                  <strong>{summary.fasts}</strong>
-                </article>
-              </section>
-
-              <TrendChart days={history.days} dashboard={dashboard} rangeDays={rangeDays} />
-
-              <section className="chart-card" aria-labelledby="intake-chart-title">
-                <header>
-                  <div>
-                    <p>Daily calories</p>
-                    <h2 id="intake-chart-title">A gentle rhythm</h2>
-                  </div>
-                  <span>
-                    Range {dashboard.target.calorieRange?.[0]?.toLocaleString() ?? '—'}–
-                    {dashboard.target.calorieRange?.[1]?.toLocaleString() ?? '—'}
-                  </span>
-                </header>
-                <div
-                  className="bar-chart"
-                  role="img"
-                  aria-label={`Calorie intake for the last ${rangeDays} days. ${inRangeCount} logged days were within the estimate.`}
-                >
-                  {history.days.map((day, index) => {
-                    const height = day.calories ? Math.max(8, (day.calories / chartMax) * 100) : 3;
-                    const inRange =
-                      Boolean(dashboard.target.calorieRange) &&
-                      day.calories >= (dashboard.target.calorieRange?.[0] ?? 0) &&
-                      day.calories <=
-                        (dashboard.target.calorieRange?.[1] ?? Number.POSITIVE_INFINITY);
-                    const showLabel = rangeDays === 7 || index % 5 === 0 || index === 29;
-                    return (
-                      <div className="bar-column" key={day.date}>
-                        <span
-                          className={inRange ? 'bar is-in-range' : 'bar'}
-                          style={{ height: `${height}%` }}
-                          title={`${day.date}: ${Math.round(day.calories)} kcal${inRange ? ', within estimate' : ''}`}
-                        />
-                        <small>{showLabel ? shortDay(day.date) : ''}</small>
-                      </div>
-                    );
-                  })}
+              <section className="cycle-progress-context" aria-label="Current cycle coverage">
+                <div>
+                  <span>Current cycle</span>
+                  <strong>{cycle?.label}</strong>
                 </div>
-                <p className="chart-note">
-                  <span className="range-key" aria-hidden="true" />
-                  {inRangeCount} logged day{inRangeCount === 1 ? '' : 's'} sat inside your estimate.
-                  Other days are context—not failures.
+                <p>
+                  {summary.loggedDays} logged day{summary.loggedDays === 1 ? '' : 's'} in this{' '}
+                  {summary.windowDays}-day window
                 </p>
               </section>
 
-              <MacroStackedChart days={history.days} rangeDays={rangeDays} />
+              {hasEntries ? (
+                <>
+                  <section className="metric-grid" aria-label="Period summary">
+                    <article>
+                      <Activity aria-hidden="true" />
+                      <span>Average intake</span>
+                      <strong>{summary.averageCalories.toLocaleString()} kcal</strong>
+                    </article>
+                    <article>
+                      <Sprout aria-hidden="true" />
+                      <span>Average protein</span>
+                      <strong>{summary.averageProtein} g</strong>
+                    </article>
+                    <article>
+                      <Leaf aria-hidden="true" />
+                      <span>Average fibre</span>
+                      <strong>{summary.averageFibre} g</strong>
+                    </article>
+                    <article>
+                      <Droplets aria-hidden="true" />
+                      <span>Average water</span>
+                      <strong>{(summary.averageWater / 1000).toFixed(1)} L</strong>
+                    </article>
+                    <article>
+                      <Scale aria-hidden="true" />
+                      <span>Weight change</span>
+                      <strong>
+                        {summary.weightChange
+                          ? `${summary.weightChange.value > 0 ? '+' : ''}${summary.weightChange.value.toFixed(1)} ${summary.weightChange.unit}`
+                          : 'Not enough data'}
+                      </strong>
+                    </article>
+                    <article>
+                      <CalendarDays aria-hidden="true" />
+                      <span>Fasting windows</span>
+                      <strong>{summary.fasts}</strong>
+                    </article>
+                  </section>
 
-              <WaterChart
-                days={history.days}
-                targetMl={dashboard.profile.waterTargetMl}
-                rangeDays={rangeDays}
-              />
+                  <TrendChart days={history.days} dashboard={dashboard} rangeDays={rangeDays} />
 
-              {visibleWeights.length >= 2 ? (
-                <WeightChart weights={visibleWeights} profile={dashboard.profile} />
-              ) : null}
+                  <section className="chart-card" aria-labelledby="intake-chart-title">
+                    <header>
+                      <div>
+                        <p>Daily calories</p>
+                        <h2 id="intake-chart-title">A gentle rhythm</h2>
+                      </div>
+                      <span>
+                        Range {dashboard.target.calorieRange?.[0]?.toLocaleString() ?? '—'}–
+                        {dashboard.target.calorieRange?.[1]?.toLocaleString() ?? '—'}
+                      </span>
+                    </header>
+                    <div
+                      className="bar-chart"
+                      role="img"
+                      aria-label={`Calorie intake for the last ${rangeDays} days. ${inRangeCount} logged days were within the estimate.`}
+                    >
+                      {history.days.map((day, index) => {
+                        const height = day.calories
+                          ? Math.max(8, (day.calories / chartMax) * 100)
+                          : 3;
+                        const inRange =
+                          Boolean(dashboard.target.calorieRange) &&
+                          day.calories >= (dashboard.target.calorieRange?.[0] ?? 0) &&
+                          day.calories <=
+                            (dashboard.target.calorieRange?.[1] ?? Number.POSITIVE_INFINITY);
+                        const showLabel = rangeDays === 7 || index % 5 === 0 || index === 29;
+                        return (
+                          <div className="bar-column" key={day.date}>
+                            <span
+                              className={inRange ? 'bar is-in-range' : 'bar'}
+                              style={{ height: `${height}%` }}
+                              title={`${day.date}: ${Math.round(day.calories)} kcal${inRange ? ', within estimate' : ''}`}
+                            />
+                            <small>{showLabel ? shortDay(day.date) : ''}</small>
+                          </div>
+                        );
+                      })}
+                    </div>
+                    <p className="chart-note">
+                      <span className="range-key" aria-hidden="true" />
+                      {inRangeCount} logged day{inRangeCount === 1 ? '' : 's'} sat inside your
+                      estimate. Other days are context—not failures.
+                    </p>
+                  </section>
 
-              {mealTiming ? (
-                <MealTimingInsights analysis={mealTiming} rangeDays={rangeDays} />
+                  <MacroStackedChart days={history.days} rangeDays={rangeDays} />
+
+                  <WaterChart
+                    days={history.days}
+                    targetMl={dashboard.profile.waterTargetMl}
+                    rangeDays={rangeDays}
+                  />
+
+                  {visibleWeights.length >= 2 ? (
+                    <WeightChart weights={visibleWeights} profile={dashboard.profile} />
+                  ) : null}
+
+                  {mealTiming ? (
+                    <MealTimingInsights analysis={mealTiming} rangeDays={rangeDays} />
+                  ) : null}
+                </>
               ) : null}
 
               {hasEntries ? (
@@ -609,22 +811,76 @@ export function ProgressPage() {
             </div>
           </section>
 
-          {visibleWeights.length > 1 ? (
+          {recentWeightEntries.length ? (
             <section className="weight-history" aria-label="Recent weight entries">
-              {[...visibleWeights]
+              <header className="weight-history-heading">
+                <strong>Recent check-ins</strong>
+                <small>Edit mistakes without losing the rest of the trend.</small>
+              </header>
+              {[...recentWeightEntries]
                 .sort((a, b) => b.recordedAt - a.recordedAt)
-                .slice(0, 5)
-                .map((entry) => (
-                  <div key={entry.id}>
-                    <span>
-                      {new Intl.DateTimeFormat(undefined, {
-                        month: 'short',
-                        day: 'numeric',
-                      }).format(entry.recordedAt)}
-                    </span>
-                    <strong>{displayWeight(entry.weightKg, dashboard.profile.units)}</strong>
-                  </div>
-                ))}
+                .slice(0, 8)
+                .map((entry) =>
+                  editingWeightId === entry.id ? (
+                    <div className="weight-history-editor" key={entry.id}>
+                      <input
+                        aria-label="Corrected weight"
+                        type="number"
+                        step="0.1"
+                        value={editingWeight}
+                        onChange={(event) => setEditingWeight(event.target.value)}
+                      />
+                      <input
+                        aria-label="Corrected weight date"
+                        type="date"
+                        max={localDateKey(today)}
+                        value={editingWeightDate}
+                        onChange={(event) => setEditingWeightDate(event.target.value)}
+                      />
+                      <button
+                        className="button button-primary button-compact"
+                        type="button"
+                        disabled={saving}
+                        onClick={() => void saveWeightEdit()}
+                      >
+                        Save
+                      </button>
+                      <button
+                        className="button button-quiet"
+                        type="button"
+                        onClick={() => setEditingWeightId(null)}
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="weight-history-row" key={entry.id}>
+                      <span>
+                        {new Intl.DateTimeFormat(undefined, {
+                          month: 'short',
+                          day: 'numeric',
+                        }).format(entry.recordedAt)}
+                      </span>
+                      <strong>{displayWeight(entry.weightKg, dashboard.profile.units)}</strong>
+                      <button
+                        className="button button-quiet"
+                        type="button"
+                        aria-label={`Edit ${displayWeight(entry.weightKg, dashboard.profile.units)} weight check-in`}
+                        onClick={() => beginWeightEdit(entry)}
+                      >
+                        <Pencil aria-hidden="true" />
+                      </button>
+                      <button
+                        className="button button-quiet danger-button"
+                        type="button"
+                        aria-label={`Remove ${displayWeight(entry.weightKg, dashboard.profile.units)} weight check-in`}
+                        onClick={() => void removeWeight(entry)}
+                      >
+                        <Trash2 aria-hidden="true" />
+                      </button>
+                    </div>
+                  )
+                )}
             </section>
           ) : null}
         </>

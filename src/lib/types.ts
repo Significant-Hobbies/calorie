@@ -5,6 +5,9 @@ export type Goal = 'lose_gentle' | 'lose_steady' | 'maintain' | 'gain_gentle';
 export type ServingMode = 'per_100g' | 'per_unit';
 export type MedicationSchedule = 'morning' | 'evening' | 'either';
 export type ThemePreference = 'system' | 'light' | 'dark';
+export type DailyActionKey = 'weight' | 'creatine' | 'food' | 'water';
+export type GoalCycle = 'cut' | 'gain' | 'recomposition';
+export type FoodKind = 'whole_food' | 'prepared' | 'packaged' | 'supplement';
 
 export type Nutrients = {
   calories: number;
@@ -30,6 +33,8 @@ export type UserProfile = {
   sleepHours: number;
   fastingThresholdHours: 12 | 14 | 16;
   waterTargetMl: number;
+  dailyActionOrder: DailyActionKey[];
+  dailyActionHidden: DailyActionKey[];
   onboardingComplete: boolean;
 };
 
@@ -41,6 +46,9 @@ export type Food = Nutrients & {
   defaultAmount: number;
   favourite: boolean;
   lastUsedAt: number | null;
+  archivedAt: number | null;
+  foodKind?: FoodKind;
+  labels?: string[];
 };
 
 export type FoodEntry = Nutrients & {
@@ -50,6 +58,8 @@ export type FoodEntry = Nutrients & {
   amount: number;
   unitLabel: string;
   eatenAt: number;
+  foodKind?: FoodKind;
+  labels?: string[];
 };
 
 export type FoodEntryWrite = FoodEntry & {
@@ -101,6 +111,7 @@ export type GymGuidance = {
   carbsG: number | null;
   sourceEntry: string | null;
   explanation: string;
+  phase?: 'upcoming' | 'active';
 };
 
 export type SleepGuidance = {
@@ -142,6 +153,46 @@ export type HistoryResponse = {
   weights: WeightEntry[];
   entries?: FoodEntry[];
   rangeDays?: 7 | 30;
+};
+
+export type GoalCycleSession = {
+  id: string;
+  userId: string;
+  cycle: GoalCycle;
+  goal: Goal;
+  startOn: string;
+  endOn: string | null;
+  calorieRange: [number, number] | null;
+  proteinRangeG: [number, number] | null;
+  createdAt: number;
+  updatedAt: number;
+};
+
+export type CyclePeriodData = {
+  session: GoalCycleSession;
+  days: HistoryDay[];
+  weights: WeightEntry[];
+};
+
+export type CycleHistoryResponse = {
+  active: CyclePeriodData;
+  previous: CyclePeriodData | null;
+  today: string;
+  timezone: string;
+};
+
+export type JournalExport = {
+  schema: 'calorie-journal-backup';
+  version: 1;
+  generatedAt: string;
+  profile: UserProfile;
+  foods: Food[];
+  entries: FoodEntry[];
+  waterEntries: WaterEntry[];
+  medications: Medication[];
+  medicationCheckIns: MedicationCheckIn[];
+  weights: WeightEntry[];
+  cycleSessions: GoalCycleSession[];
 };
 
 export type MealTimingBandKey = 'before_noon' | 'midday' | 'after_five';

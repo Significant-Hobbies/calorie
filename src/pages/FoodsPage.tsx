@@ -1,31 +1,18 @@
-import { Apple, Pencil, Plus, Search, Trash2, X } from 'lucide-react';
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { createFood, deleteFood, getDashboard, saveFood } from '../lib/api';
-import type { Food, ServingMode } from '../lib/types';
+import { Apple, Archive, Pencil, Plus, RotateCcw, Search, Trash2, X } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { createFood, deleteFood, getFoods, saveFood, setFoodArchived } from '../lib/api';
+import { FOOD_KIND_LABELS, normalizeFoodLabels } from '../lib/food-context';
+import type { FoodLifecycle } from '../lib/food-library';
+import { type FoodSortKey, sortFoods } from '../lib/food-sorting';
+import type { Food, FoodKind, ServingMode } from '../lib/types';
 
-type SortKey =
-  | 'recent'
-  | 'protein_density'
-  | 'fibre_density'
-  | 'calorie_per_protein'
-  | 'calorie_per_fibre'
-  | 'protein_per_calorie'
-  | 'fibre_per_calorie';
-
-type SortOption = { key: SortKey; label: string; hint: string };
+type SortOption = { key: FoodSortKey; label: string; hint: string };
 
 const SORT_OPTIONS: SortOption[] = [
   { key: 'recent', label: 'Recent', hint: 'Last used first' },
-  { key: 'protein_density', label: 'Protein dense', hint: 'Most protein per serving' },
-  { key: 'fibre_density', label: 'Fibre dense', hint: 'Most fibre per serving' },
-  {
-    key: 'calorie_per_protein',
-    label: 'Cal / protein',
-    hint: 'Fewest calories per gram of protein',
-  },
-  { key: 'calorie_per_fibre', label: 'Cal / fibre', hint: 'Fewest calories per gram of fibre' },
-  { key: 'protein_per_calorie', label: 'Protein / cal', hint: 'Most protein per calorie' },
-  { key: 'fibre_per_calorie', label: 'Fibre / cal', hint: 'Most fibre per calorie' },
+  { key: 'name', label: 'Name', hint: 'A to Z' },
+  { key: 'protein', label: 'Protein', hint: 'Most protein per saved basis' },
+  { key: 'fibre', label: 'Fibre', hint: 'Most fibre per saved basis' },
 ];
 
 const emptyFood = (): Food => ({
@@ -40,6 +27,9 @@ const emptyFood = (): Food => ({
   fibreG: 0,
   favourite: true,
   lastUsedAt: null,
+  archivedAt: null,
+  foodKind: 'whole_food',
+  labels: [],
 });
 
 function nutrientSummary(food: Food) {
@@ -47,60 +37,34 @@ function nutrientSummary(food: Food) {
   return `${Math.round(food.calories)} kcal · ${Math.round(food.carbsG)}C · ${Math.round(food.proteinG)}P · ${Math.round(food.fibreG)}F · ${basis}`;
 }
 
-function sortFoods(foods: Food[], sort: SortKey): Food[] {
-  const safeDiv = (a: number, b: number) => (b > 0 ? a / b : a > 0 ? Infinity : 0);
-  const byName = (a: Food, b: Food) => a.name.localeCompare(b.name);
-
-  switch (sort) {
-    case 'recent':
-      return [...foods].sort((a, b) => (b.lastUsedAt ?? 0) - (a.lastUsedAt ?? 0) || byName(a, b));
-    case 'protein_density':
-      return [...foods].sort((a, b) => b.proteinG - a.proteinG || byName(a, b));
-    case 'fibre_density':
-      return [...foods].sort((a, b) => b.fibreG - a.fibreG || byName(a, b));
-    case 'calorie_per_protein':
-      // Lower cal/g protein = better (more protein-efficient)
-      return [...foods].sort(
-        (a, b) => safeDiv(a.calories, a.proteinG) - safeDiv(b.calories, b.proteinG) || byName(a, b)
-      );
-    case 'calorie_per_fibre':
-      return [...foods].sort(
-        (a, b) => safeDiv(a.calories, a.fibreG) - safeDiv(b.calories, b.fibreG) || byName(a, b)
-      );
-    case 'protein_per_calorie':
-      // Higher g protein / cal = better
-      return [...foods].sort(
-        (a, b) => safeDiv(b.proteinG, b.calories) - safeDiv(a.proteinG, a.calories) || byName(a, b)
-      );
-    case 'fibre_per_calorie':
-      return [...foods].sort(
-        (a, b) => safeDiv(b.fibreG, b.calories) - safeDiv(a.fibreG, a.calories) || byName(a, b)
-      );
-  }
-}
-
 export function FoodsPage() {
   const [foods, setFoods] = useState<Food[]>([]);
   const [query, setQuery] = useState('');
-  const [sort, setSort] = useState<SortKey>('recent');
+  const [sort, setSort] = useState<FoodSortKey>('recent');
+  const [lifecycle, setLifecycle] = useState<FoodLifecycle>('active');
   const [draft, setDraft] = useState<Food | null>(null);
   const [isNew, setIsNew] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [nameError, setNameError] = useState<string | null>(null);
-  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [confirmArchive, setConfirmArchive] = useState(false);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const nameInputRef = useRef<HTMLInputElement>(null);
   const foodSheetOpen = draft !== null;
 
-  useEffect(() => {
-    void getDashboard()
-      .then((dashboard) => setFoods(dashboard.foods))
+  const loadFoods = useCallback((status: FoodLifecycle) => {
+    setLoading(true);
+    setError(null);
+    void getFoods(status)
+      .then(setFoods)
       .catch((caught) =>
         setError(caught instanceof Error ? caught.message : 'Foods could not load.')
       )
       .finally(() => setLoading(false));
   }, []);
+
+  useEffect(() => loadFoods(lifecycle), [lifecycle, loadFoods]);
 
   useEffect(() => {
     if (foodSheetOpen) nameInputRef.current?.focus();
@@ -108,7 +72,12 @@ export function FoodsPage() {
 
   const filtered = useMemo(() => {
     const term = query.trim().toLocaleLowerCase();
-    const matched = foods.filter((food) => !term || food.name.toLocaleLowerCase().includes(term));
+    const matched = foods.filter(
+      (food) =>
+        !term ||
+        food.name.toLocaleLowerCase().includes(term) ||
+        food.labels?.some((label) => label.includes(term))
+    );
     return sortFoods(matched, sort);
   }, [foods, query, sort]);
 
@@ -117,7 +86,7 @@ export function FoodsPage() {
     setDraft(emptyFood());
     setError(null);
     setNameError(null);
-    setConfirmDelete(false);
+    setConfirmArchive(false);
   };
 
   const openEdit = (food: Food) => {
@@ -125,7 +94,7 @@ export function FoodsPage() {
     setDraft({ ...food });
     setError(null);
     setNameError(null);
-    setConfirmDelete(false);
+    setConfirmArchive(false);
   };
 
   const submit = async () => {
@@ -154,6 +123,7 @@ export function FoodsPage() {
         ...draft,
         name: draft.name.trim(),
         unitLabel: draft.servingMode === 'per_100g' ? 'g' : draft.unitLabel.trim() || 'unit',
+        labels: normalizeFoodLabels(draft.labels),
       };
       const saved = isNew ? await createFood(normalized) : await saveFood(normalized);
       setFoods((current) =>
@@ -167,16 +137,44 @@ export function FoodsPage() {
     }
   };
 
-  const remove = async () => {
+  const archive = async () => {
     if (!draft || isNew) return;
     setSaving(true);
     setError(null);
     try {
-      await deleteFood(draft.id);
+      await setFoodArchived(draft, Date.now());
       setFoods((current) => current.filter((food) => food.id !== draft.id));
       setDraft(null);
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : 'Food could not be removed.');
+      setError(caught instanceof Error ? caught.message : 'Food could not be archived.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const restore = async (food: Food) => {
+    setSaving(true);
+    setError(null);
+    try {
+      await setFoodArchived(food, null);
+      setFoods((current) => current.filter((item) => item.id !== food.id));
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : 'Food could not be restored.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const remove = async (food: Food) => {
+    setSaving(true);
+    setError(null);
+    try {
+      await deleteFood(food.id);
+      setFoods((current) => current.filter((item) => item.id !== food.id));
+      setConfirmDeleteId(null);
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : 'Food could not be permanently deleted.');
+    } finally {
       setSaving(false);
     }
   };
@@ -186,14 +184,38 @@ export function FoodsPage() {
       <header className="page-heading split-heading">
         <div>
           <p>Your library</p>
-          <h1>Saved foods</h1>
-          <span>Make tomorrow’s logging a one-tap job.</span>
+          <h1>{lifecycle === 'active' ? 'Saved foods' : 'Archived foods'}</h1>
+          <span>
+            {lifecycle === 'active'
+              ? 'Keep your everyday foods ready for one-tap logging.'
+              : 'Restore foods whenever they return to your routine.'}
+          </span>
         </div>
-        <button className="button button-primary compact-button" type="button" onClick={openNew}>
-          <Plus size={18} aria-hidden="true" />
-          Add food
-        </button>
+        {lifecycle === 'active' ? (
+          <button className="button button-primary compact-button" type="button" onClick={openNew}>
+            <Plus size={18} aria-hidden="true" />
+            Add food
+          </button>
+        ) : null}
       </header>
+
+      <fieldset className="segmented library-tabs">
+        <legend className="sr-only">Food library view</legend>
+        {(['active', 'archived'] as FoodLifecycle[]).map((status) => (
+          <button
+            type="button"
+            key={status}
+            className={lifecycle === status ? 'is-selected' : ''}
+            aria-pressed={lifecycle === status}
+            onClick={() => {
+              setLifecycle(status);
+              setConfirmDeleteId(null);
+            }}
+          >
+            {status === 'active' ? 'Active' : 'Archived'}
+          </button>
+        ))}
+      </fieldset>
 
       <label className="search-field">
         <Search size={19} aria-hidden="true" />
@@ -211,20 +233,22 @@ export function FoodsPage() {
         ) : null}
       </label>
 
-      <fieldset className="sort-bar" aria-label="Sort foods">
-        {SORT_OPTIONS.map((option) => (
-          <button
-            key={option.key}
-            type="button"
-            className={sort === option.key ? 'is-selected' : ''}
-            aria-pressed={sort === option.key}
-            title={option.hint}
-            onClick={() => setSort(option.key)}
-          >
-            {option.label}
-          </button>
-        ))}
-      </fieldset>
+      {lifecycle === 'active' ? (
+        <fieldset className="sort-bar" aria-label="Sort foods">
+          {SORT_OPTIONS.map((option) => (
+            <button
+              key={option.key}
+              type="button"
+              className={sort === option.key ? 'is-selected' : ''}
+              aria-pressed={sort === option.key}
+              title={option.hint}
+              onClick={() => setSort(option.key)}
+            >
+              {option.label}
+            </button>
+          ))}
+        </fieldset>
+      ) : null}
 
       {error && !draft ? (
         <div className="inline-error" role="alert">
@@ -239,33 +263,99 @@ export function FoodsPage() {
           <div className="skeleton list-skeleton" />
         </div>
       ) : filtered.length ? (
-        <section className="food-list" aria-label="Saved foods">
-          {filtered.map((food) => (
-            <button className="food-row" key={food.id} type="button" onClick={() => openEdit(food)}>
-              <span className="food-glyph">
-                <Apple aria-hidden="true" />
-              </span>
-              <span className="food-row-copy">
-                <strong>{food.name}</strong>
-                <small>{nutrientSummary(food)}</small>
-              </span>
-              <Pencil size={17} aria-hidden="true" />
-            </button>
-          ))}
+        <section className="food-list" aria-label={`${lifecycle} foods`}>
+          {filtered.map((food) =>
+            lifecycle === 'active' ? (
+              <button
+                className="food-row"
+                key={food.id}
+                type="button"
+                onClick={() => openEdit(food)}
+              >
+                <span className="food-glyph">
+                  <Apple aria-hidden="true" />
+                </span>
+                <span className="food-row-copy">
+                  <strong>{food.name}</strong>
+                  <small>{nutrientSummary(food)}</small>
+                  <span className="food-context-line">
+                    {FOOD_KIND_LABELS[food.foodKind ?? 'prepared']}
+                    {food.labels?.length ? ` · ${food.labels.join(' · ')}` : ''}
+                  </span>
+                </span>
+                <Pencil size={17} aria-hidden="true" />
+              </button>
+            ) : (
+              <div className="food-row archived-food-row" key={food.id}>
+                <span className="food-glyph">
+                  <Archive aria-hidden="true" />
+                </span>
+                <span className="food-row-copy">
+                  <strong>{food.name}</strong>
+                  <small>{nutrientSummary(food)}</small>
+                </span>
+                <span className="archived-food-actions">
+                  <button
+                    className="icon-button subtle"
+                    type="button"
+                    disabled={saving}
+                    aria-label={`Restore ${food.name}`}
+                    onClick={() => void restore(food)}
+                  >
+                    <RotateCcw size={17} aria-hidden="true" />
+                  </button>
+                  <button
+                    className="icon-button subtle danger-icon"
+                    type="button"
+                    disabled={saving}
+                    aria-label={`Permanently delete ${food.name}`}
+                    onClick={() => setConfirmDeleteId(food.id)}
+                  >
+                    <Trash2 size={17} aria-hidden="true" />
+                  </button>
+                </span>
+                {confirmDeleteId === food.id ? (
+                  <div className="archive-delete-confirmation" role="alert">
+                    <span>Delete permanently? Earlier log entries will keep their snapshots.</span>
+                    <span>
+                      <button type="button" onClick={() => setConfirmDeleteId(null)}>
+                        Cancel
+                      </button>
+                      <button type="button" disabled={saving} onClick={() => void remove(food)}>
+                        Delete
+                      </button>
+                    </span>
+                  </div>
+                ) : null}
+              </div>
+            )
+          )}
         </section>
       ) : (
         <section className="empty-state compact-empty">
-          <Apple aria-hidden="true" />
-          <h2>{query ? 'No matching foods' : 'Save your first regular'}</h2>
+          {lifecycle === 'active' ? <Apple aria-hidden="true" /> : <Archive aria-hidden="true" />}
+          <h2>
+            {query
+              ? 'No matching foods'
+              : lifecycle === 'active'
+                ? 'Save your first regular'
+                : 'Nothing archived'}
+          </h2>
           <p>
             {query
-              ? 'Try another name, or add it as a new food.'
-              : 'Store its macros once, then log it from Today with one tap.'}
+              ? lifecycle === 'active'
+                ? 'Try another name, or add it as a new food.'
+                : 'Try another archived food name.'
+              : lifecycle === 'active'
+                ? 'Store its macros once, then log it from Today with one tap.'
+                : 'Foods you archive will wait here until you restore them.'}
           </p>
-          <button className="button button-secondary" type="button" onClick={openNew}>
-            <Plus size={18} aria-hidden="true" />
-            Add food
-          </button>
+          {lifecycle === 'active' ? (
+            <button className="button button-secondary" type="button" onClick={openNew}>
+              <Plus size={18} aria-hidden="true" />
+              Add food
+            </button>
+          ) : null}
         </section>
       )}
 
@@ -315,6 +405,40 @@ export function FoodsPage() {
                   </small>
                 ) : null}
               </label>
+
+              <div className="field-row">
+                <label className="field">
+                  <span>Food kind</span>
+                  <select
+                    value={draft.foodKind ?? 'prepared'}
+                    onChange={(event) =>
+                      setDraft((current) =>
+                        current ? { ...current, foodKind: event.target.value as FoodKind } : current
+                      )
+                    }
+                  >
+                    {(Object.keys(FOOD_KIND_LABELS) as FoodKind[]).map((kind) => (
+                      <option key={kind} value={kind}>
+                        {FOOD_KIND_LABELS[kind]}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="field">
+                  <span>
+                    Labels <small>Optional</small>
+                  </span>
+                  <input
+                    value={draft.labels?.join(', ') ?? ''}
+                    placeholder="breakfast, high protein"
+                    onChange={(event) =>
+                      setDraft((current) =>
+                        current ? { ...current, labels: event.target.value.split(',') } : current
+                      )
+                    }
+                  />
+                </label>
+              </div>
 
               <fieldset className="field">
                 <legend>Macros are saved</legend>
@@ -424,14 +548,14 @@ export function FoodsPage() {
               </p>
             ) : null}
 
-            {confirmDelete ? (
+            {confirmArchive ? (
               <div className="delete-confirmation" role="alert">
                 <span>
-                  Remove <strong>{draft.name}</strong> from saved foods? Existing log entries stay
-                  in your history.
+                  Archive <strong>{draft.name}</strong>? It leaves logging shortcuts, while earlier
+                  entries stay in your history.
                 </span>
-                <button type="button" onClick={() => setConfirmDelete(false)}>
-                  Keep it
+                <button type="button" onClick={() => setConfirmArchive(false)}>
+                  Cancel
                 </button>
               </div>
             ) : null}
@@ -439,13 +563,13 @@ export function FoodsPage() {
             <footer>
               {!isNew ? (
                 <button
-                  className="button button-danger"
+                  className="button button-secondary"
                   type="button"
                   disabled={saving}
-                  onClick={() => (confirmDelete ? void remove() : setConfirmDelete(true))}
+                  onClick={() => (confirmArchive ? void archive() : setConfirmArchive(true))}
                 >
-                  <Trash2 size={18} aria-hidden="true" />
-                  {confirmDelete ? 'Yes, remove' : 'Remove'}
+                  <Archive size={18} aria-hidden="true" />
+                  {confirmArchive ? 'Yes, archive' : 'Archive'}
                 </button>
               ) : (
                 <span />

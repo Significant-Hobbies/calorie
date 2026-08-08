@@ -106,7 +106,9 @@ export default function App() {
   let content: ReactNode;
   switch (tab) {
     case 'today':
-      content = <TodayPage onOpenFoods={() => setTab('foods')} />;
+      content = (
+        <TodayPage onOpenFoods={() => setTab('foods')} onOpenSettings={() => setTab('you')} />
+      );
       break;
     case 'progress':
       content = <ProgressPage />;
