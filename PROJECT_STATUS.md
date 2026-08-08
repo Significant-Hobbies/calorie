@@ -32,6 +32,9 @@ full sets/reps workout-programming system.
 
 ## Timeline
 
+- 2026-08-09 — adopted the Fleet Ultracite baseline for core TypeScript,
+  React, and Vitest code; explicit compatibility exceptions preserve current
+  behavior while 88 files pass with zero diagnostics
 - 2026-08-09 — released cycle sessions/analytics, owner-ordered daily prompts,
   water/weight corrections, JSON backup, food archive/classification,
   simplified food sorting, late-night/rest and non-stale exercise guidance,
@@ -66,6 +69,7 @@ full sets/reps workout-programming system.
 
 ## Features (shipped)
 
+- Shared Ultracite lint baseline with a clean 88-file check
 - Three-step answer-aware onboarding with reload-safe drafts and visible goal math
 - Fully account-free local journal with versioned browser storage
 - Working optional Google sign-in with a dedicated production OAuth client and per-user D1 sync
