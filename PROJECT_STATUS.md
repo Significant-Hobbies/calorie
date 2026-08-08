@@ -32,11 +32,11 @@ full sets/reps workout-programming system.
 
 ## Timeline
 
-- 2026-08-09 — implemented and locally validated cycle sessions/analytics,
-  owner-ordered daily prompts, water/weight corrections, JSON backup, food
-  archive/classification, simplified food sorting, late-night/rest and
-  non-stale exercise guidance, and mobile bottom-navigation tuning; D1
-  migrations and production deployment remain separate and unapplied
+- 2026-08-09 — released cycle sessions/analytics, owner-ordered daily prompts,
+  water/weight corrections, JSON backup, food archive/classification,
+  simplified food sorting, late-night/rest and non-stale exercise guidance,
+  and mobile bottom-navigation tuning; D1 migrations `0003` and `0004` are
+  applied in production
 - 2026-07-31 — added the full agent brief as a static asset so Cloudflare's
   asset-first routing serves `/llms-full.txt` before the SPA fallback
 - 2026-07-31 — prepared and locally verified public agent discovery,
