@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client';
 import App from './App';
 import { applyTheme, watchSystemTheme } from './lib/theme';
 import './styles.css';
+import './styles/calendar.css';
 
 applyTheme();
 watchSystemTheme();

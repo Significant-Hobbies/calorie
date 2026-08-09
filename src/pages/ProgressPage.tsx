@@ -47,6 +47,12 @@ import { analyzeFoodAnalytics, type FoodAnalyticsItem } from '../lib/food-analyt
 import { CYCLE_DETAILS, cycleFromGoal } from '../lib/goal-cycles';
 import { displayWeightValue, localDateInputValue, storedWeightValue } from '../lib/log-corrections';
 import { analyzeMealTiming } from '../lib/meal-timing';
+import {
+  calendarHistorySessionCache,
+  getProgressSessionSnapshot,
+  progressRangeCacheKey,
+  trendHistorySessionCache,
+} from '../lib/progress-session-cache';
 import type { WeeklyJournalFilter } from '../lib/weekly-journal';
 import type {
   CycleHistoryResponse,
@@ -110,24 +116,36 @@ function FoodRanking({
   );
 }
 
-export function ProgressPage() {
+export function ProgressPage({ userId }: { userId: string }) {
   const today = useMemo(() => new Date(), []);
+  const sessionSnapshot = getProgressSessionSnapshot(userId);
+  const initialCalendarMode: HistoryCalendarMode = window.matchMedia('(min-width: 1000px)').matches
+    ? 'week'
+    : 'month';
+  const initialCalendarMonth = new Date(today.getFullYear(), today.getMonth(), 1, 12);
+  const initialCalendarWeek = startOfWeek(today);
+  const initialCalendarDates =
+    initialCalendarMode === 'week'
+      ? weekDateKeys(initialCalendarWeek)
+      : calendarGrid(initialCalendarMonth).map((cell) => cell.date);
   const [viewMode, setViewMode] = useState<'calendar' | 'trends'>('calendar');
   const [rangeDays, setRangeDays] = useState<7 | 30>(7);
-  const [history, setHistory] = useState<HistoryResponse | null>(null);
-  const [calendarHistory, setCalendarHistory] = useState<HistoryResponse | null>(null);
-  const [calendarMonth, setCalendarMonth] = useState(
-    () => new Date(today.getFullYear(), today.getMonth(), 1, 12)
+  const [history, setHistory] = useState<HistoryResponse | null>(() =>
+    trendHistorySessionCache.get(progressRangeCacheKey(userId, '7'))
   );
-  const [calendarWeek, setCalendarWeek] = useState(() => startOfWeek(today));
-  const [calendarMode, setCalendarMode] = useState<HistoryCalendarMode>(() =>
-    window.matchMedia('(min-width: 1000px)').matches ? 'week' : 'month'
+  const [calendarHistory, setCalendarHistory] = useState<HistoryResponse | null>(() =>
+    calendarHistorySessionCache.get(progressRangeCacheKey(userId, initialCalendarDates))
   );
+  const [calendarMonth, setCalendarMonth] = useState(initialCalendarMonth);
+  const [calendarWeek, setCalendarWeek] = useState(initialCalendarWeek);
+  const [calendarMode, setCalendarMode] = useState<HistoryCalendarMode>(initialCalendarMode);
   const [calendarFilter, setCalendarFilter] = useState<WeeklyJournalFilter>('all');
   const desktopCalendarMode = useRef<HistoryCalendarMode>('week');
   const [selectedDate, setSelectedDate] = useState(() => localDateKey(today));
-  const [dashboard, setDashboard] = useState<Dashboard | null>(null);
-  const [cycleHistory, setCycleHistory] = useState<CycleHistoryResponse | null>(null);
+  const [dashboard, setDashboard] = useState<Dashboard | null>(sessionSnapshot.dashboard);
+  const [cycleHistory, setCycleHistory] = useState<CycleHistoryResponse | null>(
+    sessionSnapshot.cycleHistory
+  );
   const [weight, setWeight] = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -142,21 +160,31 @@ export function ProgressPage() {
         getDashboard(),
         getCycleHistory(),
       ]);
+      sessionSnapshot.dashboard = nextDashboard;
+      sessionSnapshot.cycleHistory = nextCycleHistory;
       setDashboard(nextDashboard);
       setCycleHistory(nextCycleHistory);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : 'Progress could not load.');
     }
-  }, []);
+  }, [sessionSnapshot]);
 
-  const loadTrends = useCallback(async (days: 7 | 30) => {
-    setError(null);
-    try {
-      setHistory(await getHistory(days));
-    } catch (caught) {
-      setError(caught instanceof Error ? caught.message : 'Progress could not load.');
-    }
-  }, []);
+  const loadTrends = useCallback(
+    async (days: 7 | 30) => {
+      setError(null);
+      const key = progressRangeCacheKey(userId, String(days));
+      const cached = trendHistorySessionCache.get(key);
+      if (cached) setHistory(cached);
+      try {
+        const nextHistory = await getHistory(days);
+        trendHistorySessionCache.set(key, nextHistory);
+        setHistory(nextHistory);
+      } catch (caught) {
+        setError(caught instanceof Error ? caught.message : 'Progress could not load.');
+      }
+    },
+    [userId]
+  );
 
   const calendarDateKeys = useMemo(
     () =>
@@ -165,16 +193,28 @@ export function ProgressPage() {
         : calendarGrid(calendarMonth).map((cell) => cell.date),
     [calendarMode, calendarMonth, calendarWeek]
   );
-  const calendarDateKeySignature = calendarDateKeys.join(',');
+  const calendarDateKeySignature = progressRangeCacheKey(userId, calendarDateKeys);
+  const activeCalendarRange = useRef(calendarDateKeySignature);
+  activeCalendarRange.current = calendarDateKeySignature;
 
-  const loadCalendar = useCallback(async (dateKeys: string[]) => {
-    setError(null);
-    try {
-      setCalendarHistory(await getCalendarHistory(dateKeys));
-    } catch (caught) {
-      setError(caught instanceof Error ? caught.message : 'Calendar history could not load.');
-    }
-  }, []);
+  const loadCalendar = useCallback(
+    async (dateKeys: string[]) => {
+      setError(null);
+      const key = progressRangeCacheKey(userId, dateKeys);
+      const cached = calendarHistorySessionCache.get(key);
+      if (cached && activeCalendarRange.current === key) setCalendarHistory(cached);
+      try {
+        const nextHistory = await getCalendarHistory(dateKeys);
+        calendarHistorySessionCache.set(key, nextHistory);
+        if (activeCalendarRange.current === key) setCalendarHistory(nextHistory);
+      } catch (caught) {
+        if (!cached) {
+          setError(caught instanceof Error ? caught.message : 'Calendar history could not load.');
+        }
+      }
+    },
+    [userId]
+  );
 
   useEffect(() => {
     void loadDashboard();
@@ -185,17 +225,29 @@ export function ProgressPage() {
   }, [viewMode, rangeDays, loadTrends]);
 
   useEffect(() => {
-    if (viewMode === 'calendar') void loadCalendar(calendarDateKeys);
+    if (viewMode !== 'calendar') return;
+    const cached = calendarHistorySessionCache.get(calendarDateKeySignature);
+    if (cached) setCalendarHistory(cached);
+    void loadCalendar(calendarDateKeys);
   }, [viewMode, calendarDateKeySignature, loadCalendar]);
 
   useEffect(() => {
     const media = window.matchMedia('(min-width: 1000px)');
     const handleChange = (event: MediaQueryListEvent) => {
       const anchor = dateFromKey(selectedDate);
-      setCalendarHistory(null);
-      setCalendarMode(event.matches ? desktopCalendarMode.current : 'month');
-      setCalendarWeek(startOfWeek(anchor));
-      setCalendarMonth(new Date(anchor.getFullYear(), anchor.getMonth(), 1, 12));
+      const nextMode = event.matches ? desktopCalendarMode.current : 'month';
+      const nextWeek = startOfWeek(anchor);
+      const nextMonth = new Date(anchor.getFullYear(), anchor.getMonth(), 1, 12);
+      const nextDates =
+        nextMode === 'week'
+          ? weekDateKeys(nextWeek)
+          : calendarGrid(nextMonth).map((cell) => cell.date);
+      setCalendarHistory(
+        calendarHistorySessionCache.get(progressRangeCacheKey(userId, nextDates)) ?? null
+      );
+      setCalendarMode(nextMode);
+      setCalendarWeek(nextWeek);
+      setCalendarMonth(nextMonth);
     };
     media.addEventListener('change', handleChange);
     return () => media.removeEventListener('change', handleChange);
@@ -354,15 +406,20 @@ export function ProgressPage() {
     if (calendarMode === 'week') {
       if (amount > 0 && isSameWeek(calendarWeek, today)) return;
       const next = shiftWeek(calendarWeek, amount);
-      setCalendarHistory(null);
-      setCalendarWeek(next);
       const dates = weekDateKeys(next);
+      setCalendarHistory(
+        calendarHistorySessionCache.get(progressRangeCacheKey(userId, dates)) ?? null
+      );
+      setCalendarWeek(next);
       setSelectedDate(isSameWeek(next, today) ? localDateKey(today) : dates[6]);
       return;
     }
     if (amount > 0 && isSameMonth(calendarMonth, today)) return;
     const next = shiftMonth(calendarMonth, amount);
-    setCalendarHistory(null);
+    const dates = calendarGrid(next).map((cell) => cell.date);
+    setCalendarHistory(
+      calendarHistorySessionCache.get(progressRangeCacheKey(userId, dates)) ?? null
+    );
     setCalendarMonth(next);
     setSelectedDate(
       isSameMonth(next, today)
@@ -374,11 +431,43 @@ export function ProgressPage() {
   const changeCalendarMode = (nextMode: HistoryCalendarMode) => {
     if (nextMode === calendarMode) return;
     const anchor = dateFromKey(selectedDate);
-    setCalendarHistory(null);
     setCalendarMode(nextMode);
     desktopCalendarMode.current = nextMode;
-    if (nextMode === 'week') setCalendarWeek(startOfWeek(anchor));
-    else setCalendarMonth(new Date(anchor.getFullYear(), anchor.getMonth(), 1, 12));
+    if (nextMode === 'week') {
+      const nextWeek = startOfWeek(anchor);
+      const dates = weekDateKeys(nextWeek);
+      setCalendarHistory(
+        calendarHistorySessionCache.get(progressRangeCacheKey(userId, dates)) ?? null
+      );
+      setCalendarWeek(nextWeek);
+    } else {
+      const nextMonth = new Date(anchor.getFullYear(), anchor.getMonth(), 1, 12);
+      const dates = calendarGrid(nextMonth).map((cell) => cell.date);
+      setCalendarHistory(
+        calendarHistorySessionCache.get(progressRangeCacheKey(userId, dates)) ?? null
+      );
+      setCalendarMonth(nextMonth);
+    }
+  };
+
+  const returnCalendarToToday = () => {
+    const todayKey = localDateKey(today);
+    setSelectedDate(todayKey);
+    if (calendarMode === 'week') {
+      const nextWeek = startOfWeek(today);
+      const dates = weekDateKeys(nextWeek);
+      setCalendarHistory(
+        calendarHistorySessionCache.get(progressRangeCacheKey(userId, dates)) ?? null
+      );
+      setCalendarWeek(nextWeek);
+      return;
+    }
+    const nextMonth = new Date(today.getFullYear(), today.getMonth(), 1, 12);
+    const dates = calendarGrid(nextMonth).map((cell) => cell.date);
+    setCalendarHistory(
+      calendarHistorySessionCache.get(progressRangeCacheKey(userId, dates)) ?? null
+    );
+    setCalendarMonth(nextMonth);
   };
 
   const chartMax = history
@@ -403,6 +492,14 @@ export function ProgressPage() {
     !cycleHistory ||
     !cycleAnalysis ||
     (viewMode === 'trends' && (!history || !summary || !analytics || !insights));
+  const isLoading = loading || (viewMode === 'calendar' && !calendarHistory);
+
+  const retryProgress = () => {
+    setError(null);
+    void loadDashboard();
+    if (viewMode === 'calendar') void loadCalendar(calendarDateKeys);
+    else void loadTrends(rangeDays);
+  };
 
   return (
     <div className="page-stack progress-page">
@@ -428,17 +525,27 @@ export function ProgressPage() {
         </fieldset>
       </header>
 
-      {error ? (
+      {error && !isLoading ? (
         <div className="inline-error" role="alert">
           {error}
         </div>
       ) : null}
 
-      {loading || (viewMode === 'calendar' && !calendarHistory) ? (
-        <div className="page-stack" aria-busy="true">
-          <div className="skeleton dashboard-skeleton" />
-          <div className="skeleton dashboard-skeleton short" />
-        </div>
+      {isLoading ? (
+        error ? (
+          <section className="empty-state compact-empty" role="alert">
+            <h2>Progress couldn’t load</h2>
+            <p>{error}</p>
+            <button className="button button-secondary" type="button" onClick={retryProgress}>
+              Try again
+            </button>
+          </section>
+        ) : (
+          <div className="page-stack" aria-busy="true">
+            <div className="skeleton dashboard-skeleton" />
+            <div className="skeleton dashboard-skeleton short" />
+          </div>
+        )
       ) : (
         <>
           <section className="cycle-overview" aria-labelledby="cycle-overview-title">
@@ -533,6 +640,7 @@ export function ProgressPage() {
                 onPrevious={() => moveCalendar(-1)}
                 onNext={() => moveCalendar(1)}
                 onSelectDate={setSelectedDate}
+                onToday={returnCalendarToToday}
               />
               {visibleWeights.length >= 2 ? (
                 <WeightChart weights={visibleWeights} profile={dashboard.profile} />

@@ -2,7 +2,7 @@
   "$schema": "fleet.design-review.v1",
   "version": 1,
   "project": "calorie",
-  "target": "Progress desktop weekly calendar",
+  "target": "Progress 24-hour weekly calendar",
   "mode": "preserve",
   "register": "product",
   "context": {
@@ -14,21 +14,26 @@
     "probes": [],
     "selected": "existing-design",
     "approval": "not-required",
-    "before": "artifacts/design/before.png"
+    "before": ".fleet/design-evidence/calendar-time-grid/before-calendar.png"
   },
   "evidence": {
     "screenshots": [
       {
         "width": 390,
-        "path": "artifacts/design/after-390.png"
+        "path": "artifacts/design/calendar-time-grid-after-390.png"
       },
       {
         "width": 768,
-        "path": "artifacts/design/after-768.png"
+        "path": "artifacts/design/calendar-time-grid-after-768.png"
       },
       {
         "width": 1440,
-        "path": "artifacts/design/after-1440.png"
+        "path": "artifacts/design/calendar-time-grid-after-1440.png"
+      },
+      {
+        "width": 1440,
+        "theme": "dark",
+        "path": "artifacts/design/calendar-time-grid-after-1440-dark.png"
       }
     ],
     "projectCheck": {
@@ -54,6 +59,6 @@
   },
   "ownerFeedback": {
     "decision": "keep",
-    "note": "Approved for release on 2026-08-10."
+    "note": "Owner approved release on 2026-08-10."
   }
 }

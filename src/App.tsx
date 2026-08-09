@@ -111,7 +111,7 @@ export default function App() {
       );
       break;
     case 'progress':
-      content = <ProgressPage />;
+      content = <ProgressPage key={state.session.user.id} userId={state.session.user.id} />;
       break;
     case 'foods':
       content = <FoodsPage />;

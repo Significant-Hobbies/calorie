@@ -32,6 +32,11 @@ full sets/reps workout-programming system.
 
 ## Timeline
 
+- 2026-08-10 — released a desktop-default 24-hour weekly calendar with
+  timestamped food, weight, and medicine events, explicit period navigation,
+  collision-safe event details, and user-scoped session caching for instant
+  revisits; retained the mobile month calendar and extracted calendar styling
+  from the global stylesheet
 - 2026-08-09 — released binary packaged/not-packaged food classification for
   saved and one-off entries, completion-aware daily logging prompts, and a
   Progress hardening pass covering exact accessible chart data, touch targets,
@@ -95,6 +100,9 @@ full sets/reps workout-programming system.
   analysis with visible samples and assumptions
 - Navigable month calendar with daily nutrition, water, fasting, weight, and
   chronological food-entry details
+- Desktop-default 24-hour weekly calendar with timestamped food, weight, and
+  medicine events, type filters, explicit period navigation, and instant
+  same-session revisits
 - Remaining-macro completion suggestions on Today with one-tap foods that
   best close the day's largest gap
 - Four prominent daily logging prompts that disappear as weight, supplements,

@@ -1,5 +1,6 @@
 import {
   Activity,
+  CalendarDays,
   ChevronLeft,
   ChevronRight,
   Droplets,
@@ -31,6 +32,7 @@ type HistoryCalendarProps = {
   onPrevious: () => void;
   onNext: () => void;
   onSelectDate: (date: string) => void;
+  onToday: () => void;
 };
 
 const WEEKDAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
@@ -124,6 +126,7 @@ export const HistoryCalendar = memo(function HistoryCalendar({
   onPrevious,
   onNext,
   onSelectDate,
+  onToday,
 }: HistoryCalendarProps) {
   const today = new Date();
   const todayKey = localDateKey(today);
@@ -140,6 +143,7 @@ export const HistoryCalendar = memo(function HistoryCalendar({
     ? hasDayData(selectedDay, history.weights, selectedEntries.length > 0)
     : false;
   const canMoveNext = mode === 'week' ? !isSameWeek(weekStart, today) : !isSameMonth(month, today);
+  const canReturnToday = canMoveNext;
   const monthLabel = new Intl.DateTimeFormat(undefined, {
     month: 'long',
     year: 'numeric',
@@ -174,6 +178,83 @@ export const HistoryCalendar = memo(function HistoryCalendar({
     requestAnimationFrame(() => document.getElementById(`calendar-date-${nextKey}`)?.focus());
   };
 
+  const renderMonthCell = (index: number) => {
+    const date = new Date(calendarStart);
+    date.setDate(date.getDate() + index);
+    const dateKey = localDateKey(date);
+    const inMonth =
+      date.getMonth() === month.getMonth() && date.getFullYear() === month.getFullYear();
+    const isFuture = dateKey > todayKey;
+    const day =
+      byDate.get(dateKey) ??
+      ({
+        date: dateKey,
+        calories: 0,
+        carbsG: 0,
+        proteinG: 0,
+        fibreG: 0,
+        waterMl: 0,
+        fastCount: 0,
+      } satisfies HistoryDay);
+    const dayWeights = history.weights.filter(
+      (entry) => localDateKey(new Date(entry.recordedAt)) === dateKey
+    );
+    const hasFoodEntry = entryDates.has(dateKey);
+    const hasData = hasDayData(day, dayWeights, hasFoodEntry);
+
+    if (!inMonth) {
+      return (
+        <span
+          className="calendar-day is-outside"
+          role="gridcell"
+          aria-disabled="true"
+          tabIndex={-1}
+          key={dateKey}
+        >
+          <span>{date.getDate()}</span>
+        </span>
+      );
+    }
+
+    return (
+      <button
+        className={[
+          'calendar-day',
+          dateKey === todayKey ? 'is-today' : '',
+          dateKey === selectedDate ? 'is-selected' : '',
+          hasData ? 'has-data' : '',
+        ]
+          .filter(Boolean)
+          .join(' ')}
+        type="button"
+        role="gridcell"
+        id={`calendar-date-${dateKey}`}
+        key={dateKey}
+        disabled={isFuture}
+        tabIndex={dateKey === selectedDate ? 0 : -1}
+        aria-selected={dateKey === selectedDate}
+        aria-label={cellLabel(day, dayWeights, hasFoodEntry)}
+        onClick={() => onSelectDate(dateKey)}
+        onKeyDown={(event) => moveCalendarFocus(event, dateKey)}
+      >
+        <span className="calendar-day-number">{date.getDate()}</span>
+        {day.calories > 0 ? (
+          <strong>
+            {cellCalories(day.calories)}
+            <span className="sr-only"> calories</span>
+          </strong>
+        ) : (
+          <strong aria-hidden="true">—</strong>
+        )}
+        <span className="calendar-signals" aria-hidden="true">
+          {day.waterMl > 0 ? <i className="is-water" /> : null}
+          {day.fastCount > 0 ? <i className="is-fast" /> : null}
+          {dayWeights.length > 0 ? <i className="is-weight" /> : null}
+        </span>
+      </button>
+    );
+  };
+
   return (
     <section className="calendar-card" aria-labelledby="history-calendar-title">
       <header className="calendar-header">
@@ -196,16 +277,34 @@ export const HistoryCalendar = memo(function HistoryCalendar({
               </button>
             ))}
           </fieldset>
-          <nav className="calendar-nav" aria-label={`Choose ${mode}`}>
-            <button type="button" onClick={onPrevious} aria-label={`Previous ${mode}`}>
+          <nav className="calendar-nav" aria-label={`Browse by ${mode}`}>
+            <button
+              className="calendar-nav-period"
+              type="button"
+              onClick={onPrevious}
+              aria-label={`Previous ${mode}`}
+            >
               <ChevronLeft aria-hidden="true" />
+              <span>Previous</span>
             </button>
             <button
+              className="calendar-nav-today"
+              type="button"
+              onClick={onToday}
+              disabled={!canReturnToday}
+              aria-label={`Return to current ${mode}`}
+            >
+              <CalendarDays aria-hidden="true" />
+              <span>Today</span>
+            </button>
+            <button
+              className="calendar-nav-period"
               type="button"
               onClick={onNext}
               aria-label={`Next ${mode}`}
               disabled={!canMoveNext}
             >
+              <span>Next</span>
               <ChevronRight aria-hidden="true" />
             </button>
           </nav>
@@ -244,82 +343,15 @@ export const HistoryCalendar = memo(function HistoryCalendar({
           </div>
 
           <div className="calendar-grid" role="grid" aria-label={`${monthLabel} journal`}>
-            {Array.from({ length: 42 }, (_, index) => {
-              const date = new Date(calendarStart);
-              date.setDate(date.getDate() + index);
-              const dateKey = localDateKey(date);
-              const inMonth =
-                date.getMonth() === month.getMonth() && date.getFullYear() === month.getFullYear();
-              const isFuture = dateKey > todayKey;
-              const day =
-                byDate.get(dateKey) ??
-                ({
-                  date: dateKey,
-                  calories: 0,
-                  carbsG: 0,
-                  proteinG: 0,
-                  fibreG: 0,
-                  waterMl: 0,
-                  fastCount: 0,
-                } satisfies HistoryDay);
-              const dayWeights = history.weights.filter(
-                (entry) => localDateKey(new Date(entry.recordedAt)) === dateKey
-              );
-              const hasFoodEntry = entryDates.has(dateKey);
-              const hasData = hasDayData(day, dayWeights, hasFoodEntry);
-
-              if (!inMonth) {
-                return (
-                  <span
-                    className="calendar-day is-outside"
-                    role="gridcell"
-                    aria-disabled="true"
-                    tabIndex={-1}
-                    key={dateKey}
-                  >
-                    <span>{date.getDate()}</span>
-                  </span>
-                );
-              }
-
-              return (
-                <button
-                  className={[
-                    'calendar-day',
-                    dateKey === todayKey ? 'is-today' : '',
-                    dateKey === selectedDate ? 'is-selected' : '',
-                    hasData ? 'has-data' : '',
-                  ]
-                    .filter(Boolean)
-                    .join(' ')}
-                  type="button"
-                  role="gridcell"
-                  id={`calendar-date-${dateKey}`}
-                  key={dateKey}
-                  disabled={isFuture}
-                  tabIndex={dateKey === selectedDate ? 0 : -1}
-                  aria-selected={dateKey === selectedDate}
-                  aria-label={cellLabel(day, dayWeights, hasFoodEntry)}
-                  onClick={() => onSelectDate(dateKey)}
-                  onKeyDown={(event) => moveCalendarFocus(event, dateKey)}
-                >
-                  <span className="calendar-day-number">{date.getDate()}</span>
-                  {day.calories > 0 ? (
-                    <strong>
-                      {cellCalories(day.calories)}
-                      <span className="sr-only"> calories</span>
-                    </strong>
-                  ) : (
-                    <strong aria-hidden="true">—</strong>
-                  )}
-                  <span className="calendar-signals" aria-hidden="true">
-                    {day.waterMl > 0 ? <i className="is-water" /> : null}
-                    {day.fastCount > 0 ? <i className="is-fast" /> : null}
-                    {dayWeights.length > 0 ? <i className="is-weight" /> : null}
-                  </span>
-                </button>
-              );
-            })}
+            {Array.from({ length: 6 }, (_, weekIndex) => (
+              // The row is structural; its gridcell buttons own the roving keyboard focus.
+              // biome-ignore lint/a11y/useFocusableInteractive: ARIA grid rows should not be tab stops.
+              <div className="calendar-row" role="row" key={`week-${weekIndex + 1}`}>
+                {Array.from({ length: 7 }, (_, dayIndex) =>
+                  renderMonthCell(weekIndex * 7 + dayIndex)
+                )}
+              </div>
+            ))}
           </div>
 
           <div className="calendar-legend" aria-hidden="true">
