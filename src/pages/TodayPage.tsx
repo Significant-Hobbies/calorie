@@ -21,6 +21,7 @@ import {
   X,
 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { NutrientDensityBadge } from '../components/NutrientDensityBadge';
 import {
   addFoodEntry,
   addMedicationCheckIn,
@@ -1583,6 +1584,7 @@ export function TodayPage({
                     {entry.amount} {entry.unitLabel} · {Math.round(entry.carbsG)}C ·{' '}
                     {Math.round(entry.proteinG)}P · {Math.round(entry.fibreG)}F
                   </span>
+                  <NutrientDensityBadge nutrients={entry} />
                 </div>
                 <b>{Math.round(entry.calories)} kcal</b>
               </button>
@@ -1906,6 +1908,13 @@ export function TodayPage({
                       ))}
                     </div>
                   </fieldset>
+
+                  <div className="nutrient-density-preview is-compact">
+                    <NutrientDensityBadge nutrients={entryDraft} showBasis />
+                    <p>
+                      Based only on tracked protein and fibre per calorie—not overall food quality.
+                    </p>
+                  </div>
 
                   <label className="field">
                     <span>Time eaten</span>

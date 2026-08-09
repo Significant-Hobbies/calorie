@@ -168,7 +168,17 @@ let medications: Medication[] = [
   },
 ];
 
-let medicationCheckIns: MedicationCheckIn[] = [];
+let medicationCheckIns: MedicationCheckIn[] = Array.from({ length: 7 }, (_, index) => {
+  const taken = new Date();
+  taken.setDate(taken.getDate() - (6 - index));
+  taken.setHours(8, 5 + (index % 3) * 5, 0, 0);
+  return {
+    id: `demo-medication-${localDateKey(taken)}`,
+    medicationId: 'demo-medication',
+    takenOn: localDateKey(taken),
+    takenAt: taken.getTime(),
+  };
+});
 
 let weights: WeightEntry[] = Array.from({ length: 7 }, (_, index) => ({
   id: `weight-${index}`,
@@ -497,6 +507,14 @@ export function demoHistory(rangeDays: 7 | 30): HistoryResponse {
     days: applyDemoFastCount(days, entries, threshold),
     weights: [...weights],
     entries,
+    medicationEvents: medicationCheckIns.map((checkIn) => ({
+      id: checkIn.id,
+      medicationId: checkIn.medicationId,
+      medicationName:
+        medications.find((medication) => medication.id === checkIn.medicationId)?.name ??
+        'Medicine',
+      takenAt: checkIn.takenAt,
+    })),
     rangeDays,
   };
 }
@@ -511,7 +529,7 @@ export function demoCalendarHistory(dateKeys: string[]): HistoryResponse {
     const isFuture = dateKey > todayKey;
     const isEmpty = dayNumber % 5 === 0;
     const wave = Math.sin(dayNumber * 1.4);
-    if (isFuture || isEmpty) {
+    if (isFuture || (isEmpty && !isToday)) {
       return {
         date: dateKey,
         calories: 0,
@@ -542,6 +560,16 @@ export function demoCalendarHistory(dateKeys: string[]): HistoryResponse {
       (entry) => entry.recordedAt >= bounds.start && entry.recordedAt < bounds.end
     ),
     entries,
+    medicationEvents: medicationCheckIns
+      .filter((checkIn) => checkIn.takenAt >= bounds.start && checkIn.takenAt < bounds.end)
+      .map((checkIn) => ({
+        id: checkIn.id,
+        medicationId: checkIn.medicationId,
+        medicationName:
+          medications.find((medication) => medication.id === checkIn.medicationId)?.name ??
+          'Medicine',
+        takenAt: checkIn.takenAt,
+      })),
   };
 }
 

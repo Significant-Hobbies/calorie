@@ -38,6 +38,32 @@ export function calendarGrid(month: Date): CalendarCell[] {
   });
 }
 
+export function startOfWeek(date: Date) {
+  const start = new Date(date.getFullYear(), date.getMonth(), date.getDate(), 12);
+  const mondayOffset = (start.getDay() + 6) % 7;
+  start.setDate(start.getDate() - mondayOffset);
+  return start;
+}
+
+export function weekDateKeys(date: Date) {
+  const start = startOfWeek(date);
+  return Array.from({ length: 7 }, (_, index) => {
+    const day = new Date(start);
+    day.setDate(day.getDate() + index);
+    return localDateKey(day);
+  });
+}
+
+export function shiftWeek(date: Date, amount: number) {
+  const shifted = startOfWeek(date);
+  shifted.setDate(shifted.getDate() + amount * 7);
+  return shifted;
+}
+
+export function isSameWeek(left: Date, right: Date) {
+  return localDateKey(startOfWeek(left)) === localDateKey(startOfWeek(right));
+}
+
 export function calendarHistoryBounds(cells: CalendarCell[]) {
   if (cells.length === 0) throw new Error('A calendar range needs at least one date.');
   const startDate = dateFromKey(cells[0].date);

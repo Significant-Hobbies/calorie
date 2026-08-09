@@ -41,4 +41,14 @@ describe('private Worker data controls', () => {
     expect(source).toContain('isPackaged: normalizeIsPackaged(row.is_packaged, row.food_kind)');
     expect(source).toContain("entry.isPackaged ? 'packaged' : 'prepared'");
   });
+
+  it('loads medicine history through a user-owned routine join', () => {
+    expect(source).toContain(
+      'JOIN medications m ON m.id = c.medication_id AND m.user_id = c.user_id'
+    );
+    expect(source).toContain(
+      'WHERE c.user_id = ? AND c.taken_at >= ? AND c.taken_at < ? ORDER BY c.taken_at ASC'
+    );
+    expect(source).toContain('medicationName: row.medication_name');
+  });
 });

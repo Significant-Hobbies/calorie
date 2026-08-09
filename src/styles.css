@@ -59,6 +59,11 @@
     --error-ink: #7d302c;
     --error-line: #edc3bf;
     --error-surface: #fff3f1;
+    --cycle-surface: #274424;
+    --cycle-ink: #ffffff;
+    --cycle-muted: #d7e7d2;
+    --cycle-reason: #edf5ea;
+    --cycle-tile: rgb(255 255 255 / 9%);
     --shadow: 0 6px 18px rgb(31 50 29 / 6%);
     --shadow-high: 0 20px 52px rgb(31 50 29 / 16%);
     --radius-sm: 12px;
@@ -104,6 +109,11 @@
     --error-ink: #ffb4ad;
     --error-line: #6e3834;
     --error-surface: #351d1b;
+    --cycle-surface: #1b2d1c;
+    --cycle-ink: #e8efe5;
+    --cycle-muted: #bfd0ba;
+    --cycle-reason: #e8efe5;
+    --cycle-tile: rgb(232 239 229 / 9%);
     --shadow: 0 8px 22px rgb(0 0 0 / 24%);
     --shadow-high: 0 22px 58px rgb(0 0 0 / 42%);
   }
@@ -1233,6 +1243,7 @@
   .entry-row time {
     color: var(--ink-soft);
     font-size: 0.75rem;
+    white-space: nowrap;
   }
 
   .entry-dot {
@@ -2577,6 +2588,40 @@
     line-height: 1.2;
   }
 
+  .calendar-header-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .calendar-mode-toggle,
+  .calendar-filter {
+    display: none;
+    padding: 3px;
+    border: 0;
+    border-radius: 12px;
+    background: var(--control-track);
+  }
+
+  .calendar-mode-toggle button,
+  .calendar-filter button {
+    min-height: 44px;
+    padding: 7px 11px;
+    border: 0;
+    border-radius: 9px;
+    background: transparent;
+    color: var(--ink-soft);
+    font-size: 0.75rem;
+    font-weight: var(--weight-strong);
+  }
+
+  .calendar-mode-toggle button.is-selected,
+  .calendar-filter button.is-selected {
+    background: var(--white);
+    color: var(--moss-900);
+    box-shadow: 0 2px 7px rgb(31 50 29 / 9%);
+  }
+
   .calendar-nav {
     display: flex;
     gap: 6px;
@@ -2597,9 +2642,17 @@
     background: var(--moss-100);
   }
 
+  .calendar-nav button:disabled {
+    cursor: not-allowed;
+  }
+
   .calendar-nav svg {
     width: 19px;
     height: 19px;
+  }
+
+  .weekly-journal {
+    display: none;
   }
 
   .calendar-weekdays,
@@ -2702,16 +2755,20 @@
 
   .calendar-signals .is-water,
   .calendar-legend .is-water {
+    border-radius: 50%;
     background: var(--sky);
   }
 
   .calendar-signals .is-fast,
   .calendar-legend .is-fast {
+    border-radius: 1px;
     background: var(--amber);
+    transform: rotate(45deg) scale(0.84);
   }
 
   .calendar-signals .is-weight,
   .calendar-legend .is-weight {
+    border-radius: 1px;
     background: var(--plum);
   }
 
@@ -4283,6 +4340,202 @@
     .daily-action-grid {
       grid-template-columns: repeat(4, minmax(0, 1fr));
     }
+
+    .calendar-mode-toggle,
+    .calendar-filter {
+      display: flex;
+    }
+
+    .calendar-filter {
+      width: fit-content;
+      max-width: 100%;
+      overflow-x: auto;
+    }
+
+    .calendar-filter-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      margin-top: 18px;
+    }
+
+    .calendar-density-note {
+      max-width: 48ch;
+      color: var(--ink-soft);
+      font-size: 0.6875rem;
+      text-align: right;
+    }
+
+    .calendar-filter button {
+      min-width: 74px;
+    }
+
+    .weekly-journal {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      margin-top: 16px;
+      border-top: 1px solid var(--line);
+    }
+
+    .weekly-day {
+      min-width: 0;
+      min-height: 112px;
+      padding: 14px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .weekly-day:nth-child(even) {
+      border-left: 1px solid var(--line);
+    }
+
+    .weekly-day.is-today {
+      background: var(--moss-100);
+    }
+
+    .weekly-day.is-future {
+      color: var(--ink-soft);
+      background: var(--surface);
+    }
+
+    .weekly-day > header,
+    .weekly-day > header > div {
+      min-width: 0;
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 8px;
+    }
+
+    .weekly-day > header > div {
+      flex-wrap: wrap;
+      justify-content: flex-start;
+    }
+
+    .weekly-day h3 {
+      font-size: 0.875rem;
+      line-height: 1.25;
+    }
+
+    .weekly-day header span,
+    .weekly-day header > strong,
+    .weekly-day-empty,
+    .weekly-event time,
+    .weekly-event div > span {
+      color: var(--ink-soft);
+      font-size: 0.6875rem;
+    }
+
+    .weekly-day header > strong {
+      flex: none;
+      font-variant-numeric: tabular-nums;
+      white-space: nowrap;
+    }
+
+    .weekly-day-empty {
+      margin-top: 26px;
+    }
+
+    .weekly-event-list {
+      display: grid;
+      margin: 11px 0 0;
+      padding: 0;
+      list-style: none;
+    }
+
+    .weekly-event {
+      min-width: 0;
+      display: grid;
+      grid-template-columns: 24px minmax(0, 1fr);
+      align-items: start;
+      gap: 6px;
+      padding: 10px 0;
+      border-top: 1px solid var(--line);
+    }
+
+    .weekly-event time {
+      grid-column: 1 / -1;
+      padding-top: 3px;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .weekly-event-icon {
+      width: 24px;
+      height: 24px;
+      display: grid;
+      place-items: center;
+      border-radius: 8px;
+      background: var(--moss-100);
+      color: var(--moss-700);
+    }
+
+    .weekly-event-weight .weekly-event-icon {
+      background: var(--plum-soft);
+      color: var(--plum);
+    }
+
+    .weekly-event-medicine .weekly-event-icon {
+      background: var(--amber-soft);
+      color: var(--amber-ink);
+    }
+
+    .weekly-event-icon svg {
+      width: 14px;
+      height: 14px;
+    }
+
+    .weekly-event > div {
+      min-width: 0;
+      display: grid;
+      justify-items: start;
+      gap: 2px;
+    }
+
+    .weekly-event strong {
+      max-width: 100%;
+      font-size: 0.8125rem;
+      line-height: 1.35;
+      overflow-wrap: anywhere;
+    }
+
+    .weekly-event .nutrient-density-wrap {
+      margin-top: 4px;
+    }
+
+    .weekly-event .nutrient-density {
+      max-width: 100%;
+      padding: 2px 5px;
+      font-size: 0.625rem;
+      white-space: normal;
+    }
+
+    .weekly-event .nutrient-density svg {
+      width: 10px;
+      height: 10px;
+    }
+  }
+
+  @media (min-width: 1280px) {
+    .shell-body {
+      width: min(100%, 1400px);
+    }
+
+    .progress-page {
+      width: min(100%, 1120px);
+    }
+
+    .weekly-journal {
+      grid-template-columns: repeat(7, minmax(0, 1fr));
+    }
+
+    .weekly-day,
+    .weekly-day:nth-child(even) {
+      border-left: 1px solid var(--line);
+    }
+
+    .weekly-day:first-child {
+      border-left: 0;
+    }
   }
 
   @media (max-width: 430px) {
@@ -4343,7 +4596,7 @@
     }
 
     .entry-row {
-      grid-template-columns: 48px auto minmax(0, 1fr);
+      grid-template-columns: 58px auto minmax(0, 1fr);
     }
 
     .entry-row > b {
@@ -4479,6 +4732,72 @@
     white-space: nowrap;
   }
 
+  .nutrient-density-wrap {
+    min-width: 0;
+    display: inline-flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 5px 8px;
+    width: fit-content;
+    max-width: 100%;
+  }
+
+  .nutrient-density {
+    min-height: 22px;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 7px;
+    border-radius: 999px;
+    font-size: 0.6875rem;
+    font-weight: var(--weight-strong);
+    line-height: 1.25;
+    white-space: nowrap;
+  }
+
+  .nutrient-density-high {
+    background: var(--moss-100);
+    color: var(--moss-900);
+  }
+
+  .nutrient-density-medium {
+    background: var(--amber-soft);
+    color: var(--amber-ink);
+  }
+
+  .nutrient-density-low,
+  .nutrient-density-unavailable {
+    border: 1px solid var(--line);
+    background: var(--surface);
+    color: var(--ink-soft);
+  }
+
+  .nutrient-density-wrap > small {
+    color: var(--ink-soft);
+    font-size: 0.6875rem;
+    line-height: 1.35;
+    white-space: normal;
+  }
+
+  .nutrient-density-preview {
+    display: grid;
+    gap: 7px;
+    padding: 11px 12px;
+    border-radius: 12px;
+    background: var(--surface);
+  }
+
+  .nutrient-density-preview p {
+    max-width: 65ch;
+    color: var(--ink-soft);
+    font-size: 0.75rem;
+    line-height: 1.45;
+  }
+
+  .nutrient-density-preview.is-compact {
+    padding: 10px;
+  }
+
   .prompt-preference-list,
   .water-log {
     display: grid;
@@ -4576,8 +4895,8 @@
     gap: 14px;
     padding: 18px;
     border-radius: var(--radius);
-    background: var(--moss-900);
-    color: var(--white);
+    background: var(--cycle-surface);
+    color: var(--cycle-ink);
     box-shadow: var(--shadow);
   }
 
@@ -4596,7 +4915,7 @@
   .cycle-overview header p,
   .cycle-overview header span,
   .cycle-overview small {
-    color: #d7e7d2;
+    color: var(--cycle-muted);
   }
 
   .cycle-status {
@@ -4622,8 +4941,8 @@
   .cycle-comparison {
     padding: 12px;
     border-radius: var(--radius-sm);
-    background: rgb(255 255 255 / 9%);
-    color: #edf5ea;
+    background: var(--cycle-tile);
+    color: var(--cycle-reason);
     font-size: 0.82rem;
   }
 
@@ -4640,11 +4959,11 @@
     gap: 3px;
     padding: 11px;
     border-radius: var(--radius-sm);
-    background: rgb(255 255 255 / 8%);
+    background: var(--cycle-tile);
   }
 
   .cycle-overview-metrics dt {
-    color: #d7e7d2;
+    color: var(--cycle-muted);
     font-size: 0.72rem;
   }
 

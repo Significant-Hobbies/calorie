@@ -12,13 +12,13 @@ import {
   Sprout,
   Trash2,
 } from 'lucide-react';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { MacroStackedChart } from '../components/charts/MacroStackedChart';
 import { TrendChart } from '../components/charts/TrendChart';
 import { WaterChart } from '../components/charts/WaterChart';
 import { WeightChart } from '../components/charts/WeightChart';
 import { AccessibleChartTable } from '../components/charts/AccessibleChartTable';
-import { HistoryCalendar } from '../components/HistoryCalendar';
+import { HistoryCalendar, type HistoryCalendarMode } from '../components/HistoryCalendar';
 import { MealTimingInsights } from '../components/MealTimingInsights';
 import { analyzeActionableInsights } from '../lib/actionable-insights';
 import {
@@ -30,13 +30,24 @@ import {
   getHistory,
   updateWeight,
 } from '../lib/api';
-import { calendarGrid, isSameMonth, localDateKey, shiftMonth } from '../lib/calendar';
+import {
+  calendarGrid,
+  dateFromKey,
+  isSameMonth,
+  isSameWeek,
+  localDateKey,
+  shiftMonth,
+  shiftWeek,
+  startOfWeek,
+  weekDateKeys,
+} from '../lib/calendar';
 import { analyzeCyclePeriod, compareCycleAnalyses } from '../lib/cycle-analytics';
 import { summarizeCycleProgress } from '../lib/cycle-progress';
 import { analyzeFoodAnalytics, type FoodAnalyticsItem } from '../lib/food-analytics';
 import { CYCLE_DETAILS, cycleFromGoal } from '../lib/goal-cycles';
 import { displayWeightValue, localDateInputValue, storedWeightValue } from '../lib/log-corrections';
 import { analyzeMealTiming } from '../lib/meal-timing';
+import type { WeeklyJournalFilter } from '../lib/weekly-journal';
 import type {
   CycleHistoryResponse,
   Dashboard,
@@ -108,6 +119,12 @@ export function ProgressPage() {
   const [calendarMonth, setCalendarMonth] = useState(
     () => new Date(today.getFullYear(), today.getMonth(), 1, 12)
   );
+  const [calendarWeek, setCalendarWeek] = useState(() => startOfWeek(today));
+  const [calendarMode, setCalendarMode] = useState<HistoryCalendarMode>(() =>
+    window.matchMedia('(min-width: 1000px)').matches ? 'week' : 'month'
+  );
+  const [calendarFilter, setCalendarFilter] = useState<WeeklyJournalFilter>('all');
+  const desktopCalendarMode = useRef<HistoryCalendarMode>('week');
   const [selectedDate, setSelectedDate] = useState(() => localDateKey(today));
   const [dashboard, setDashboard] = useState<Dashboard | null>(null);
   const [cycleHistory, setCycleHistory] = useState<CycleHistoryResponse | null>(null);
@@ -141,11 +158,19 @@ export function ProgressPage() {
     }
   }, []);
 
-  const loadCalendar = useCallback(async (month: Date) => {
+  const calendarDateKeys = useMemo(
+    () =>
+      calendarMode === 'week'
+        ? weekDateKeys(calendarWeek)
+        : calendarGrid(calendarMonth).map((cell) => cell.date),
+    [calendarMode, calendarMonth, calendarWeek]
+  );
+  const calendarDateKeySignature = calendarDateKeys.join(',');
+
+  const loadCalendar = useCallback(async (dateKeys: string[]) => {
     setError(null);
     try {
-      const cells = calendarGrid(month);
-      setCalendarHistory(await getCalendarHistory(cells.map((cell) => cell.date)));
+      setCalendarHistory(await getCalendarHistory(dateKeys));
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : 'Calendar history could not load.');
     }
@@ -160,8 +185,21 @@ export function ProgressPage() {
   }, [viewMode, rangeDays, loadTrends]);
 
   useEffect(() => {
-    if (viewMode === 'calendar') void loadCalendar(calendarMonth);
-  }, [viewMode, calendarMonth, loadCalendar]);
+    if (viewMode === 'calendar') void loadCalendar(calendarDateKeys);
+  }, [viewMode, calendarDateKeySignature, loadCalendar]);
+
+  useEffect(() => {
+    const media = window.matchMedia('(min-width: 1000px)');
+    const handleChange = (event: MediaQueryListEvent) => {
+      const anchor = dateFromKey(selectedDate);
+      setCalendarHistory(null);
+      setCalendarMode(event.matches ? desktopCalendarMode.current : 'month');
+      setCalendarWeek(startOfWeek(anchor));
+      setCalendarMonth(new Date(anchor.getFullYear(), anchor.getMonth(), 1, 12));
+    };
+    media.addEventListener('change', handleChange);
+    return () => media.removeEventListener('change', handleChange);
+  }, [selectedDate]);
 
   const summary = useMemo(
     () =>
@@ -247,7 +285,7 @@ export function ProgressPage() {
       setWeight('');
       await Promise.all([
         loadDashboard(),
-        viewMode === 'calendar' ? loadCalendar(calendarMonth) : loadTrends(rangeDays),
+        viewMode === 'calendar' ? loadCalendar(calendarDateKeys) : loadTrends(rangeDays),
       ]);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : 'Weight could not be logged.');
@@ -281,7 +319,7 @@ export function ProgressPage() {
       setEditingWeightId(null);
       await Promise.all([
         loadDashboard(),
-        viewMode === 'calendar' ? loadCalendar(calendarMonth) : loadTrends(rangeDays),
+        viewMode === 'calendar' ? loadCalendar(calendarDateKeys) : loadTrends(rangeDays),
       ]);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : 'Weight could not be updated.');
@@ -303,7 +341,7 @@ export function ProgressPage() {
       await deleteWeight(entry.id);
       await Promise.all([
         loadDashboard(),
-        viewMode === 'calendar' ? loadCalendar(calendarMonth) : loadTrends(rangeDays),
+        viewMode === 'calendar' ? loadCalendar(calendarDateKeys) : loadTrends(rangeDays),
       ]);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : 'Weight could not be removed.');
@@ -312,9 +350,18 @@ export function ProgressPage() {
     }
   };
 
-  const moveMonth = (amount: number) => {
-    const next = shiftMonth(calendarMonth, amount);
+  const moveCalendar = (amount: number) => {
+    if (calendarMode === 'week') {
+      if (amount > 0 && isSameWeek(calendarWeek, today)) return;
+      const next = shiftWeek(calendarWeek, amount);
+      setCalendarHistory(null);
+      setCalendarWeek(next);
+      const dates = weekDateKeys(next);
+      setSelectedDate(isSameWeek(next, today) ? localDateKey(today) : dates[6]);
+      return;
+    }
     if (amount > 0 && isSameMonth(calendarMonth, today)) return;
+    const next = shiftMonth(calendarMonth, amount);
     setCalendarHistory(null);
     setCalendarMonth(next);
     setSelectedDate(
@@ -322,6 +369,16 @@ export function ProgressPage() {
         ? localDateKey(today)
         : localDateKey(new Date(next.getFullYear(), next.getMonth() + 1, 0, 12))
     );
+  };
+
+  const changeCalendarMode = (nextMode: HistoryCalendarMode) => {
+    if (nextMode === calendarMode) return;
+    const anchor = dateFromKey(selectedDate);
+    setCalendarHistory(null);
+    setCalendarMode(nextMode);
+    desktopCalendarMode.current = nextMode;
+    if (nextMode === 'week') setCalendarWeek(startOfWeek(anchor));
+    else setCalendarMonth(new Date(anchor.getFullYear(), anchor.getMonth(), 1, 12));
   };
 
   const chartMax = history
@@ -348,7 +405,7 @@ export function ProgressPage() {
     (viewMode === 'trends' && (!history || !summary || !analytics || !insights));
 
   return (
-    <div className="page-stack">
+    <div className="page-stack progress-page">
       <header className="page-heading split-heading progress-heading">
         <div>
           <p>A wider view</p>
@@ -463,13 +520,18 @@ export function ProgressPage() {
           {viewMode === 'calendar' && calendarHistory ? (
             <>
               <HistoryCalendar
+                mode={calendarMode}
                 month={calendarMonth}
+                weekStart={calendarWeek}
+                filter={calendarFilter}
                 history={calendarHistory}
                 selectedDate={selectedDate}
                 target={dashboard.target}
                 units={dashboard.profile.units}
-                onPreviousMonth={() => moveMonth(-1)}
-                onNextMonth={() => moveMonth(1)}
+                onModeChange={changeCalendarMode}
+                onFilterChange={setCalendarFilter}
+                onPrevious={() => moveCalendar(-1)}
+                onNext={() => moveCalendar(1)}
                 onSelectDate={setSelectedDate}
               />
               {visibleWeights.length >= 2 ? (

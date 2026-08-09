@@ -407,6 +407,9 @@ function buildLocalHistory(
     .filter((entry) => entry.eatenAt < startAt)
     .sort((a, b) => b.eatenAt - a.eatenAt)[0];
   const fastingThreshold = state.profile.fastingThresholdHours;
+  const medicationNames = new Map(
+    state.medications.map((medication) => [medication.id, medication.name])
+  );
   for (const fast of calculateCompletedFasts(
     prior ? [prior, ...entries] : entries,
     Intl.DateTimeFormat().resolvedOptions().timeZone
@@ -427,6 +430,15 @@ function buildLocalHistory(
       (entry) => entry.recordedAt >= startAt && entry.recordedAt < endAt
     ),
     entries,
+    medicationEvents: state.medicationCheckIns
+      .filter((checkIn) => checkIn.takenAt >= startAt && checkIn.takenAt < endAt)
+      .map((checkIn) => ({
+        id: checkIn.id,
+        medicationId: checkIn.medicationId,
+        medicationName: medicationNames.get(checkIn.medicationId) ?? 'Medicine',
+        takenAt: checkIn.takenAt,
+      }))
+      .sort((left, right) => left.takenAt - right.takenAt),
     ...(rangeDays ? { rangeDays } : {}),
   };
 }

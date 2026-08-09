@@ -86,6 +86,13 @@ export type MedicationCheckIn = {
   takenAt: number;
 };
 
+export type MedicationHistoryEvent = {
+  id: string;
+  medicationId: string;
+  medicationName: string;
+  takenAt: number;
+};
+
 export type WeightEntry = {
   id: string;
   weightKg: number;
@@ -151,6 +158,7 @@ export type HistoryResponse = {
   days: HistoryDay[];
   weights: WeightEntry[];
   entries?: FoodEntry[];
+  medicationEvents?: MedicationHistoryEvent[];
   rangeDays?: 7 | 30;
 };
 

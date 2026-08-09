@@ -384,6 +384,12 @@ type MedicationCheckInRow = {
   taken_on: string;
   taken_at: number;
 };
+type MedicationHistoryRow = {
+  id: string;
+  medication_id: string;
+  medication_name: string;
+  taken_at: number;
+};
 
 function mapWater(row: WaterRow): WaterEntry {
   return { id: row.id, amountMl: row.amount_ml, drankAt: row.drank_at };
@@ -1555,33 +1561,42 @@ app.get('/api/app/history', async (c) => {
     return c.json(jsonError('Choose a history range of one year or less.'), 400);
   }
   const userId = c.get('userId');
-  const [profile, entriesResult, waterResult, weightResult, priorEntry] = await Promise.all([
-    readProfile(c.env.DB, userId, c.get('userName')),
-    c.env.DB.prepare(
-      `SELECT * FROM food_entries
+  const [profile, entriesResult, waterResult, weightResult, medicationResult, priorEntry] =
+    await Promise.all([
+      readProfile(c.env.DB, userId, c.get('userName')),
+      c.env.DB.prepare(
+        `SELECT * FROM food_entries
        WHERE user_id = ? AND eaten_at >= ? AND eaten_at < ? ORDER BY eaten_at ASC`
-    )
-      .bind(userId, range.start, range.end)
-      .all<FoodEntryRow>(),
-    c.env.DB.prepare(
-      `SELECT id, amount_ml, drank_at FROM water_entries
+      )
+        .bind(userId, range.start, range.end)
+        .all<FoodEntryRow>(),
+      c.env.DB.prepare(
+        `SELECT id, amount_ml, drank_at FROM water_entries
        WHERE user_id = ? AND drank_at >= ? AND drank_at < ? ORDER BY drank_at ASC`
-    )
-      .bind(userId, range.start, range.end)
-      .all<WaterRow>(),
-    c.env.DB.prepare(
-      `SELECT id, weight_kg, recorded_at FROM weight_entries
+      )
+        .bind(userId, range.start, range.end)
+        .all<WaterRow>(),
+      c.env.DB.prepare(
+        `SELECT id, weight_kg, recorded_at FROM weight_entries
        WHERE user_id = ? AND recorded_at >= ? AND recorded_at < ? ORDER BY recorded_at ASC`
-    )
-      .bind(userId, range.start, range.end)
-      .all<WeightRow>(),
-    c.env.DB.prepare(
-      `SELECT * FROM food_entries
+      )
+        .bind(userId, range.start, range.end)
+        .all<WeightRow>(),
+      c.env.DB.prepare(
+        `SELECT c.id, c.medication_id, c.taken_at, m.name AS medication_name
+       FROM medication_check_ins c
+       JOIN medications m ON m.id = c.medication_id AND m.user_id = c.user_id
+       WHERE c.user_id = ? AND c.taken_at >= ? AND c.taken_at < ? ORDER BY c.taken_at ASC`
+      )
+        .bind(userId, range.start, range.end)
+        .all<MedicationHistoryRow>(),
+      c.env.DB.prepare(
+        `SELECT * FROM food_entries
        WHERE user_id = ? AND eaten_at < ? ORDER BY eaten_at DESC LIMIT 1`
-    )
-      .bind(userId, range.start)
-      .first<FoodEntryRow>(),
-  ]);
+      )
+        .bind(userId, range.start)
+        .first<FoodEntryRow>(),
+    ]);
   const entries = entriesResult.results.map(mapFoodEntry);
   const water = waterResult.results.map(mapWater);
   const dayMap = new Map<string, HistoryDay>();
@@ -1641,6 +1656,12 @@ app.get('/api/app/history', async (c) => {
     days,
     weights: weightResult.results.map(mapWeight),
     entries,
+    medicationEvents: medicationResult.results.map((row) => ({
+      id: row.id,
+      medicationId: row.medication_id,
+      medicationName: row.medication_name,
+      takenAt: row.taken_at,
+    })),
     ...(rangeDays ? { rangeDays } : {}),
   };
   return conditionalJson(c, response);

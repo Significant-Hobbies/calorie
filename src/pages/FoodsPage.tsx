@@ -1,5 +1,6 @@
 import { Apple, Archive, Pencil, Plus, RotateCcw, Search, Trash2, X } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { NutrientDensityBadge } from '../components/NutrientDensityBadge';
 import { createFood, deleteFood, getFoods, saveFood, setFoodArchived } from '../lib/api';
 import { normalizeFoodLabels } from '../lib/food-context';
 import type { FoodLifecycle } from '../lib/food-library';
@@ -278,6 +279,7 @@ export function FoodsPage() {
                 <span className="food-row-copy">
                   <strong>{food.name}</strong>
                   <small>{nutrientSummary(food)}</small>
+                  <NutrientDensityBadge nutrients={food} />
                   <span className="food-context-line">
                     {food.isPackaged ? 'Packaged' : 'Not packaged'}
                     {food.labels?.length ? ` · ${food.labels.join(' · ')}` : ''}
@@ -293,6 +295,7 @@ export function FoodsPage() {
                 <span className="food-row-copy">
                   <strong>{food.name}</strong>
                   <small>{nutrientSummary(food)}</small>
+                  <NutrientDensityBadge nutrients={food} />
                 </span>
                 <span className="archived-food-actions">
                   <button
@@ -517,6 +520,14 @@ export function FoodsPage() {
                     </div>
                   </label>
                 ))}
+              </div>
+
+              <div className="nutrient-density-preview">
+                <NutrientDensityBadge nutrients={draft} showBasis />
+                <p>
+                  This compares tracked protein and fibre per calorie. It does not assess vitamins,
+                  minerals, ingredients, or overall health quality.
+                </p>
               </div>
 
               <label className="field">
