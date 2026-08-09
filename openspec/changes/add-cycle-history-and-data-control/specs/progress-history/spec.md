@@ -31,3 +31,25 @@ Progress SHALL lead cycle analytics with the active cycle and date range, a tran
 #### Scenario: Open sparse cycle analytics
 - **WHEN** cycle data is insufficient
 - **THEN** the summary names the missing sample and keeps available measurements neutral rather than filling absent values with zero
+
+### Requirement: Progress chart annotations remain visually distinct
+Every Progress graph SHALL reserve visible space between the plotted area and its x-axis labels, legend, or explanatory note at supported widths and text zoom.
+
+#### Scenario: Read a graph annotation
+- **WHEN** a Progress graph includes labels, a legend, or a note below the plot
+- **THEN** the annotation does not touch or visually merge with the plotted area
+
+### Requirement: Progress remains exact and correct at the edges
+Progress SHALL expose each plotted value in an accessible table, preserve a weight check-in's local calendar date during correction, use valid list semantics, and keep interactive metric controls at least 44 CSS pixels tall.
+
+#### Scenario: Review exact chart values without sight
+- **WHEN** assistive technology reaches a populated Progress chart
+- **THEN** every plotted date and value is available in a captioned table in addition to the chart summary
+
+#### Scenario: Edit an early-morning weight check-in
+- **WHEN** the owner edits a check-in recorded after local midnight but before the corresponding UTC date changes
+- **THEN** the date input opens on the original local calendar day
+
+#### Scenario: Read sparse summaries and operate chart filters
+- **WHEN** Progress has singular counts or no configured calorie range
+- **THEN** the copy is grammatical, no placeholder range is announced, ranked foods keep valid list structure, and metric filters meet the 44 CSS pixel touch-target floor

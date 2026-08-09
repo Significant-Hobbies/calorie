@@ -17,6 +17,7 @@ import { MacroStackedChart } from '../components/charts/MacroStackedChart';
 import { TrendChart } from '../components/charts/TrendChart';
 import { WaterChart } from '../components/charts/WaterChart';
 import { WeightChart } from '../components/charts/WeightChart';
+import { AccessibleChartTable } from '../components/charts/AccessibleChartTable';
 import { HistoryCalendar } from '../components/HistoryCalendar';
 import { MealTimingInsights } from '../components/MealTimingInsights';
 import { analyzeActionableInsights } from '../lib/actionable-insights';
@@ -34,7 +35,7 @@ import { analyzeCyclePeriod, compareCycleAnalyses } from '../lib/cycle-analytics
 import { summarizeCycleProgress } from '../lib/cycle-progress';
 import { analyzeFoodAnalytics, type FoodAnalyticsItem } from '../lib/food-analytics';
 import { CYCLE_DETAILS, cycleFromGoal } from '../lib/goal-cycles';
-import { displayWeightValue, storedWeightValue } from '../lib/log-corrections';
+import { displayWeightValue, localDateInputValue, storedWeightValue } from '../lib/log-corrections';
 import { analyzeMealTiming } from '../lib/meal-timing';
 import type {
   CycleHistoryResponse,
@@ -69,7 +70,7 @@ function FoodRanking({
     1
   );
   return (
-    <ol className="insights-ranking">
+    <ol className="insights-ranking" aria-label={metricLabel}>
       {items.map((item, index) => {
         const barValue = metric(item).includes('kcal') ? item.totalCalories : item.occasions;
         const width = Math.max(8, (barValue / maxMetric) * 100);
@@ -94,7 +95,6 @@ function FoodRanking({
           </li>
         );
       })}
-      <span className="sr-only">{metricLabel}</span>
     </ol>
   );
 }
@@ -260,7 +260,7 @@ export function ProgressPage() {
     if (!dashboard) return;
     setEditingWeightId(entry.id);
     setEditingWeight(String(displayWeightValue(entry.weightKg, dashboard.profile.units)));
-    setEditingWeightDate(new Date(entry.recordedAt).toISOString().slice(0, 10));
+    setEditingWeightDate(localDateInputValue(entry.recordedAt));
   };
 
   const saveWeightEdit = async () => {
@@ -392,8 +392,9 @@ export function ProgressPage() {
                   {cycleAnalysis.elapsedDays} day{cycleAnalysis.elapsedDays === 1 ? '' : 's'} in
                 </h2>
                 <span>
-                  Since {cycleAnalysis.startOn} · {cycleAnalysis.loggedDays} food-logged days (
-                  {cycleAnalysis.coveragePercent}% coverage)
+                  Since {cycleAnalysis.startOn} · {cycleAnalysis.loggedDays} food-logged day
+                  {cycleAnalysis.loggedDays === 1 ? '' : 's'} ({cycleAnalysis.coveragePercent}%
+                  coverage)
                 </span>
               </div>
               <span className={`cycle-status cycle-status-${cycleAnalysis.status}`}>
@@ -441,7 +442,7 @@ export function ProgressPage() {
                 </dd>
                 <small>
                   {cycleAnalysis.weeklyWeightRateKg === null
-                    ? `${cycleAnalysis.weightCount} check-ins; span 7 days for rate`
+                    ? `${cycleAnalysis.weightCount} check-in${cycleAnalysis.weightCount === 1 ? '' : 's'}; span 7 days for rate`
                     : `${cycleAnalysis.weeklyWeightRateKg >= 0 ? '+' : ''}${cycleAnalysis.weeklyWeightRateKg} kg/week fitted rate`}
                 </small>
               </div>
@@ -584,14 +585,15 @@ export function ProgressPage() {
                         <h2 id="intake-chart-title">A gentle rhythm</h2>
                       </div>
                       <span>
-                        Range {dashboard.target.calorieRange?.[0]?.toLocaleString() ?? '—'}–
-                        {dashboard.target.calorieRange?.[1]?.toLocaleString() ?? '—'}
+                        {dashboard.target.calorieRange
+                          ? `Range ${dashboard.target.calorieRange[0].toLocaleString()}–${dashboard.target.calorieRange[1].toLocaleString()}`
+                          : 'No range set'}
                       </span>
                     </header>
                     <div
                       className="bar-chart"
                       role="img"
-                      aria-label={`Calorie intake for the last ${rangeDays} days. ${inRangeCount} logged days were within the estimate.`}
+                      aria-label={`Calorie intake for the last ${rangeDays} days. ${inRangeCount} logged day${inRangeCount === 1 ? '' : 's'} ${inRangeCount === 1 ? 'was' : 'were'} within the estimate.`}
                     >
                       {history.days.map((day, index) => {
                         const height = day.calories
@@ -615,6 +617,27 @@ export function ProgressPage() {
                         );
                       })}
                     </div>
+                    <AccessibleChartTable
+                      caption={`Calorie values for the last ${rangeDays} days`}
+                      columns={['Date', 'Calories (kcal)', 'Estimate status']}
+                      rows={history.days.map((day) => {
+                        const inRange =
+                          Boolean(dashboard.target.calorieRange) &&
+                          day.calories > 0 &&
+                          day.calories >= (dashboard.target.calorieRange?.[0] ?? 0) &&
+                          day.calories <=
+                            (dashboard.target.calorieRange?.[1] ?? Number.POSITIVE_INFINITY);
+                        return [
+                          day.date,
+                          Math.round(day.calories),
+                          day.calories === 0
+                            ? 'No entry'
+                            : inRange
+                              ? 'Within estimate'
+                              : 'Outside estimate',
+                        ];
+                      })}
+                    />
                     <p className="chart-note">
                       <span className="range-key" aria-hidden="true" />
                       {inRangeCount} logged day{inRangeCount === 1 ? '' : 's'} sat inside your
@@ -647,17 +670,26 @@ export function ProgressPage() {
                       <div>
                         <dt>Logged occasions</dt>
                         <dd>{insights.variety.totalOccasions}</dd>
-                        <small>Across {insights.confidence.loggedDays} logged days</small>
+                        <small>
+                          Across {insights.confidence.loggedDays} logged day
+                          {insights.confidence.loggedDays === 1 ? '' : 's'}
+                        </small>
                       </div>
                       <div>
                         <dt>Food variety</dt>
-                        <dd>{insights.variety.distinctFoods} foods</dd>
+                        <dd>
+                          {insights.variety.distinctFoods} food
+                          {insights.variety.distinctFoods === 1 ? '' : 's'}
+                        </dd>
                         <small>{insights.variety.repeatedFoods} repeated in this window</small>
                       </div>
                       <div>
                         <dt>Most logged</dt>
                         <dd>{analytics.byOccasions[0]?.foodName ?? '—'}</dd>
-                        <small>{analytics.byOccasions[0]?.occasions ?? 0} logged occasions</small>
+                        <small>
+                          {analytics.byOccasions[0]?.occasions ?? 0} logged occasion
+                          {(analytics.byOccasions[0]?.occasions ?? 0) === 1 ? '' : 's'}
+                        </small>
                       </div>
                     </dl>
                     {insights.comparison ? (
@@ -687,7 +719,7 @@ export function ProgressPage() {
                         <p>Configured targets</p>
                         <h2 id="coverage-title">Average coverage on logged days</h2>
                       </div>
-                      <span>{insights.confidence.loggedDays} day sample</span>
+                      <span>{insights.confidence.loggedDays}-day sample</span>
                     </header>
                     {insights.coverage.length ? (
                       <div className="coverage-list">

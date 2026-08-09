@@ -26,6 +26,10 @@ The system SHALL let the owner arrange the four prompt types in a stable order u
 - **WHEN** an enabled prompt is complete for the local day
 - **THEN** it remains hidden for that day without changing the saved order of the remaining prompt types
 
+#### Scenario: All prompts complete
+- **WHEN** no enabled daily prompt remains incomplete
+- **THEN** Today hides the entire prompt surface without showing a completion message or explaining the hide behavior
+
 ### Requirement: Private preference parity
 The system SHALL persist daily-prompt settings in local, demo, and authenticated cloud journals and MUST scope cloud preferences to the authenticated user.
 

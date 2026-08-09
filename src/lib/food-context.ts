@@ -1,16 +1,8 @@
-import type { FoodKind } from './types';
-
-export const FOOD_KIND_LABELS: Record<FoodKind, string> = {
-  whole_food: 'Whole food',
-  prepared: 'Prepared meal',
-  packaged: 'Packaged food',
-  supplement: 'Supplement',
-};
-
-export function normalizeFoodKind(value: unknown): FoodKind {
-  return value === 'whole_food' || value === 'packaged' || value === 'supplement'
-    ? value
-    : 'prepared';
+export function normalizeIsPackaged(value: unknown, legacyFoodKind?: unknown): boolean {
+  if (typeof value === 'boolean') return value;
+  if (value === 1) return true;
+  if (value === 0) return false;
+  return legacyFoodKind === 'packaged';
 }
 
 export function normalizeFoodLabels(value: unknown): string[] {

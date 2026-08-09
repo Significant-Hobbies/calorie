@@ -7,7 +7,6 @@ export type MedicationSchedule = 'morning' | 'evening' | 'either';
 export type ThemePreference = 'system' | 'light' | 'dark';
 export type DailyActionKey = 'weight' | 'creatine' | 'food' | 'water';
 export type GoalCycle = 'cut' | 'gain' | 'recomposition';
-export type FoodKind = 'whole_food' | 'prepared' | 'packaged' | 'supplement';
 
 export type Nutrients = {
   calories: number;
@@ -47,7 +46,7 @@ export type Food = Nutrients & {
   favourite: boolean;
   lastUsedAt: number | null;
   archivedAt: number | null;
-  foodKind?: FoodKind;
+  isPackaged?: boolean;
   labels?: string[];
 };
 
@@ -58,7 +57,7 @@ export type FoodEntry = Nutrients & {
   amount: number;
   unitLabel: string;
   eatenAt: number;
-  foodKind?: FoodKind;
+  isPackaged?: boolean;
   labels?: string[];
 };
 
@@ -183,7 +182,7 @@ export type CycleHistoryResponse = {
 
 export type JournalExport = {
   schema: 'calorie-journal-backup';
-  version: 1;
+  version: 2;
   generatedAt: string;
   profile: UserProfile;
   foods: Food[];

@@ -1,4 +1,4 @@
-import { normalizeFoodKind, normalizeFoodLabels } from './food-context';
+import { normalizeFoodLabels, normalizeIsPackaged } from './food-context';
 import type { Food, FoodEntry } from './types';
 
 const MAX_AMOUNT = 10_000;
@@ -39,7 +39,7 @@ export function normalizeDirectEntry(entry: FoodEntry): FoodEntry {
     ...entry,
     foodName: entry.foodName.trim(),
     unitLabel: entry.unitLabel.trim(),
-    foodKind: normalizeFoodKind(entry.foodKind),
+    isPackaged: normalizeIsPackaged(entry.isPackaged),
     labels: normalizeFoodLabels(entry.labels),
   };
 }
@@ -59,7 +59,7 @@ export function foodFromDirectEntry(entry: FoodEntry, id: string): Food {
     favourite: true,
     lastUsedAt: null,
     archivedAt: null,
-    foodKind: normalized.foodKind,
+    isPackaged: normalized.isPackaged,
     labels: normalized.labels,
   };
 }

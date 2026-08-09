@@ -495,15 +495,6 @@
     letter-spacing: -0.025em;
   }
 
-  .daily-actions-heading > span {
-    padding: 5px 9px;
-    border-radius: 999px;
-    background: var(--white);
-    color: var(--ink-soft);
-    font-size: 0.75rem;
-    font-weight: var(--weight-strong);
-  }
-
   .daily-action-grid {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -588,19 +579,6 @@
     color: var(--sky);
   }
 
-  .daily-actions-complete {
-    min-height: 50px;
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    padding: 10px 12px;
-    border-radius: 13px;
-    background: var(--moss-100);
-    color: var(--moss-900);
-    font-size: 0.875rem;
-    font-weight: var(--weight-strong);
-  }
-
   .weight-quick-form {
     display: grid;
     gap: 12px;
@@ -677,27 +655,6 @@
     flex-direction: column;
     align-items: flex-end;
     gap: 8px;
-  }
-
-  .daily-status {
-    display: grid;
-    gap: 1px;
-    padding: 6px 10px;
-    border-radius: 12px;
-    background: var(--amber-soft);
-    color: var(--amber-ink);
-    text-align: right;
-  }
-
-  .daily-status small {
-    color: inherit;
-    font-size: 0.68rem;
-    font-weight: var(--weight-label);
-  }
-
-  .daily-status strong {
-    font-size: 0.78rem;
-    letter-spacing: -0.01em;
   }
 
   .progress-bar,
@@ -1929,8 +1886,8 @@
     justify-content: space-between;
     gap: 16px;
     padding: 13px 16px;
-    border-left: 4px solid var(--moss-600);
-    border-radius: 8px 14px 14px 8px;
+    border: 1px solid var(--moss-200);
+    border-radius: 14px;
     background: var(--moss-100);
   }
 
@@ -2325,7 +2282,7 @@
     display: flex;
     align-items: stretch;
     gap: 5px;
-    margin: 24px 0 8px;
+    margin: 24px 0 16px;
     padding-top: 8px;
     border-bottom: 1px solid var(--line);
   }
@@ -2411,13 +2368,16 @@
   }
 
   .chart-svg-wrap {
-    height: 180px;
-    margin: 18px 0 6px;
+    height: auto;
+    display: grid;
+    grid-template-rows: 180px auto;
+    gap: 8px;
+    margin: 18px 0 14px;
   }
 
   .chart-svg-wrap svg {
     width: 100%;
-    height: 100%;
+    height: 180px;
     display: block;
     overflow: visible;
   }
@@ -2450,7 +2410,7 @@
     display: flex;
     flex-wrap: wrap;
     gap: 14px;
-    margin: 8px 0 0;
+    margin: 0;
     padding: 0;
     list-style: none;
   }
@@ -2486,6 +2446,7 @@
   }
 
   .metric-toggle button {
+    min-height: 44px;
     display: inline-flex;
     align-items: center;
     gap: 6px;

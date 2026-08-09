@@ -25,7 +25,12 @@ import {
   demoUpdateWater,
   demoUpdateWeight,
 } from './demo';
-import { type FoodLifecycle, foodsByLifecycle, normalizeFood } from './food-library';
+import {
+  type FoodLifecycle,
+  foodsByLifecycle,
+  normalizeFood,
+  normalizeFoodEntry,
+} from './food-library';
 import {
   localAddEntry,
   localAddMedicationCheckIn,
@@ -107,6 +112,7 @@ function normalizeDashboard(dashboard: Dashboard): Dashboard {
     ...dashboard,
     profile: normalizeProfile(dashboard.profile),
     foods: foodsByLifecycle(dashboard.foods ?? [], 'active'),
+    entries: (dashboard.entries ?? []).map(normalizeFoodEntry),
     medications: dashboard.medications ?? [],
     medicationCheckIns: dashboard.medicationCheckIns ?? [],
   };
@@ -586,7 +592,12 @@ export async function updateCycleStart(startOn: string) {
 export async function getJournalExport(): Promise<JournalExport> {
   if (isDemo()) return demoJournalExport();
   if (isLocalMode()) return localJournalExport();
-  return readJson<JournalExport>('/api/app/export');
+  const value = await readJson<JournalExport>('/api/app/export');
+  return {
+    ...value,
+    foods: value.foods.map(normalizeFood),
+    entries: value.entries.map(normalizeFoodEntry),
+  };
 }
 
 export async function getHistory(rangeDays: 7 | 30): Promise<HistoryResponse> {
@@ -602,9 +613,10 @@ export async function getHistory(rangeDays: 7 | 30): Promise<HistoryResponse> {
     days: String(rangeDays),
     timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
   });
-  return dedupe(`history:${rangeDays}:${end.toDateString()}`, () =>
+  const response = await dedupe(`history:${rangeDays}:${end.toDateString()}`, () =>
     readJson<HistoryResponse>(`/api/app/history?${params}`)
   );
+  return { ...response, entries: response.entries?.map(normalizeFoodEntry) };
 }
 
 export async function getCalendarHistory(dateKeys: string[]): Promise<HistoryResponse> {
@@ -623,6 +635,7 @@ export async function getCalendarHistory(dateKeys: string[]): Promise<HistoryRes
   const byDate = new Map(response.days.map((day) => [day.date, day]));
   return {
     ...response,
+    entries: response.entries?.map(normalizeFoodEntry),
     days: dateKeys.map(
       (date) =>
         byDate.get(date) ?? {

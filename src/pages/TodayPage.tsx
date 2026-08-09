@@ -39,9 +39,8 @@ import {
 } from '../lib/api';
 import { enabledDailyActions } from '../lib/daily-action-preferences';
 import { type DailyActionKey, getDailyActionState } from '../lib/daily-actions';
-import { computeDailyRating } from '../lib/daily-rating';
 import { directEntryError, foodFromDirectEntry } from '../lib/entries';
-import { FOOD_KIND_LABELS, normalizeFoodLabels } from '../lib/food-context';
+import { normalizeFoodLabels } from '../lib/food-context';
 import { waterTotal } from '../lib/log-corrections';
 import { computeMacroCompletion } from '../lib/macro-completion';
 import {
@@ -55,7 +54,6 @@ import type {
   Dashboard,
   Food,
   FoodEntry,
-  FoodKind,
   Medication,
   MedicationSchedule,
   WaterEntry,
@@ -134,7 +132,7 @@ type EntryDraft = {
   fibreG: number;
   eatenAt: string;
   saveForLater: boolean;
-  foodKind: FoodKind;
+  isPackaged: boolean;
   labels: string[];
 };
 
@@ -238,17 +236,6 @@ export function TodayPage({
             (a, b) => (b.lastUsedAt ?? 0) - (a.lastUsedAt ?? 0) || a.name.localeCompare(b.name)
           )
         : [],
-    [dashboard]
-  );
-  const rating = useMemo(
-    () =>
-      dashboard
-        ? computeDailyRating({
-            totals: dashboard.totals,
-            target: dashboard.target,
-            waterTargetMl: dashboard.profile.waterTargetMl,
-          })
-        : null,
     [dashboard]
   );
   const dailyActionState = useMemo(
@@ -559,7 +546,7 @@ export function TodayPage({
         : { calories: 0, carbsG: 0, proteinG: 0, fibreG: 0 }),
       eatenAt: toLocalInput(Date.now()),
       saveForLater: false,
-      foodKind: food?.foodKind ?? 'prepared',
+      isPackaged: food?.isPackaged ?? false,
       labels: food?.labels ?? [],
     });
   };
@@ -580,7 +567,7 @@ export function TodayPage({
       fibreG: entry.fibreG,
       eatenAt: toLocalInput(entry.eatenAt),
       saveForLater: false,
-      foodKind: entry.foodKind ?? 'prepared',
+      isPackaged: entry.isPackaged ?? false,
       labels: entry.labels ?? [],
     });
   };
@@ -597,7 +584,7 @@ export function TodayPage({
             amount: food.defaultAmount,
             unitLabel: food.servingMode === 'per_100g' ? 'g' : food.unitLabel,
             ...scaleNutrients(food, food.servingMode, food.defaultAmount),
-            foodKind: food.foodKind ?? 'prepared',
+            isPackaged: food.isPackaged ?? false,
             labels: food.labels ?? [],
           }
         : current
@@ -643,7 +630,7 @@ export function TodayPage({
           proteinG: 0,
           fibreG: 0,
           saveForLater: false,
-          foodKind: 'prepared',
+          isPackaged: false,
           labels: [],
         };
       }
@@ -659,7 +646,7 @@ export function TodayPage({
         amount: food.defaultAmount,
         unitLabel: food.servingMode === 'per_100g' ? 'g' : food.unitLabel,
         ...scaleNutrients(food, food.servingMode, food.defaultAmount),
-        foodKind: food.foodKind ?? 'prepared',
+        isPackaged: food.isPackaged ?? false,
         labels: food.labels ?? [],
       };
     });
@@ -693,7 +680,7 @@ export function TodayPage({
             unitLabel: food.servingMode === 'per_100g' ? 'g' : food.unitLabel,
             ...scaleNutrients(food, food.servingMode, entryDraft.amount),
             eatenAt,
-            foodKind: food.foodKind,
+            isPackaged: food.isPackaged,
             labels: food.labels,
           }
         : {
@@ -707,7 +694,7 @@ export function TodayPage({
             proteinG: entryDraft.proteinG,
             fibreG: entryDraft.fibreG,
             eatenAt,
-            foodKind: entryDraft.foodKind,
+            isPackaged: entryDraft.isPackaged,
             labels: normalizeFoodLabels(entryDraft.labels),
           };
     const directError = directEntry.foodId === null ? directEntryError(directEntry) : null;
@@ -981,20 +968,19 @@ export function TodayPage({
         </div>
       ) : null}
 
-      <section
-        className="daily-actions"
-        aria-labelledby="daily-actions-title"
-        ref={dailyActionsRef}
-      >
-        <div className="daily-actions-heading">
-          <div>
-            <p>Daily basics</p>
-            <h2 id="daily-actions-title">Up next</h2>
+      {incompleteActions.length ? (
+        <section
+          className="daily-actions"
+          aria-labelledby="daily-actions-title"
+          ref={dailyActionsRef}
+        >
+          <div className="daily-actions-heading">
+            <div>
+              <p>Daily basics</p>
+              <h2 id="daily-actions-title">Up next</h2>
+            </div>
           </div>
-          <span>Hides when logged</span>
-        </div>
 
-        {incompleteActions.length ? (
           <div className="daily-action-grid">
             {incompleteActions.map((action) => {
               const details = {
@@ -1030,54 +1016,53 @@ export function TodayPage({
               );
             })}
           </div>
-        ) : (
-          <div className="daily-actions-complete">
-            <Check size={19} aria-hidden="true" />
-            <span>Daily basics logged. Add more whenever you need.</span>
-          </div>
-        )}
 
-        {weightEditorOpen ? (
-          <form
-            className="weight-quick-form"
-            onSubmit={(event) => {
-              event.preventDefault();
-              void saveWeightCheckIn();
-            }}
-          >
-            <label className="field">
-              <span>Today’s weight</span>
-              <div className="input-with-unit">
-                <input
-                  ref={weightInputRef}
-                  type="number"
-                  inputMode="decimal"
-                  step="0.1"
-                  value={weightValue}
-                  onChange={(event) => setWeightValue(event.target.value)}
-                />
-                <b>{dashboard.profile.units === 'imperial' ? 'lb' : 'kg'}</b>
+          {weightEditorOpen ? (
+            <form
+              className="weight-quick-form"
+              onSubmit={(event) => {
+                event.preventDefault();
+                void saveWeightCheckIn();
+              }}
+            >
+              <label className="field">
+                <span>Today’s weight</span>
+                <div className="input-with-unit">
+                  <input
+                    ref={weightInputRef}
+                    type="number"
+                    inputMode="decimal"
+                    step="0.1"
+                    value={weightValue}
+                    onChange={(event) => setWeightValue(event.target.value)}
+                  />
+                  <b>{dashboard.profile.units === 'imperial' ? 'lb' : 'kg'}</b>
+                </div>
+              </label>
+              <div>
+                <button
+                  className="button button-secondary"
+                  type="button"
+                  onClick={() => setWeightEditorOpen(false)}
+                >
+                  Cancel
+                </button>
+                <button
+                  className="button button-primary"
+                  type="submit"
+                  disabled={Boolean(pendingId)}
+                >
+                  Check in
+                </button>
               </div>
-            </label>
-            <div>
-              <button
-                className="button button-secondary"
-                type="button"
-                onClick={() => setWeightEditorOpen(false)}
-              >
-                Cancel
-              </button>
-              <button className="button button-primary" type="submit" disabled={Boolean(pendingId)}>
-                Check in
-              </button>
-            </div>
-          </form>
-        ) : null}
+            </form>
+          ) : null}
+        </section>
+      ) : null}
 
-        <p className="sr-only" aria-live="polite">
-          {dailyAnnouncement}
-        </p>
-      </section>
+      <p className="sr-only" aria-live="polite">
+        {dailyAnnouncement}
+      </p>
 
       <section className="daily-summary" aria-labelledby="daily-summary-title">
         <div className="summary-topline">
@@ -1102,15 +1087,6 @@ export function TodayPage({
             ) : null}
           </div>
           <div className="summary-topline-right">
-            {rating ? (
-              <span
-                className="daily-status"
-                title={`Based on ${rating.factors.map((factor) => factor.label).join(', ')} completion`}
-              >
-                <small>Today</small>
-                <strong>{rating.label}</strong>
-              </span>
-            ) : null}
             <span>{target ? `${Math.round(calorieProgress)}%` : '—'}</span>
           </div>
         </div>
@@ -1573,7 +1549,10 @@ export function TodayPage({
         <div className="section-heading">
           <div>
             <h2 id="today-log-title">Today’s log</h2>
-            <p>{dashboard.entries.length} food entries</p>
+            <p>
+              {dashboard.entries.length} food entr
+              {dashboard.entries.length === 1 ? 'y' : 'ies'}
+            </p>
           </div>
           <button
             className="button button-primary button-compact"
@@ -1828,22 +1807,19 @@ export function TodayPage({
 
                   <div className="field-row">
                     <label className="field">
-                      <span>Food kind</span>
+                      <span>Packaging</span>
                       <select
-                        value={entryDraft.foodKind}
+                        value={entryDraft.isPackaged ? 'packaged' : 'not-packaged'}
                         onChange={(event) =>
                           setEntryDraft((current) =>
                             current
-                              ? { ...current, foodKind: event.target.value as FoodKind }
+                              ? { ...current, isPackaged: event.target.value === 'packaged' }
                               : current
                           )
                         }
                       >
-                        {(Object.keys(FOOD_KIND_LABELS) as FoodKind[]).map((kind) => (
-                          <option value={kind} key={kind}>
-                            {FOOD_KIND_LABELS[kind]}
-                          </option>
-                        ))}
+                        <option value="not-packaged">Not packaged</option>
+                        <option value="packaged">Packaged</option>
                       </select>
                     </label>
                     <label className="field">

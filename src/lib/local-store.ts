@@ -6,6 +6,7 @@ import {
   type FoodLifecycle,
   foodsByLifecycle,
   normalizeFood,
+  normalizeFoodEntry,
 } from './food-library';
 import { entriesWithinRange } from './history';
 import { createJournalExport } from './journal-export';
@@ -35,7 +36,7 @@ import type {
 const LOCAL_STATE_KEY = 'calorie-local-state-v1';
 
 type LocalState = {
-  version: 4;
+  version: 5;
   profile: UserProfile;
   foods: Food[];
   entries: FoodEntry[];
@@ -48,7 +49,7 @@ type LocalState = {
 
 function initialState(): LocalState {
   return {
-    version: 4,
+    version: 5,
     profile: {
       userId: 'local-user',
       displayName: '',
@@ -89,13 +90,13 @@ function readState(): LocalState {
       version?: number;
       profile?: Partial<UserProfile>;
     };
-    if ([1, 2, 3, 4].includes(parsed.version ?? 0)) {
+    if ([1, 2, 3, 4, 5].includes(parsed.version ?? 0)) {
       const fallback = initialState();
       const legacyManualTarget = parsed.profile?.manualCalorieTarget ?? null;
       return {
         ...fallback,
         ...parsed,
-        version: 4,
+        version: 5,
         profile: {
           ...fallback.profile,
           ...parsed.profile,
@@ -106,7 +107,7 @@ function readState(): LocalState {
               : null),
         },
         foods: (parsed.foods ?? []).map(normalizeFood),
-        entries: parsed.entries ?? [],
+        entries: (parsed.entries ?? []).map(normalizeFoodEntry),
         waterEntries: parsed.waterEntries ?? [],
         medications: parsed.medications ?? [],
         medicationCheckIns: parsed.medicationCheckIns ?? [],
@@ -235,7 +236,7 @@ export function localAddEntry(input: FoodEntryWrite) {
     unitLabel: food.servingMode === 'per_100g' ? 'g' : food.unitLabel,
     ...scaleNutrients(food, food.servingMode, input.amount),
     eatenAt: input.eatenAt,
-    foodKind: food.foodKind,
+    isPackaged: food.isPackaged,
     labels: food.labels,
   };
   state.entries = [entry, ...state.entries.filter((item) => item.id !== entry.id)];

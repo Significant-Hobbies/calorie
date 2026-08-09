@@ -19,11 +19,12 @@ const entry = (overrides: Partial<FoodEntry> = {}): FoodEntry => ({
 describe('direct entries', () => {
   it('normalizes a valid direct snapshot', () => {
     vi.setSystemTime(1_700_000_000_000);
-    expect(normalizeDirectEntry(entry())).toMatchObject({
+    expect(normalizeDirectEntry(entry({ isPackaged: true }))).toMatchObject({
       foodId: null,
       foodName: 'Lunch special',
       unitLabel: 'serving',
       calories: 420,
+      isPackaged: true,
     });
     vi.useRealTimers();
   });
@@ -38,7 +39,10 @@ describe('direct entries', () => {
   it('creates a reusable food scaled to the direct-entry serving', () => {
     vi.setSystemTime(1_700_000_000_000);
     expect(
-      foodFromDirectEntry(entry({ amount: 2, calories: 420, proteinG: 22 }), 'food-1')
+      foodFromDirectEntry(
+        entry({ amount: 2, calories: 420, proteinG: 22, isPackaged: true }),
+        'food-1'
+      )
     ).toMatchObject({
       id: 'food-1',
       name: 'Lunch special',
@@ -47,6 +51,7 @@ describe('direct entries', () => {
       defaultAmount: 2,
       calories: 210,
       proteinG: 11,
+      isPackaged: true,
     });
     vi.useRealTimers();
   });

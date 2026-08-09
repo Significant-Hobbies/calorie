@@ -32,9 +32,14 @@ full sets/reps workout-programming system.
 
 ## Timeline
 
+- 2026-08-09 — released binary packaged/not-packaged food classification for
+  saved and one-off entries, completion-aware daily logging prompts, and a
+  Progress hardening pass covering exact accessible chart data, touch targets,
+  local-date corrections, graph spacing, and mobile polish; D1 migration
+  `0005` is applied in production
 - 2026-08-09 — adopted the Fleet Ultracite baseline for core TypeScript,
   React, and Vitest code; explicit compatibility exceptions preserve current
-  behavior while 88 files pass with zero diagnostics
+  behavior while 87 files pass with zero diagnostics
 - 2026-08-09 — released cycle sessions/analytics, owner-ordered daily prompts,
   water/weight corrections, JSON backup, food archive/classification,
   simplified food sorting, late-night/rest and non-stale exercise guidance,
@@ -69,12 +74,14 @@ full sets/reps workout-programming system.
 
 ## Features (shipped)
 
-- Shared Ultracite lint baseline with a clean 88-file check
+- Shared Ultracite lint baseline with a clean 87-file check
 - Three-step answer-aware onboarding with reload-safe drafts and visible goal math
 - Fully account-free local journal with versioned browser storage
 - Working optional Google sign-in with a dedicated production OAuth client and per-user D1 sync
 - Public privacy and terms pages for cloud-account users
 - Reusable foods per unit or per 100 g
+- Food archiving plus packaged/not-packaged classification on saved foods and
+  one-off entries
 - Direct one-off entries that do not create reusable foods
 - One-tap and custom amount/time food logging with edit, delete, and undo
 - Calories, carbs, protein, fibre, water, and weight tracking
@@ -90,9 +97,9 @@ full sets/reps workout-programming system.
   chronological food-entry details
 - Remaining-macro completion suggestions on Today with one-tap foods that
   best close the day's largest gap
-- Inferred 1–5 daily rating from calorie, protein, fibre, and water target
-  completion on Today and in calendar day detail
-- Food-analytics Insights tab with most-logged and biggest-calorie-contributor
+- Four prominent daily logging prompts that disappear as weight, supplements,
+  food, and water are completed
+- Food analytics in Progress with most-logged and biggest-calorie-contributor
   rankings over 7- and 30-day windows
 - Last-used quick picks on Today replacing the favourite pin
 - Installable PWA shell, recent cloud-state cache, and queued offline writes

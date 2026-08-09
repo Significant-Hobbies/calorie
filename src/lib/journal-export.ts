@@ -8,7 +8,7 @@ export function createJournalExport(
 ): JournalExport {
   return {
     schema: 'calorie-journal-backup',
-    version: 1,
+    version: 2,
     generatedAt: generatedAt.toISOString(),
     profile: { ...data.profile },
     foods: data.foods.map((item) => ({ ...item })),
