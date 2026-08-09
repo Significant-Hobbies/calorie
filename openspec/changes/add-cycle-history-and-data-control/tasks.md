@@ -53,3 +53,20 @@
 - [x] 7.3 Capture after screenshots at 390px, 768px, and 1440px and complete the design receipt with passing scores and evidence.
 - [x] 7.4 Run targeted tests during each group, then `pnpm check`, `git diff --check`, and strict OpenSpec validation.
 - [x] 7.5 Verify no migration, deployment, credential, production configuration, commit, push, or dependency change occurred; request final owner keep/close feedback before archival.
+
+## 8. Owner clarification follow-up
+
+- [x] 8.1 Replace the four-value food-kind contract with a tested binary `isPackaged` property across shared types, local/demo normalization, saved foods, and entry snapshots.
+- [x] 8.2 Add unapplied migration `0005_food_packaging.sql` with deterministic legacy backfill and authenticated Worker/API/export parity.
+- [x] 8.3 Replace food-kind controls with Packaged/Not packaged controls in saved-food create/edit and every direct one-off logging path.
+- [x] 8.4 Hide the entire Today daily-action surface when no incomplete prompt remains; remove explanatory mechanics copy and the aggregate “targets in view” status.
+- [x] 8.5 Correct shared Progress graph/annotation spacing, then run the requested code-level audit and one Impeccable detector pass.
+- [x] 8.6 Run focused tests, `pnpm check`, `git diff --check`, and strict OpenSpec validation; do not migrate, deploy, commit, or push without new approval.
+
+## 9. Progress audit remediation
+
+- [x] 9.1 Preserve the local calendar date when opening an existing weight check-in for editing, with an early-morning regression test.
+- [x] 9.2 Add captioned, screen-reader-only data tables containing every plotted value for all Progress charts.
+- [x] 9.3 Raise metric-filter touch targets to 44 CSS pixels and replace the one-sided accent border with the existing quiet surface treatment.
+- [x] 9.4 Correct singular count and unset-range copy, and restore valid ordered-list children for food rankings.
+- [x] 9.5 Run the focused test, full repo check, Impeccable detector, strict OpenSpec validation, and `git diff --check` without deploying.

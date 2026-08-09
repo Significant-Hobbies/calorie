@@ -5,7 +5,7 @@ import {
   normalizeDailyActionOrder,
 } from './lib/daily-action-preferences';
 import { normalizeDirectEntry } from './lib/entries';
-import { normalizeFoodKind, normalizeFoodLabels } from './lib/food-context';
+import { normalizeFoodLabels, normalizeIsPackaged } from './lib/food-context';
 import { cycleFromGoal } from './lib/goal-cycles';
 import { createJournalExport } from './lib/journal-export';
 import {
@@ -192,7 +192,7 @@ function directEntryFromBody(
     proteinG,
     fibreG,
     eatenAt,
-    foodKind: normalizeFoodKind(body.foodKind),
+    isPackaged: normalizeIsPackaged(body.isPackaged, body.foodKind),
     labels: normalizeFoodLabels(body.labels),
   });
 }
@@ -299,6 +299,7 @@ type FoodRow = {
   last_used_at: number | null;
   archived_at: number | null;
   food_kind: string;
+  is_packaged: number;
   labels_json: string;
 };
 
@@ -316,7 +317,7 @@ function mapFood(row: FoodRow): Food {
     favourite: Boolean(row.favourite),
     lastUsedAt: row.last_used_at,
     archivedAt: row.archived_at ?? null,
-    foodKind: normalizeFoodKind(row.food_kind),
+    isPackaged: normalizeIsPackaged(row.is_packaged, row.food_kind),
     labels: normalizeFoodLabels(JSON.parse(row.labels_json || '[]')),
   };
 }
@@ -333,6 +334,7 @@ type FoodEntryRow = {
   fibre_g: number;
   eaten_at: number;
   food_kind: string;
+  is_packaged: number;
   labels_json: string;
 };
 
@@ -348,7 +350,7 @@ function mapFoodEntry(row: FoodEntryRow): FoodEntry {
     proteinG: row.protein_g,
     fibreG: row.fibre_g,
     eatenAt: row.eaten_at,
-    foodKind: normalizeFoodKind(row.food_kind),
+    isPackaged: normalizeIsPackaged(row.is_packaged, row.food_kind),
     labels: normalizeFoodLabels(JSON.parse(row.labels_json || '[]')),
   };
 }
@@ -866,7 +868,7 @@ function parseFoodBody(body: Record<string, unknown>) {
     proteinG,
     fibreG,
     favourite: body.favourite === true ? 1 : 0,
-    foodKind: normalizeFoodKind(body.foodKind),
+    isPackaged: normalizeIsPackaged(body.isPackaged, body.foodKind),
     labels: normalizeFoodLabels(body.labels),
   };
 }
@@ -881,8 +883,8 @@ app.post('/api/app/foods', async (c) => {
     await c.env.DB.prepare(
       `INSERT INTO foods (
         id, user_id, name, serving_mode, unit_label, default_amount,
-        calories, carbs_g, protein_g, fibre_g, favourite, food_kind, labels_json, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+        calories, carbs_g, protein_g, fibre_g, favourite, food_kind, is_packaged, labels_json, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     )
       .bind(
         id,
@@ -896,7 +898,8 @@ app.post('/api/app/foods', async (c) => {
         parsed.proteinG,
         parsed.fibreG,
         parsed.favourite,
-        parsed.foodKind,
+        parsed.isPackaged ? 'packaged' : 'prepared',
+        parsed.isPackaged ? 1 : 0,
         JSON.stringify(parsed.labels),
         now,
         now
@@ -922,7 +925,7 @@ app.put('/api/app/foods/:id', async (c) => {
   if (!parsed) return c.json(jsonError('Complete all four nutrient values.'), 400);
   const result = await c.env.DB.prepare(
     `UPDATE foods SET name = ?, serving_mode = ?, unit_label = ?, default_amount = ?,
-      calories = ?, carbs_g = ?, protein_g = ?, fibre_g = ?, favourite = ?, food_kind = ?, labels_json = ?, updated_at = ?
+      calories = ?, carbs_g = ?, protein_g = ?, fibre_g = ?, favourite = ?, food_kind = ?, is_packaged = ?, labels_json = ?, updated_at = ?
      WHERE id = ? AND user_id = ?`
   )
     .bind(
@@ -935,7 +938,8 @@ app.put('/api/app/foods/:id', async (c) => {
       parsed.proteinG,
       parsed.fibreG,
       parsed.favourite,
-      parsed.foodKind,
+      parsed.isPackaged ? 'packaged' : 'prepared',
+      parsed.isPackaged ? 1 : 0,
       JSON.stringify(parsed.labels),
       Date.now(),
       c.req.param('id'),
@@ -1008,7 +1012,7 @@ app.post('/api/app/entries', async (c) => {
       unitLabel: food.servingMode === 'per_100g' ? 'g' : food.unitLabel,
       ...scaleNutrients(food, food.servingMode, amount),
       eatenAt,
-      foodKind: food.foodKind,
+      isPackaged: food.isPackaged,
       labels: food.labels,
     };
     foodUpdate = c.env.DB.prepare(
@@ -1025,8 +1029,8 @@ app.post('/api/app/entries', async (c) => {
   const insert = c.env.DB.prepare(
     `INSERT OR IGNORE INTO food_entries (
       id, user_id, food_id, food_name, amount, unit_label, calories,
-      carbs_g, protein_g, fibre_g, food_kind, labels_json, eaten_at, created_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      carbs_g, protein_g, fibre_g, food_kind, is_packaged, labels_json, eaten_at, created_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
   ).bind(
     entry.id,
     c.get('userId'),
@@ -1038,7 +1042,8 @@ app.post('/api/app/entries', async (c) => {
     entry.carbsG,
     entry.proteinG,
     entry.fibreG,
-    normalizeFoodKind(entry.foodKind),
+    entry.isPackaged ? 'packaged' : 'prepared',
+    entry.isPackaged ? 1 : 0,
     JSON.stringify(normalizeFoodLabels(entry.labels)),
     entry.eatenAt,
     now
@@ -1080,7 +1085,7 @@ app.patch('/api/app/entries/:id', async (c) => {
       unitLabel: food.servingMode === 'per_100g' ? 'g' : food.unitLabel,
       ...scaleNutrients(food, food.servingMode, amount),
       eatenAt,
-      foodKind: food.foodKind,
+      isPackaged: food.isPackaged,
       labels: food.labels,
     };
   } else {
@@ -1093,7 +1098,7 @@ app.patch('/api/app/entries/:id', async (c) => {
 
   const result = await c.env.DB.prepare(
     `UPDATE food_entries SET food_id = ?, food_name = ?, amount = ?, unit_label = ?,
-      calories = ?, carbs_g = ?, protein_g = ?, fibre_g = ?, food_kind = ?, labels_json = ?, eaten_at = ?
+      calories = ?, carbs_g = ?, protein_g = ?, fibre_g = ?, food_kind = ?, is_packaged = ?, labels_json = ?, eaten_at = ?
      WHERE id = ? AND user_id = ?`
   )
     .bind(
@@ -1105,7 +1110,8 @@ app.patch('/api/app/entries/:id', async (c) => {
       entry.carbsG,
       entry.proteinG,
       entry.fibreG,
-      normalizeFoodKind(entry.foodKind),
+      entry.isPackaged ? 'packaged' : 'prepared',
+      entry.isPackaged ? 1 : 0,
       JSON.stringify(normalizeFoodLabels(entry.labels)),
       entry.eatenAt,
       entry.id,

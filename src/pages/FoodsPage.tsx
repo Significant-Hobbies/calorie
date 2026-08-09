@@ -1,10 +1,10 @@
 import { Apple, Archive, Pencil, Plus, RotateCcw, Search, Trash2, X } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createFood, deleteFood, getFoods, saveFood, setFoodArchived } from '../lib/api';
-import { FOOD_KIND_LABELS, normalizeFoodLabels } from '../lib/food-context';
+import { normalizeFoodLabels } from '../lib/food-context';
 import type { FoodLifecycle } from '../lib/food-library';
 import { type FoodSortKey, sortFoods } from '../lib/food-sorting';
-import type { Food, FoodKind, ServingMode } from '../lib/types';
+import type { Food, ServingMode } from '../lib/types';
 
 type SortOption = { key: FoodSortKey; label: string; hint: string };
 
@@ -28,7 +28,7 @@ const emptyFood = (): Food => ({
   favourite: true,
   lastUsedAt: null,
   archivedAt: null,
-  foodKind: 'whole_food',
+  isPackaged: false,
   labels: [],
 });
 
@@ -279,7 +279,7 @@ export function FoodsPage() {
                   <strong>{food.name}</strong>
                   <small>{nutrientSummary(food)}</small>
                   <span className="food-context-line">
-                    {FOOD_KIND_LABELS[food.foodKind ?? 'prepared']}
+                    {food.isPackaged ? 'Packaged' : 'Not packaged'}
                     {food.labels?.length ? ` · ${food.labels.join(' · ')}` : ''}
                   </span>
                 </span>
@@ -408,20 +408,19 @@ export function FoodsPage() {
 
               <div className="field-row">
                 <label className="field">
-                  <span>Food kind</span>
+                  <span>Packaging</span>
                   <select
-                    value={draft.foodKind ?? 'prepared'}
+                    value={draft.isPackaged ? 'packaged' : 'not-packaged'}
                     onChange={(event) =>
                       setDraft((current) =>
-                        current ? { ...current, foodKind: event.target.value as FoodKind } : current
+                        current
+                          ? { ...current, isPackaged: event.target.value === 'packaged' }
+                          : current
                       )
                     }
                   >
-                    {(Object.keys(FOOD_KIND_LABELS) as FoodKind[]).map((kind) => (
-                      <option key={kind} value={kind}>
-                        {FOOD_KIND_LABELS[kind]}
-                      </option>
-                    ))}
+                    <option value="not-packaged">Not packaged</option>
+                    <option value="packaged">Packaged</option>
                   </select>
                 </label>
                 <label className="field">

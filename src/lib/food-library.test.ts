@@ -23,6 +23,13 @@ describe('food library lifecycle', () => {
     expect(normalizeFood(legacy).archivedAt).toBeNull();
   });
 
+  it('maps only the legacy packaged kind to packaged', () => {
+    expect(normalizeFood({ ...food('packaged', null), foodKind: 'packaged' }).isPackaged).toBe(
+      true
+    );
+    expect(normalizeFood({ ...food('meal', null), foodKind: 'prepared' }).isPackaged).toBe(false);
+  });
+
   it('separates active and archived foods', () => {
     const foods = [food('active', null), food('archived', 1000)];
     expect(foodsByLifecycle(foods, 'active').map((item) => item.id)).toEqual(['active']);

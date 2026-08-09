@@ -1,5 +1,6 @@
 import { useMemo } from 'react';
 import type { HistoryDay } from '../../lib/types';
+import { AccessibleChartTable } from './AccessibleChartTable';
 import { niceMax, scale } from './chart-utils';
 
 const WIDTH = 320;
@@ -78,6 +79,12 @@ export function MacroStackedChart({ days, rangeDays }: { days: HistoryDay[]; ran
           ))}
         </div>
       </div>
+
+      <AccessibleChartTable
+        caption={`Macro values for the last ${rangeDays} days`}
+        columns={['Date', 'Carbs (g)', 'Protein (g)', 'Fibre (g)']}
+        rows={days.map((day) => [day.date, day.carbsG, day.proteinG, day.fibreG])}
+      />
 
       <ul className="chart-legend">
         {SEGMENTS.map((seg) => (

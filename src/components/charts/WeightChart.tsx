@@ -1,5 +1,7 @@
 import { useMemo } from 'react';
+import { displayWeightValue } from '../../lib/log-corrections';
 import type { UserProfile, WeightEntry } from '../../lib/types';
+import { AccessibleChartTable } from './AccessibleChartTable';
 import { areaPath, linePath, scale } from './chart-utils';
 
 const WIDTH = 320;
@@ -142,6 +144,19 @@ export function WeightChart({
           </span>
         </div>
       </div>
+
+      <AccessibleChartTable
+        caption="Weight check-in values"
+        columns={['Date', `Weight (${profile.units === 'metric' ? 'kg' : 'lb'})`]}
+        rows={sorted.map((entry) => [
+          new Intl.DateTimeFormat(undefined, {
+            year: 'numeric',
+            month: 'short',
+            day: 'numeric',
+          }).format(entry.recordedAt),
+          displayWeightValue(entry.weightKg, profile.units),
+        ])}
+      />
 
       <p className="chart-note">
         {target != null

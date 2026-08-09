@@ -35,4 +35,10 @@ describe('private Worker data controls', () => {
     expect(source).toContain('createJournalExport({');
     expect(source).not.toMatch(/createJournalExport\(\{[\s\S]*?(session|token|email|cache):/);
   });
+
+  it('stores binary packaging snapshots while retaining legacy columns', () => {
+    expect(source).toContain('food_kind, is_packaged, labels_json');
+    expect(source).toContain('isPackaged: normalizeIsPackaged(row.is_packaged, row.food_kind)');
+    expect(source).toContain("entry.isPackaged ? 'packaged' : 'prepared'");
+  });
 });

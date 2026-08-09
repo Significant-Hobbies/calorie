@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { displayWeightValue, storedWeightValue, waterTotal } from './log-corrections';
+import {
+  displayWeightValue,
+  localDateInputValue,
+  storedWeightValue,
+  waterTotal,
+} from './log-corrections';
 
 describe('log correction calculations', () => {
   it('recalculates water totals after edits and removals', () => {
@@ -16,5 +21,10 @@ describe('log correction calculations', () => {
     expect(displayWeightValue(70, 'imperial')).toBe(154.3);
     expect(storedWeightValue(154.3, 'imperial')).toBe(70);
     expect(storedWeightValue(70.04, 'metric')).toBe(70);
+  });
+
+  it('keeps the local calendar day when preparing a weight edit', () => {
+    const earlyMorning = new Date(2026, 7, 9, 1, 30).getTime();
+    expect(localDateInputValue(earlyMorning)).toBe('2026-08-09');
   });
 });

@@ -13,7 +13,9 @@ Calorie is now used as a real daily journal, so changing the current goal is no 
 - Preserve legacy local and cloud journals by deriving default prompt preferences and lazily creating an active cycle session when none exists.
 - Add a backward-compatible D1 migration but do not apply or deploy it as part of implementation.
 - Harden meal-based exercise timing so weak or expired signals are never presented as the next window.
-- Fine-tune the mobile shell and saved-food library: opaque safe-area navigation, simpler predictable sorting, aligned actions, and private food-kind/label snapshots on saved and one-off entries.
+- Fine-tune the mobile shell and saved-food library: opaque safe-area navigation, simpler predictable sorting, aligned actions, and private packaging/label snapshots on saved and one-off entries.
+- Keep the incomplete daily-action queue quiet by removing completed prompts and the container itself when nothing remains.
+- Give every Progress graph deliberate separation from its labels, legend, or explanatory note.
 
 ## Capabilities
 
@@ -22,7 +24,7 @@ Calorie is now used as a real daily journal, so changing the current goal is no 
 - `goal-cycle-history`: Private cycle-session transitions, editable cycle dates, plan snapshots, and cycle-bounded interpretation.
 - `daily-action-preferences`: Owner-controlled visibility and ordering for the four incomplete daily prompts without removing standard logging surfaces.
 - `private-data-export`: A complete, versioned, user-scoped downloadable journal backup with no cross-user data exposure.
-- `food-classification`: Food kind and optional labels shared by saved foods and one-off journal snapshots, plus predictable library ordering.
+- `food-classification`: A binary Packaged/Not packaged property and optional labels shared by saved foods and one-off journal snapshots, plus predictable library ordering.
 - `guidance-and-mobile-polish`: Non-stale exercise timing and safe mobile bottom chrome.
 
 ### Modified Capabilities
@@ -34,5 +36,5 @@ Calorie is now used as a real daily journal, so changing the current goal is no 
 
 - Shared types, profile normalization, recommendation and analytics helpers, local/demo state versions, offline writes/cache behavior, client API adapters, Worker routes, and per-user D1 queries change.
 - Today, Progress, and Settings gain new multi-state controls while preserving the current botanical design system and mobile-first logging speed.
-- A new D1 migration adds cycle-session storage plus daily-prompt preference fields; existing migration `0003_food_archiving.sql` remains unapplied.
+- Additive D1 migrations store cycle-session data, prompt preferences, and a packaging boolean while retaining the already-shipped food-kind column for backward compatibility.
 - No new production dependency, credential, deployment, remote migration, medical inference, or destructive import path is introduced.

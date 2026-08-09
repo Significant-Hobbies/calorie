@@ -62,9 +62,11 @@ This is preferred over multiple CSVs because nested profile, definition, and ses
 
 Settings gains two existing-pattern disclosures: Cycle history and Daily prompts/Data backup. Today changes only prompt ordering/filtering. Progress adds one cycle overview before existing bounded trends, with sparse and comparison states. Correction editors reuse the current bottom-sheet/form patterns rather than adding a parallel interaction language.
 
-### Snapshot food context and reject expired timing signals
+### Snapshot packaging context and reject expired timing signals
 
-Saved foods and food-entry snapshots gain a compact `foodKind` enum plus normalized private labels. Direct logs expose the same fields, so analytics can later distinguish whole foods, prepared meals, packaged foods, and supplements without guessing from names. Existing rows normalize to `prepared` with no labels; no historical classification is invented beyond that neutral default.
+Saved foods and food-entry snapshots expose one binary `isPackaged` property plus normalized private labels. Direct logs expose the same fields. Migration `0005` backfills `isPackaged = true` only for rows previously marked `packaged`; every other legacy food-kind value becomes Not packaged. The already-shipped `food_kind` columns remain untouched for backward compatibility but are no longer part of the owner-facing contract.
+
+The JSON backup advances to version 2 because packaging replaces the owner-facing food-kind field. Existing version 1 files remain valid historical exports; import remains out of scope.
 
 Exercise guidance evaluates each qualifying carb entry against its own computed window, ignores entries under 10 g carbohydrate, and rejects windows whose end is already past. The result includes an `upcoming` or `active` phase so Today can say `Now` instead of showing a past start time. The mobile nav becomes a solid bottom-edge surface; the library reduces technical ratio sorts to four legible owner choices.
 
@@ -91,6 +93,7 @@ flowchart LR
 - **Queued corrections can race with another device** → use id-based last-write behavior already established by offline writes and reload authoritative state after sync.
 - **Profile list fields can drift** → normalize against the four known action keys at every boundary and test legacy, duplicate, and unknown values.
 - **The new D1 schema is not active until migration** → local mode remains testable; authenticated behavior is code-complete but must not be claimed live before the migration and deployment are explicitly approved.
+- **Legacy four-kind rows need a deterministic binary mapping** → preserve only explicit `packaged` rows as Packaged and map whole food, prepared meal, supplement, missing, or unknown values to Not packaged.
 
 ## Migration Plan
 
@@ -98,3 +101,4 @@ flowchart LR
 2. Ship code only after the migration is applied in the target environment through a separately approved release workflow.
 3. Bootstrap missing cycle sessions lazily so existing profiles do not require a destructive data rewrite.
 4. Rollback application code by ignoring the additive columns/table; do not drop user rows as part of rollback.
+5. Add but do not apply `0005_food_packaging.sql`; apply it before deploying code that reads `is_packaged` in authenticated mode.

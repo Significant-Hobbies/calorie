@@ -75,6 +75,7 @@ let foods: Food[] = [
     favourite: true,
     lastUsedAt: atToday(7, 30),
     archivedAt: null,
+    isPackaged: false,
   },
   {
     id: 'dal',
@@ -89,6 +90,7 @@ let foods: Food[] = [
     favourite: true,
     lastUsedAt: atToday(12, 45),
     archivedAt: null,
+    isPackaged: false,
   },
   {
     id: 'banana',
@@ -103,6 +105,7 @@ let foods: Food[] = [
     favourite: true,
     lastUsedAt: now - 24 * 60 * 60 * 1000,
     archivedAt: null,
+    isPackaged: false,
   },
   {
     id: 'paneer',
@@ -117,6 +120,7 @@ let foods: Food[] = [
     favourite: false,
     lastUsedAt: now - 2 * 24 * 60 * 60 * 1000,
     archivedAt: null,
+    isPackaged: false,
   },
 ];
 
@@ -132,6 +136,7 @@ let entries: FoodEntry[] = [
     proteinG: 13,
     fibreG: 6,
     eatenAt: atToday(7, 30),
+    isPackaged: false,
   },
   {
     id: 'entry-dal',
@@ -144,6 +149,7 @@ let entries: FoodEntry[] = [
     proteinG: 21,
     fibreG: 7,
     eatenAt: atToday(12, 45),
+    isPackaged: false,
   },
 ];
 
@@ -318,7 +324,7 @@ export function demoAddEntry(input: FoodEntryWrite) {
     unitLabel: food.servingMode === 'per_100g' ? 'g' : food.unitLabel,
     ...nutrients,
     eatenAt: input.eatenAt,
-    foodKind: food.foodKind,
+    isPackaged: food.isPackaged,
     labels: food.labels,
   };
   entries = [entry, ...entries.filter((item) => item.id !== entry.id)];

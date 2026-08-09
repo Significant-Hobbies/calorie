@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import type { Dashboard, HistoryDay } from '../../lib/types';
+import { AccessibleChartTable } from './AccessibleChartTable';
 import { areaPath, linePath, niceMax, type SeriesKey, scale, xPositions } from './chart-utils';
 
 const METRICS: Array<{
@@ -162,6 +163,12 @@ export function TrendChart({
           ))}
         </div>
       </div>
+
+      <AccessibleChartTable
+        caption={`${metric.label === 'Calories' ? 'Calorie' : metric.label} values for the last ${rangeDays} days`}
+        columns={['Date', `${metric.label} (${metric.unit})`]}
+        rows={days.map((day) => [day.date, metric.get(day)])}
+      />
 
       <p className="chart-note">
         {target != null ? (

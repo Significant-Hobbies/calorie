@@ -1,5 +1,12 @@
 ## ADDED Requirements
 
+### Requirement: Daily summary stays factual
+The Today summary SHALL show the nutrient totals and configured range without an aggregate target-completion label.
+
+#### Scenario: Open Today with configured targets
+- **WHEN** the owner views the daily summary
+- **THEN** it does not show “targets in view” or an equivalent count-based status
+
 ### Requirement: Visible water correction history
 The system SHALL show today's individual water check-ins with amount and local time and SHALL let the owner edit or remove any of their own check-ins without changing unrelated entries.
 

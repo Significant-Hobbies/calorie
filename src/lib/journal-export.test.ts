@@ -45,7 +45,7 @@ describe('journal export', () => {
     );
     expect(value).toMatchObject({
       schema: 'calorie-journal-backup',
-      version: 1,
+      version: 2,
       generatedAt: '2026-08-09T10:00:00.000Z',
     });
     const serialized = serializeJournalExport(value);

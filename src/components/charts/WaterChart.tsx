@@ -1,5 +1,6 @@
 import { useMemo } from 'react';
 import type { HistoryDay } from '../../lib/types';
+import { AccessibleChartTable } from './AccessibleChartTable';
 import { niceMax, scale } from './chart-utils';
 
 const WIDTH = 320;
@@ -88,6 +89,12 @@ export function WaterChart({
           ))}
         </div>
       </div>
+
+      <AccessibleChartTable
+        caption={`Water values for the last ${rangeDays} days`}
+        columns={['Date', 'Water (ml)']}
+        rows={days.map((day) => [day.date, day.waterMl])}
+      />
 
       <p className="chart-note">
         {targetMl > 0
