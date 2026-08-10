@@ -4,6 +4,22 @@ import type { Food, FoodEntry } from './types';
 const MAX_AMOUNT = 10_000;
 const MAX_NUTRIENT = 100_000;
 
+export function mergeDashboardEntry(
+  entries: FoodEntry[],
+  entry: FoodEntry,
+  dashboardDate: string,
+  timezone: string
+): FoodEntry[] {
+  const entriesWithoutSaved = entries.filter((item) => item.id !== entry.id);
+  const entryDate = new Intl.DateTimeFormat('en-CA', {
+    timeZone: timezone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(entry.eatenAt);
+  return entryDate === dashboardDate ? [entry, ...entriesWithoutSaved] : entriesWithoutSaved;
+}
+
 export function directEntryError(entry: FoodEntry): string | null {
   if (entry.foodId !== null) return 'A direct entry cannot reference a saved food.';
   if (!entry.foodName.trim() || entry.foodName.trim().length > 80) {

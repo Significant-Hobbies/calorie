@@ -1,6 +1,6 @@
 # Calorie — PROJECT STATUS
 
-Last updated: 2026-08-09
+Last updated: 2026-08-11
 
 ## Why / What
 
@@ -32,6 +32,10 @@ full sets/reps workout-programming system.
 
 ## Timeline
 
+- 2026-08-11 — removed the private-cloud dashboard's 20-food cap so the food
+  selector exposes every active food owned by the signed-in user while
+  preserving recent-use and alphabetical ordering; backdated food saves and
+  cross-date edits now stay out of Today's optimistic list and nutrient totals
 - 2026-08-10 — released a desktop-default 24-hour weekly calendar with
   timestamped food, weight, and medicine events, explicit period navigation,
   collision-safe event details, and user-scoped session caching for instant
@@ -85,6 +89,8 @@ full sets/reps workout-programming system.
 - Working optional Google sign-in with a dedicated production OAuth client and per-user D1 sync
 - Public privacy and terms pages for cloud-account users
 - Reusable foods per unit or per 100 g
+- Complete active saved-food selection without a fixed item-count cap
+- Date- and timezone-correct optimistic food logging for Today's list and totals
 - Food archiving plus packaged/not-packaged classification on saved foods and
   one-off entries
 - Direct one-off entries that do not create reusable foods
