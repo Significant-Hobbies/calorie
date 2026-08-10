@@ -40,7 +40,7 @@ import {
 } from '../lib/api';
 import { enabledDailyActions } from '../lib/daily-action-preferences';
 import { type DailyActionKey, getDailyActionState } from '../lib/daily-actions';
-import { directEntryError, foodFromDirectEntry } from '../lib/entries';
+import { directEntryError, foodFromDirectEntry, mergeDashboardEntry } from '../lib/entries';
 import { normalizeFoodLabels } from '../lib/food-context';
 import { waterTotal } from '../lib/log-corrections';
 import { computeMacroCompletion } from '../lib/macro-completion';
@@ -712,9 +712,12 @@ export function TodayPage({
       ? { ...directEntry, foodId: reusableFood.id, foodName: reusableFood.name }
       : directEntry;
     const previous = dashboard;
-    const nextEntries = entryDraft.entryId
-      ? dashboard.entries.map((entry) => (entry.id === id ? optimistic : entry))
-      : [optimistic, ...dashboard.entries];
+    const nextEntries = mergeDashboardEntry(
+      dashboard.entries,
+      optimistic,
+      dashboard.date,
+      dashboard.timezone
+    );
     let savedFood: Food | null = null;
     setPendingId(`entry-${id}`);
     try {

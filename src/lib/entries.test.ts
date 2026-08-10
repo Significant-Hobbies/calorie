@@ -1,5 +1,10 @@
 import { describe, expect, it, vi } from 'vitest';
-import { directEntryError, foodFromDirectEntry, normalizeDirectEntry } from './entries';
+import {
+  directEntryError,
+  foodFromDirectEntry,
+  mergeDashboardEntry,
+  normalizeDirectEntry,
+} from './entries';
 import type { FoodEntry } from './types';
 
 const entry = (overrides: Partial<FoodEntry> = {}): FoodEntry => ({
@@ -54,5 +59,35 @@ describe('direct entries', () => {
       isPackaged: true,
     });
     vi.useRealTimers();
+  });
+});
+
+describe('optimistic dashboard entries', () => {
+  const dashboardDate = '2026-08-11';
+  const timezone = 'Asia/Kolkata';
+
+  it('does not insert a backdated entry into the current-day dashboard', () => {
+    const current = entry({ id: 'today', eatenAt: Date.UTC(2026, 7, 11, 6) });
+    const backdated = entry({ id: 'yesterday', eatenAt: Date.UTC(2026, 7, 10, 6) });
+
+    expect(mergeDashboardEntry([current], backdated, dashboardDate, timezone)).toEqual([current]);
+  });
+
+  it('removes an edited entry that moved out of the dashboard date', () => {
+    const original = entry({ id: 'moving', eatenAt: Date.UTC(2026, 7, 11, 6) });
+    const edited = entry({ id: 'moving', eatenAt: Date.UTC(2026, 7, 10, 6) });
+    const remaining = entry({ id: 'remaining', eatenAt: Date.UTC(2026, 7, 11, 8) });
+
+    expect(mergeDashboardEntry([original, remaining], edited, dashboardDate, timezone)).toEqual([
+      remaining,
+    ]);
+  });
+
+  it('uses the dashboard timezone at a date boundary', () => {
+    const midnightInKolkata = entry({ eatenAt: Date.UTC(2026, 7, 10, 18, 30) });
+
+    expect(mergeDashboardEntry([], midnightInKolkata, dashboardDate, timezone)).toEqual([
+      midnightInKolkata,
+    ]);
   });
 });

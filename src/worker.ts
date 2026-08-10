@@ -54,6 +54,10 @@ const SECURITY_HEADERS = {
   'Permissions-Policy': 'camera=(), microphone=(), geolocation=()',
 };
 
+export const DASHBOARD_FOODS_QUERY = `SELECT * FROM foods
+  WHERE user_id = ? AND archived_at IS NULL
+  ORDER BY last_used_at DESC, name ASC`;
+
 app.use('*', async (c, next) => {
   const agentResponse = handleAgentEdge(c.req.raw);
   if (agentResponse) return agentResponse;
@@ -1501,12 +1505,7 @@ app.get('/api/app/dashboard', async (c) => {
     fastingRows,
   ] = await Promise.all([
     readProfile(c.env.DB, userId, c.get('userName')),
-    c.env.DB.prepare(
-      `SELECT * FROM foods WHERE user_id = ? AND archived_at IS NULL
-         ORDER BY last_used_at DESC, name ASC LIMIT 20`
-    )
-      .bind(userId)
-      .all<FoodRow>(),
+    c.env.DB.prepare(DASHBOARD_FOODS_QUERY).bind(userId).all<FoodRow>(),
     c.env.DB.prepare(
       `SELECT * FROM food_entries
          WHERE user_id = ? AND eaten_at >= ? AND eaten_at < ?
