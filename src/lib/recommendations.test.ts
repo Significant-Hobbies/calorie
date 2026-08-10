@@ -235,6 +235,22 @@ describe('timing calculations', () => {
     expect(result.phase).toBe('active');
   });
 
+  it('selects the most recent open exercise window without relying on entry order', () => {
+    const now = Date.UTC(2026, 6, 25, 12);
+    const result = calculateGymGuidance(
+      [
+        entry('Older open meal', now - 3 * 60 * 60 * 1000, 60),
+        entry('Future meal', now + 10 * 60 * 1000, 60),
+        entry('Expired recent snack', now - 2 * 60 * 60 * 1000, 10),
+        entry('Most recent open meal', now - 90 * 60 * 1000, 45),
+      ],
+      now
+    );
+
+    expect(result.state).toBe('window');
+    expect(result.sourceEntry).toBe('Most recent open meal');
+  });
+
   it('pushes sleep later after a heavy late meal', () => {
     const result = calculateSleepGuidance({
       wakeTime: '07:00',
