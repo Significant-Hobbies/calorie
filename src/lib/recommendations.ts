@@ -252,19 +252,28 @@ export function calculateCompletedFasts(
 }
 
 export function calculateGymGuidance(entries: FoodEntry[], now = Date.now()): GymGuidance {
-  const recent = [...entries]
-    .filter((entry) => entry.carbsG >= 10 && entry.eatenAt <= now)
-    .sort((a, b) => b.eatenAt - a.eatenAt)
-    .map((entry) => {
-      const minutes = entry.carbsG <= 20 ? [30, 90] : entry.carbsG <= 50 ? [60, 150] : [90, 240];
-      return {
-        entry,
-        startAt: entry.eatenAt + minutes[0] * 60 * 1000,
-        endAt: entry.eatenAt + minutes[1] * 60 * 1000,
-        minutes,
-      };
-    })
-    .find((candidate) => candidate.endAt >= now);
+  let recent:
+    | {
+        entry: FoodEntry;
+        startAt: number;
+        endAt: number;
+        minutes: readonly [number, number];
+      }
+    | undefined;
+
+  for (const entry of entries) {
+    if (entry.carbsG < 10 || entry.eatenAt > now) continue;
+    const minutes: readonly [number, number] =
+      entry.carbsG <= 20 ? [30, 90] : entry.carbsG <= 50 ? [60, 150] : [90, 240];
+    const endAt = entry.eatenAt + minutes[1] * 60 * 1000;
+    if (endAt < now || (recent && recent.entry.eatenAt >= entry.eatenAt)) continue;
+    recent = {
+      entry,
+      startAt: entry.eatenAt + minutes[0] * 60 * 1000,
+      endAt,
+      minutes,
+    };
+  }
 
   if (!recent) {
     return {
