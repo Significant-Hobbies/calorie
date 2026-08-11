@@ -47,7 +47,10 @@ food journal,calories,protein,macros,nutrition,meal log,water,timing,weight
 - Optional cloud mode: account identifier, name, email or Apple relay address, nutrition journal, water, weight, and routine check-ins are linked to the account for app functionality
 - Sign in with Apple: uses Apple's stable provider identifier; email equality is not used for account ownership
 - Medication routines: names and daily boolean check-ins only; no dosage or medical advice
-- App Store Connect draft: disclose contact info, user ID, and health/fitness journal data as linked to the user and used only for optional app functionality; confirm against the current questionnaire before TestFlight review
+- App Store Connect draft: disclose name, email address, user ID, Health,
+  Fitness, and Other User Content as linked to the user and used only for
+  optional app functionality; confirm against the current questionnaire before
+  TestFlight review
 - IDFA: not used
 
 ## Age rating draft
@@ -65,8 +68,10 @@ The app can be used without an account. A fresh journal contains reusable food t
 
 ## Screenshots and release
 
-- iPhone 6.9-inch portrait: `today.png`, `quick-log.png`, `foods.png`, `progress.png`, and `you.png`
-- Each store image is `1206 × 2622`, an accepted 6.9-inch screenshot size
+- iPhone 6.9-inch portrait: `artifacts/app-store/iphone-6.9/today.jpg`,
+  `quick-log.jpg`, `foods.jpg`, `progress.jpg`, and `you.jpg`
+- Each store image is `1320 × 2868`, has no alpha channel, and is an accepted
+  6.9-inch screenshot size
 - Dark Mode and accessibility evidence are retained separately and are not in the default store sequence
 - iPad screenshots: not required; the target is iPhone only
 - App previews: omit for version 1.0
