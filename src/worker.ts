@@ -48,7 +48,7 @@ import {
   saveNativeHandoff,
 } from './server/native-handoff';
 import { DASHBOARD_FOODS_QUERY } from './server/queries';
-import { authenticateReadToken, createReadToken, hashReadToken } from './server/read-tokens';
+import { authenticateMcpRead, createReadToken, hashReadToken } from './server/read-tokens';
 
 type AppBindings = AuthBindings;
 type AppVariables = {
@@ -248,11 +248,20 @@ app.use('/api/app/*', async (c, next) => {
 });
 
 app.use('/api/mcp/*', async (c, next) => {
-  const userId = await authenticateReadToken(c.env.DB, c.req.header('Authorization'));
-  if (!userId) {
+  const auth = await authenticateMcpRead(c.env.DB, c.req.header('Authorization'), c.env);
+  if (auth.status === 'account_not_found') {
+    return c.json(
+      {
+        code: 'ACCOUNT_NOT_FOUND',
+        message: 'Sign in to Calorie with the same Google account first.',
+      },
+      403
+    );
+  }
+  if (auth.status !== 'authorized') {
     return c.json({ code: 'UNAUTHORIZED', message: 'Provide a valid Calorie read token.' }, 401);
   }
-  c.set('mcpUserId', userId);
+  c.set('mcpUserId', auth.userId);
   await next();
 });
 
