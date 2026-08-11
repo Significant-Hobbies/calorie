@@ -47,6 +47,7 @@ import {
   NATIVE_AUTH_CALLBACK,
   saveNativeHandoff,
 } from './server/native-handoff';
+import { DASHBOARD_FOODS_QUERY } from './server/queries';
 import { authenticateReadToken, createReadToken, hashReadToken } from './server/read-tokens';
 
 type AppBindings = AuthBindings;
@@ -66,10 +67,6 @@ const SECURITY_HEADERS = {
   'Referrer-Policy': 'strict-origin-when-cross-origin',
   'Permissions-Policy': 'camera=(), microphone=(), geolocation=()',
 };
-
-export const DASHBOARD_FOODS_QUERY = `SELECT * FROM foods
-  WHERE user_id = ? AND archived_at IS NULL
-  ORDER BY last_used_at DESC, name ASC`;
 
 app.use('*', async (c, next) => {
   const agentResponse = handleAgentEdge(c.req.raw);
