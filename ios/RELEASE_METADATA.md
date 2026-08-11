@@ -18,20 +18,20 @@ Preparation only. No App Store Connect record has been created.
 
 ## Store copy
 
-**Subtitle**  
+**Subtitle**
 A food journal that shows its work
 
-**Promotional text**  
+**Promotional text**
 Log familiar food in seconds, see four nutrients and useful timing, and keep every estimate transparent.
 
-**Description**  
+**Description**
 Calorie is a small, private food journal for the moments right after you eat. Record calories, protein, carbohydrates, fat, fibre, water, weight check-ins, and simple medication routines without punitive scores or streak pressure.
 
 Daily targets can be entered manually or estimated with a published equation profile. Every timing suggestion names its recorded inputs and rule, and clearly remains an estimate—not medical advice.
 
 Logging works locally without an account. Review days and weeks, meal timing, trends, familiar and custom foods, and export or preview-replace your journal whenever you choose.
 
-**Keywords**  
+**Keywords**
 food journal,calories,protein,macros,nutrition,meal log,water,timing,weight
 
 ## URLs
