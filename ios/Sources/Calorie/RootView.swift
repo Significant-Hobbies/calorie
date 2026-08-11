@@ -61,23 +61,23 @@ private struct ReconciliationView: View {
                     comparison
                     choice(
                         title: "Use cloud journal",
-                        detail: "Replace supported records on this iPhone with your existing web history. Appearance stays the same.",
+                        detail: "Replace supported records on this device with your existing web history. Appearance stays the same.",
                         symbol: "icloud.and.arrow.down.fill",
                         choice: .keepCloud
                     )
                     choice(
                         title: "Merge both journals",
-                        detail: "Keep records from both sides. If the same record was edited twice, this iPhone's version stays.",
+                        detail: "Keep records from both sides. If the same record was edited twice, this device's version stays.",
                         symbol: "arrow.triangle.merge",
                         choice: .merge
                     )
                     choice(
-                        title: "Keep this iPhone",
-                        detail: "Leave this iPhone unchanged and upload its food, water, weight, and routine records.",
+                        title: "Keep this device",
+                        detail: "Leave this device unchanged and upload its food, water, weight, and routine records.",
                         symbol: "iphone.gen3",
                         choice: .keepIPhone
                     )
-                    Text("Meal labels, cycle context, daily notes, and fat values that exist only on iPhone stay on iPhone. Calorie never invents missing cloud fields.")
+                    Text("Meal labels, cycle context, daily notes, and fat values that exist only on this device stay on this device. Calorie never invents missing cloud fields.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
@@ -137,7 +137,7 @@ private struct ReconciliationView: View {
 
     @ViewBuilder
     private var comparisonCards: some View {
-        countCard("This iPhone", counts: JournalCounts(document: model.document), tint: CaloriePalette.moss)
+        countCard("This device", counts: JournalCounts(document: model.document), tint: CaloriePalette.moss)
         countCard("Cloud journal", counts: model.cloudSnapshot?.counts ?? JournalCounts(document: CalorieDocument()), tint: CaloriePalette.cherry)
     }
 
@@ -190,8 +190,8 @@ private struct ReconciliationView: View {
     private var confirmationTitle: String {
         guard let proposedChoice else { return "Choose a journal" }
         return switch proposedChoice {
-        case .keepCloud: "Replace this iPhone's supported records?"
-        case .keepIPhone: "Upload this iPhone's supported records?"
+        case .keepCloud: "Replace this device's supported records?"
+        case .keepIPhone: "Upload this device's supported records?"
         case .merge: "Merge both journals?"
         }
     }
@@ -200,18 +200,18 @@ private struct ReconciliationView: View {
         guard let proposedChoice else { return "Nothing changes until you confirm." }
         return switch proposedChoice {
         case .keepCloud:
-            "Cloud food, water, weight, and routine history will replace those categories here. Notes, meal labels, cycle context, fat values, and appearance that only exist on this iPhone stay here."
+            "Cloud food, water, weight, and routine history will replace those categories here. Notes, meal labels, cycle context, fat values, and appearance that only exist on this device stay here."
         case .keepIPhone:
-            "This iPhone stays unchanged. Its supported records will be queued for cloud sync; device-only notes and context remain private to this iPhone."
+            "This device stays unchanged. Its supported records will be queued for cloud sync; device-only notes and context remain private to this device."
         case .merge:
-            "Records from both journals will be kept. When the same record exists in both places, this iPhone's version will be used."
+            "Records from both journals will be kept. When the same record exists in both places, this device's version will be used."
         }
     }
 
     private func confirmationAction(_ choice: JournalReconciliationChoice) -> String {
         switch choice {
         case .keepCloud: "Use cloud records"
-        case .keepIPhone: "Keep and upload iPhone records"
+        case .keepIPhone: "Keep and upload device records"
         case .merge: "Merge journals"
         }
     }

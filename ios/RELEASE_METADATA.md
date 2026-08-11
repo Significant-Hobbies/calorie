@@ -70,9 +70,11 @@ The app can be used without an account. A fresh journal contains reusable food t
 
 - iPhone 6.9-inch portrait: `ios/artifacts/app-store/iphone-6.9/today.jpg`,
   `quick-log.jpg`, `foods.jpg`, `progress.jpg`, and `you.jpg`
-- Each store image is `1320 × 2868`, has no alpha channel, and is an accepted
-  6.9-inch screenshot size
+- iPad 13-inch portrait: `ios/artifacts/app-store/ipad-13/today.jpg`,
+  `quick-log.jpg`, `foods.jpg`, `progress.jpg`, and `you.jpg`
+- Each iPhone image is `1320 × 2868`; each iPad image is `2064 × 2752`.
+  Every store image has no alpha channel and uses an accepted screenshot size.
 - Dark Mode and accessibility evidence are retained separately and are not in the default store sequence
-- iPad screenshots: not required; the target is iPhone only
+- The target is universal, so both the iPhone and iPad sequences are required
 - App previews: omit for version 1.0
 - Release: manual

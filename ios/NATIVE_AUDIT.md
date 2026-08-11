@@ -10,7 +10,7 @@ Audit target: iPhone simulator build of the native SwiftUI application in light 
 | Performance | 4/4 | Atomic local journal, bounded queries, native Charts, and no blocking startup or polling work. |
 | Appearance | 4/4 | Cohesive botanical journal identity, adaptive semantic colors, restrained materials, and consistent hierarchy in Light, Dark, and System modes. |
 | Platform conventions | 4/4 | SwiftUI tabs, sheets, menus, confirmations, forms, Charts, and native content-size behavior. |
-| Adaptivity | 3/4 | Compact and accessibility layouts reflow cleanly across iPhone orientations. Dedicated iPad composition is outside this submission scope. |
+| Adaptivity | 3/4 | Compact and accessibility layouts reflow cleanly across iPhone orientations, and the universal 13-inch iPad Release routes are store-ready. Physical iPad window resizing and keyboard behavior remain device checks. |
 
 **Total: 18/20 — Excellent**
 
@@ -25,7 +25,7 @@ Audit target: iPhone simulator build of the native SwiftUI application in light 
 
 - P0: 0
 - P1: 0
-- P2: 2 — physical-device VoiceOver pass; dedicated iPad composition if that device class enters scope.
+- P2: 2 — physical-device VoiceOver pass; physical iPad window-resizing and keyboard pass.
 - P3: 0
 
 ## Evidence

@@ -357,7 +357,7 @@ struct YouView: View {
             }
             Button("Cancel", role: .cancel) {}
         } message: {
-            Text("Cloud data and linked sign-ins will be deleted. Your journal on this iPhone will remain until you reset it separately.")
+            Text("Cloud data and linked sign-ins will be deleted. Your journal on this device will remain until you reset it separately.")
         }
     }
 
@@ -409,7 +409,7 @@ struct YouView: View {
                 appleButton
             }
         } else {
-            Label("On this iPhone", systemImage: "iphone.gen3")
+            Label("On this device", systemImage: "ipad.and.iphone")
                 .font(.headline)
                 .frame(minHeight: 44)
             Text("Already use Calorie on the web? Connect that journal first, then add Apple. Email matching is never used to guess ownership.")
@@ -469,7 +469,7 @@ struct YouView: View {
 
     private var syncStatusText: String {
         switch model.document.syncState {
-        case .localOnly: "On this iPhone"
+        case .localOnly: "On this device"
         case .pending: model.pendingSyncCount == 1 ? "1 change pending" : "\(model.pendingSyncCount) changes pending"
         case .synced: "Up to date"
         case .conflict: "Choice required"

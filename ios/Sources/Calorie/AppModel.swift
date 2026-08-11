@@ -267,7 +267,7 @@ final class AppModel {
                 await prepareCloudReconciliation()
             }
         } catch {
-            message = accountErrorMessage(error, recovery: "Try Apple sign-in again. Your iPhone journal has not changed.")
+            message = accountErrorMessage(error, recovery: "Try Apple sign-in again. Your device journal has not changed.")
         }
     }
 
@@ -278,7 +278,7 @@ final class AppModel {
         document.syncState = .localOnly
         try? await store.save(document)
         isAccountWorking = false
-        accountNotice = "Signed out. This iPhone journal is still here."
+        accountNotice = "Signed out. This device journal is still here."
     }
 
     func deleteCloudAccount() async {
@@ -291,9 +291,9 @@ final class AppModel {
             account = nil
             document.syncState = .localOnly
             try await store.save(document)
-            accountNotice = "Cloud account deleted. This iPhone journal was preserved."
+            accountNotice = "Cloud account deleted. This device journal was preserved."
         } catch {
-            message = accountErrorMessage(error, recovery: "Try deleting the cloud account again. Nothing was removed from this iPhone.")
+            message = accountErrorMessage(error, recovery: "Try deleting the cloud account again. Nothing was removed from this device.")
         }
     }
 
@@ -316,9 +316,9 @@ final class AppModel {
             self.cloudSnapshot = nil
             isReconciliationPresented = false
             accountNotice = switch choice {
-            case .keepCloud: "Your current cloud journal is now on this iPhone."
-            case .keepIPhone: "This iPhone journal is preserved and queued for cloud sync."
-            case .merge: "Cloud and iPhone records were merged without duplicate IDs."
+            case .keepCloud: "Your current cloud journal is now on this device."
+            case .keepIPhone: "This device journal is preserved and queued for cloud sync."
+            case .merge: "Cloud and device records were merged without duplicate IDs."
             }
         } catch {
             message = accountErrorMessage(error, recovery: "Try this journal choice again. Neither journal was discarded.")
@@ -347,7 +347,7 @@ final class AppModel {
         } catch {
             document.syncState = .failed
             try? await store.save(document)
-            message = accountErrorMessage(error, recovery: "Try loading your cloud journal again. This iPhone journal has not changed.")
+            message = accountErrorMessage(error, recovery: "Try loading your cloud journal again. This device journal has not changed.")
         }
     }
 
@@ -371,7 +371,7 @@ final class AppModel {
         } catch {
             document.syncState = pendingSyncCount > 0 ? .pending : .failed
             try? await store.save(document)
-            message = accountErrorMessage(error, recovery: "Your changes are saved on this iPhone and cloud sync can be retried.")
+            message = accountErrorMessage(error, recovery: "Your changes are saved on this device and cloud sync can be retried.")
         }
     }
 

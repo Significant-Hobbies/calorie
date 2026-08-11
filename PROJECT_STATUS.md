@@ -1,12 +1,12 @@
 # Calorie — PROJECT STATUS
 
-Last updated: 2026-08-11
+Last updated: 2026-08-12
 
 ## Why / What
 
 Calorie is a private, mobile-first food, water, and weight journal that turns
 lightweight macro tracking into practical daily timing guidance. It works
-account-free with local browser or iPhone storage; optional Google or native
+account-free with local browser or iOS-device storage; optional Google or native
 Apple sign-in can add private Cloudflare D1 sync.
 
 In scope: timestamped food entries, reusable foods measured per 100 g or per
@@ -25,7 +25,7 @@ full sets/reps workout-programming system.
 - React and Vite
 - Optional Google OAuth and native Apple ID-token verification through Better
   Auth
-- SwiftUI, AuthenticationServices, and Keychain for the native iPhone client
+- SwiftUI, AuthenticationServices, and Keychain for the native iOS client
 - Cloudflare Workers, static assets, and D1 for optional cloud sync
 
 ### Internal
@@ -39,8 +39,8 @@ full sets/reps workout-programming system.
   durable offline sync intents, and single-use Google-to-native handoffs; D1
   migration `0007` is applied in production and the Worker is SHA-tagged at
   100% traffic
-- 2026-08-11 — prepared the first native SwiftUI iPhone beta with complete
-  local-first food and daily-care logging, transparent guidance, progress,
+- 2026-08-11 — prepared the first universal native SwiftUI iPhone and iPad beta
+  with complete local-first food and daily-care logging, transparent guidance, progress,
   data transfer, accessibility, simulator coverage, App Store metadata, and a
   personal-team signed archive with a verified Sign in with Apple entitlement
 - 2026-08-11 — finalized the food-first mobile Today hierarchy and actionable
@@ -93,14 +93,14 @@ full sets/reps workout-programming system.
 
 ## Products
 
-- Native SwiftUI iPhone beta under `ios/`; App Store Connect/TestFlight
+- Universal native SwiftUI iPhone and iPad beta under `ios/`; App Store Connect/TestFlight
   transport remains manual
 - Installable local-first web app
 - Production Worker — `https://calorie.significanthobbies.com`
 
 ## Features (shipped)
 
-- Native iPhone journal with local onboarding, food/water/weight/routine
+- Native iPhone and iPad journal with local onboarding, food/water/weight/routine
   capture, transparent calculations and guidance, progress/history, food
   management, data transfer, appearance and accessibility support, simulator
   tests, and personal-team archiving

@@ -75,7 +75,7 @@ struct TodayView: View {
     }
 
     private var syncLabel: some View {
-        Text(model.document.syncState == .localOnly ? "On this iPhone" : model.document.syncState.rawValue)
+        Text(model.document.syncState == .localOnly ? "On this device" : model.document.syncState.rawValue)
             .font(.caption.weight(.bold))
             .foregroundStyle(.secondary)
     }
