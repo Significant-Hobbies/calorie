@@ -84,6 +84,17 @@
             parallelizable = "NO">
             <BuildableReference
                BuildableIdentifier = "primary"
+               BlueprintIdentifier = "DF1260293A15F303E48EC737"
+               BuildableName = "CalorieTests.xctest"
+               BlueprintName = "CalorieTests"
+               ReferencedContainer = "container:Calorie.xcodeproj">
+            </BuildableReference>
+         </TestableReference>
+         <TestableReference
+            skipped = "NO"
+            parallelizable = "NO">
+            <BuildableReference
+               BuildableIdentifier = "primary"
                BlueprintIdentifier = "77ED3E0B8D7C160F02DF2A45"
                BuildableName = "CalorieUITests.xctest"
                BlueprintName = "CalorieUITests"

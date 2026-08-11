@@ -30,6 +30,23 @@ targets:
   Calorie:
     type: application
     platform: iOS
+    info:
+      path: Sources/Calorie/Info.plist
+      properties:
+        CFBundleDisplayName: Calorie
+        CFBundleURLTypes:
+          - CFBundleTypeRole: Editor
+            CFBundleURLSchemes:
+              - calorie
+        ITSAppUsesNonExemptEncryption: false
+        LSApplicationCategoryType: public.app-category.healthcare-fitness
+        UIApplicationSupportsIndirectInputEvents: true
+        UILaunchScreen: {}
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
+          - UIInterfaceOrientationPortraitUpsideDown
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
     sources:
       - path: Sources/Calorie
       - path: Sources/Calorie/Resources
@@ -40,14 +57,8 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.significanthobbies.calorie
         PRODUCT_NAME: Calorie
+        CODE_SIGN_ENTITLEMENTS: Sources/Calorie/Calorie.entitlements
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
-        GENERATE_INFOPLIST_FILE: YES
-        INFOPLIST_KEY_CFBundleDisplayName: Calorie
-        INFOPLIST_KEY_ITSAppUsesNonExemptEncryption: NO
-        INFOPLIST_KEY_LSApplicationCategoryType: public.app-category.healthcare-fitness
-        INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents: YES
-        INFOPLIST_KEY_UILaunchScreen_Generation: YES
-        INFOPLIST_KEY_UISupportedInterfaceOrientations: "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight"
         SUPPORTS_MACCATALYST: NO
   CalorieCoreTests:
     type: bundle.unit-test
@@ -58,6 +69,16 @@ targets:
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.significanthobbies.calorie.core-tests
+        GENERATE_INFOPLIST_FILE: YES
+  CalorieTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources: Tests/CalorieTests
+    dependencies:
+      - target: Calorie
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.significanthobbies.calorie.tests
         GENERATE_INFOPLIST_FILE: YES
   CalorieUITests:
     type: bundle.ui-testing
@@ -79,6 +100,7 @@ schemes:
     test:
       targets:
         - CalorieCoreTests
+        - CalorieTests
         - CalorieUITests
       gatherCoverageData: true
     run:

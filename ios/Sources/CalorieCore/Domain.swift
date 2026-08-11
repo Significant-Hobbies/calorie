@@ -302,14 +302,22 @@ public struct CalorieDocument: Codable, Equatable, Sendable {
 }
 
 public extension CalorieDocument {
-    static var sample: CalorieDocument {
-        let foods = [
+    private static var seedFoods: [Food] {
+        [
             Food(name: "Greek yoghurt bowl", servingName: "1 bowl", servingGrams: 280, nutrients: Nutrients(calories: 410, protein: 29, carbohydrates: 48, fat: 11, fibre: 7), isFavorite: true),
             Food(name: "Paneer rice bowl", servingName: "1 bowl", servingGrams: 420, nutrients: Nutrients(calories: 620, protein: 31, carbohydrates: 72, fat: 23, fibre: 8), isFavorite: true),
             Food(name: "Banana", servingName: "1 medium", servingGrams: 118, nutrients: Nutrients(calories: 105, protein: 1.3, carbohydrates: 27, fat: 0.4, fibre: 3.1)),
             Food(name: "Masala omelette", servingName: "2 eggs", servingGrams: 150, nutrients: Nutrients(calories: 240, protein: 17, carbohydrates: 7, fat: 16, fibre: 1.5)),
             Food(name: "Dal and roti", servingName: "1 plate", servingGrams: 380, nutrients: Nutrients(calories: 510, protein: 22, carbohydrates: 79, fat: 12, fibre: 15)),
         ]
+    }
+
+    static var starter: CalorieDocument {
+        CalorieDocument(foods: seedFoods)
+    }
+
+    static var sample: CalorieDocument {
+        let foods = seedFoods
         let calendar = Calendar.current
         let today = calendar.startOfDay(for: .now)
         let yoghurt = foods[0]

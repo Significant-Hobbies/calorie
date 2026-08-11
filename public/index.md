@@ -4,7 +4,7 @@ Private, local-first food, water, and weight journal.
 
 ## Public boundary
 
-- Product explanation and optional Google sign-in
+- Product explanation, optional Google sign-in, and explicit native Apple account linking
 - Deterministic methodology with visible assumptions
 - No public food, water, weight, profile, or journal data
 

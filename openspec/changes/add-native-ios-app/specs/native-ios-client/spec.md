@@ -40,7 +40,23 @@ The iOS client SHALL provide day and week history, calendar and time-grid review
 - **THEN** the client shows recorded totals and trends without punitive scoring or streak pressure
 
 ### Requirement: Optional account mode preserves a useful local journal
-The iOS client SHALL be fully usable without an account. When an account is connected through existing Calorie contracts, the client SHALL expose synchronization state, deterministic conflict behavior, sign out, export, and account deletion without silently discarding local records.
+The iOS client SHALL be fully usable without an account. It SHALL support native Sign in with Apple using Apple's stable provider identifier, not an email address, and SHALL store session material only in Keychain. When an account is connected through existing Calorie contracts, the client SHALL expose synchronization state, durable pending writes, deterministic conflict behavior, sign out, export, and account deletion without silently discarding local records.
+
+#### Scenario: Existing owner connects their current journal
+- **WHEN** an owner chooses to connect existing Calorie data, proves control of the Google-authenticated account, and completes Sign in with Apple
+- **THEN** the Apple provider identity is explicitly linked to that same Calorie user and the iOS client previews the existing D1 journal before merging or replacing local records
+
+#### Scenario: Apple provides a private relay address
+- **WHEN** Sign in with Apple returns a private relay address or omits email after the first authorization
+- **THEN** Calorie identifies the account by Apple's verified stable subject and does not infer ownership from email equality
+
+#### Scenario: Local and cloud journals both contain records
+- **WHEN** an authenticated first sync finds records on both sides
+- **THEN** the client shows counts and timestamps, offers keep-cloud, keep-iPhone, or deterministic ID-based merge, and performs no destructive reconciliation before explicit confirmation
+
+#### Scenario: Offline write waits for sync
+- **WHEN** an authenticated owner records supported journal data without connectivity
+- **THEN** the local save completes immediately, a durable owner-scoped intent remains pending, and the client retries it after connectivity returns
 
 #### Scenario: User signs out
 - **WHEN** an authenticated user signs out

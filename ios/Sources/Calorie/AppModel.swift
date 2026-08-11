@@ -6,7 +6,7 @@ import SwiftUI
 @MainActor
 @Observable
 final class AppModel {
-    private(set) var document: CalorieDocument = .sample
+    private(set) var document: CalorieDocument = .starter
     var selectedDate = Date.now
     var selectedTab = 0
     var isLoading = true
@@ -15,11 +15,26 @@ final class AppModel {
     var lastDeletedEntry: FoodEntry?
     var importPreview: CalorieDocument?
     var isImportConfirmationPresented = false
+    private(set) var account: CalorieAccount?
+    private(set) var isAccountWorking = false
+    private(set) var accountNotice: String?
+    private(set) var cloudSnapshot: CloudJournalSnapshot?
+    var isReconciliationPresented = false
+    private(set) var pendingSyncCount = 0
 
     private let store: CalorieStore
+    private let accountClient: NativeAccountClient
+    private let syncStore: SyncIntentStore
+    private let webAuthentication = WebAuthenticationCoordinator()
 
-    init(store: CalorieStore = CalorieStore()) {
+    init(
+        store: CalorieStore = CalorieStore(),
+        accountClient: NativeAccountClient = NativeAccountClient(),
+        syncStore: SyncIntentStore = SyncIntentStore()
+    ) {
         self.store = store
+        self.accountClient = accountClient
+        self.syncStore = syncStore
         if ProcessInfo.processInfo.arguments.contains("--progress-demo") { selectedTab = 1 }
         if ProcessInfo.processInfo.arguments.contains("--foods-demo") { selectedTab = 2 }
         if ProcessInfo.processInfo.arguments.contains("--you-demo") { selectedTab = 3 }
@@ -43,8 +58,15 @@ final class AppModel {
         do {
             document = ProcessInfo.processInfo.arguments.contains("--fresh-demo") ? .sample : try await store.load()
             if ProcessInfo.processInfo.arguments.contains("--quick-log-demo") { isQuickLogPresented = true }
+            account = try? await accountClient.restoreAccount()
+            pendingSyncCount = (try? await syncStore.pending().count) ?? 0
+            if account?.hasApple == true, document.syncState == .localOnly {
+                await prepareCloudReconciliation()
+            } else if account != nil, pendingSyncCount > 0 {
+                await syncNow()
+            }
         } catch {
-            document = .sample
+            document = .starter
             message = error.localizedDescription
         }
     }
@@ -56,7 +78,7 @@ final class AppModel {
     }
 
     func delete(_ entry: FoodEntry) async {
-        await mutate { document in
+        await mutate(deletions: [.deleteFoodEntry(entry.id)]) { document in
             lastDeletedEntry = try document.deleteEntry(entry.id)
         }
         message = "Entry removed. Undo is available below."
@@ -97,7 +119,12 @@ final class AppModel {
     }
 
     func toggleRoutine(_ routine: MedicationRoutine) async {
-        await mutate { $0.toggleRoutine(routine.id, on: selectedDate) }
+        let deletion = document.routineCheckIns.first {
+            $0.routineID == routine.id && Calendar.current.isDate($0.date, inSameDayAs: selectedDate)
+        }.map { SyncOperation.deleteRoutineCheckIn($0.id) }
+        await mutate(deletions: deletion.map { [$0] } ?? []) {
+            $0.toggleRoutine(routine.id, on: selectedDate)
+        }
     }
 
     func toggleFavorite(_ food: Food) async {
@@ -128,7 +155,10 @@ final class AppModel {
     }
 
     func saveDailyContext(weightKilograms: Double?, note: String, cycle: CycleContext) async {
-        await mutate { document in
+        let removedWeights = document.weightEntries
+            .filter { Calendar.current.isDate($0.date, inSameDayAs: selectedDate) }
+            .map { SyncOperation.deleteWeightEntry($0.id) }
+        await mutate(deletions: removedWeights) { document in
             let calendar = Calendar.current
             document.weightEntries.removeAll { calendar.isDate($0.date, inSameDayAs: selectedDate) }
             if let weightKilograms, weightKilograms > 0 {
@@ -184,6 +214,10 @@ final class AppModel {
         do {
             try await store.replace(with: importPreview)
             document = importPreview
+            if account != nil {
+                try await syncStore.enqueue(.snapshot(importPreview))
+                await syncNow()
+            }
             self.importPreview = nil
             isImportConfirmationPresented = false
             message = "Calorie journal replaced."
@@ -195,19 +229,173 @@ final class AppModel {
     func resetLocalData() async {
         do {
             try await store.reset()
-            document = .sample
+            document = .starter
             message = "Local journal reset."
         } catch {
             message = error.localizedDescription
         }
     }
 
-    private func mutate(_ operation: (inout CalorieDocument) throws -> Void) async {
+    func connectExistingAccount() async {
+        accountNotice = nil
+        isAccountWorking = true
+        defer { isAccountWorking = false }
+        do {
+            let startURL = await accountClient.googleStartURL
+            let callback = try await webAuthentication.authenticate(at: startURL)
+            guard
+                let components = URLComponents(url: callback, resolvingAgainstBaseURL: false),
+                let code = components.queryItems?.first(where: { $0.name == "code" })?.value
+            else { throw NativeAccountError.invalidCallback }
+            account = try await accountClient.exchangeGoogleHandoff(code)
+            accountNotice = "Existing journal connected. Add Apple once so future Apple sign-ins open this journal."
+        } catch {
+            message = accountErrorMessage(error, recovery: "Try connecting your existing journal again.")
+        }
+    }
+
+    func completeAppleSignIn(_ payload: AppleIdentityPayload) async {
+        accountNotice = nil
+        isAccountWorking = true
+        defer { isAccountWorking = false }
+        do {
+            if let account, !account.hasApple {
+                self.account = try await accountClient.linkApple(payload)
+                await prepareCloudReconciliation()
+            } else {
+                account = try await accountClient.signInWithApple(payload)
+                await prepareCloudReconciliation()
+            }
+        } catch {
+            message = accountErrorMessage(error, recovery: "Try Apple sign-in again. Your iPhone journal has not changed.")
+        }
+    }
+
+    func signOut() async {
+        isAccountWorking = true
+        await accountClient.signOut()
+        account = nil
+        document.syncState = .localOnly
+        try? await store.save(document)
+        isAccountWorking = false
+        accountNotice = "Signed out. This iPhone journal is still here."
+    }
+
+    func deleteCloudAccount() async {
+        isAccountWorking = true
+        defer { isAccountWorking = false }
+        do {
+            try await accountClient.deleteAccount()
+            try await syncStore.removeAll()
+            pendingSyncCount = 0
+            account = nil
+            document.syncState = .localOnly
+            try await store.save(document)
+            accountNotice = "Cloud account deleted. This iPhone journal was preserved."
+        } catch {
+            message = accountErrorMessage(error, recovery: "Try deleting the cloud account again. Nothing was removed from this iPhone.")
+        }
+    }
+
+    func reconcileJournal(_ choice: JournalReconciliationChoice) async {
+        guard let cloudSnapshot else { return }
+        isAccountWorking = true
+        defer { isAccountWorking = false }
+        do {
+            let next = CloudJournalMapper.reconcile(local: document, cloud: cloudSnapshot, choice: choice)
+            if choice == .keepCloud {
+                try await syncStore.removeAll()
+                pendingSyncCount = 0
+            }
+            try await store.save(next)
+            document = next
+            if choice != .keepCloud {
+                try await syncStore.enqueue(.snapshot(next))
+                await syncNow()
+            }
+            self.cloudSnapshot = nil
+            isReconciliationPresented = false
+            accountNotice = switch choice {
+            case .keepCloud: "Your current cloud journal is now on this iPhone."
+            case .keepIPhone: "This iPhone journal is preserved and queued for cloud sync."
+            case .merge: "Cloud and iPhone records were merged without duplicate IDs."
+            }
+        } catch {
+            message = accountErrorMessage(error, recovery: "Try this journal choice again. Neither journal was discarded.")
+        }
+    }
+
+    func deferReconciliation() {
+        isReconciliationPresented = false
+        accountNotice = "Your journals are unchanged. Resolve them whenever you are ready."
+    }
+
+    func resumeReconciliation() async {
+        if cloudSnapshot != nil {
+            isReconciliationPresented = true
+        } else {
+            await prepareCloudReconciliation()
+        }
+    }
+
+    private func prepareCloudReconciliation() async {
+        do {
+            cloudSnapshot = try CloudJournalMapper.decode(await accountClient.cloudExport())
+            document.syncState = .conflict
+            try await store.save(document)
+            isReconciliationPresented = true
+        } catch {
+            document.syncState = .failed
+            try? await store.save(document)
+            message = accountErrorMessage(error, recovery: "Try loading your cloud journal again. This iPhone journal has not changed.")
+        }
+    }
+
+    func syncNow() async {
+        guard account != nil else { return }
+        if document.syncState == .conflict {
+            await resumeReconciliation()
+            return
+        }
+        do {
+            let pending = try await syncStore.pending()
+            pendingSyncCount = pending.count
+            for intent in pending {
+                try await accountClient.apply(intent)
+                try await syncStore.complete(intent.id)
+                pendingSyncCount -= 1
+            }
+            document.syncState = .synced
+            document.lastSyncedAt = .now
+            try await store.save(document)
+        } catch {
+            document.syncState = pendingSyncCount > 0 ? .pending : .failed
+            try? await store.save(document)
+            message = accountErrorMessage(error, recovery: "Your changes are saved on this iPhone and cloud sync can be retried.")
+        }
+    }
+
+    private func accountErrorMessage(_ error: Error, recovery: String) -> String {
+        let detail = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
+        return "\(detail) \(recovery)"
+    }
+
+    private func mutate(
+        deletions: [SyncOperation] = [],
+        _ operation: (inout CalorieDocument) throws -> Void
+    ) async {
         do {
             var next = document
             try operation(&next)
+            if account != nil { next.syncState = .pending }
             try await store.save(next)
             document = next
+            if account != nil {
+                for deletion in deletions { try await syncStore.enqueue(deletion) }
+                try await syncStore.enqueue(.snapshot(next))
+                pendingSyncCount = (try await syncStore.pending()).count
+                await syncNow()
+            }
         } catch {
             message = error.localizedDescription
         }
