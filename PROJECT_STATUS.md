@@ -6,8 +6,8 @@ Last updated: 2026-08-11
 
 Calorie is a private, mobile-first food, water, and weight journal that turns
 lightweight macro tracking into practical daily timing guidance. It works
-account-free with local browser storage; optional Google sign-in can add private
-Cloudflare D1 sync.
+account-free with local browser or iPhone storage; optional Google or native
+Apple sign-in can add private Cloudflare D1 sync.
 
 In scope: timestamped food entries, reusable foods measured per 100 g or per
 unit, calories/carbs/protein/fibre, water, medication routines and daily
@@ -23,7 +23,9 @@ full sets/reps workout-programming system.
 ### External
 
 - React and Vite
-- Optional Google OAuth through Better Auth
+- Optional Google OAuth and native Apple ID-token verification through Better
+  Auth
+- SwiftUI, AuthenticationServices, and Keychain for the native iPhone client
 - Cloudflare Workers, static assets, and D1 for optional cloud sync
 
 ### Internal
@@ -32,11 +34,15 @@ full sets/reps workout-programming system.
 
 ## Timeline
 
+- 2026-08-11 — released native Sign in with Apple, explicit linking to an
+  existing Google-owned journal, deterministic iPhone/cloud reconciliation,
+  durable offline sync intents, and single-use Google-to-native handoffs; D1
+  migration `0007` is applied in production and the Worker is SHA-tagged at
+  100% traffic
 - 2026-08-11 — prepared the first native SwiftUI iPhone beta with complete
   local-first food and daily-care logging, transparent guidance, progress,
   data transfer, accessibility, simulator coverage, App Store metadata, and a
-  personal-team signed archive path; native account synchronization remains
-  tracked separately
+  personal-team signed archive with a verified Sign in with Apple entitlement
 - 2026-08-11 — finalized the food-first mobile Today hierarchy and actionable
   Progress insights with equal 7/30-day comparisons, visible target/sample
   context, accessible progressive chart disclosure, modal focus containment,
@@ -98,6 +104,9 @@ full sets/reps workout-programming system.
   capture, transparent calculations and guidance, progress/history, food
   management, data transfer, appearance and accessibility support, simulator
   tests, and personal-team archiving
+- Native Sign in with Apple using bundle-audience token verification, explicit
+  existing-account linking without email matching, Keychain bearer sessions,
+  iPhone/cloud reconciliation, and durable offline sync intents
 - Shared Ultracite lint baseline with a clean 87-file check
 - Three-step answer-aware onboarding with reload-safe drafts and visible goal math
 - Fully account-free local journal with versioned browser storage
