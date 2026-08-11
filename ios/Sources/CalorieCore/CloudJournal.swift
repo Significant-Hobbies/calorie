@@ -44,16 +44,19 @@ public enum CloudJournalMapper {
         let generatedAt = ISO8601DateFormatter().date(from: export.generatedAt) ?? Date.distantPast
         let foodByID = Dictionary(uniqueKeysWithValues: export.foods.map { ($0.id, $0) })
         let foods = export.foods.map(mapFood)
+        let weights = export.weights.map {
+            WeightEntry(id: stableUUID($0.id), date: date($0.recordedAt), kilograms: $0.weightKg)
+        }
+        var profile = mapProfile(export.profile)
+        profile.weightKilograms = weights.max(by: { $0.date < $1.date })?.kilograms
         let document = CalorieDocument(
-            profile: mapProfile(export.profile),
+            profile: profile,
             foods: foods,
             foodEntries: export.entries.map { mapEntry($0, food: $0.foodId.flatMap { foodByID[$0] }) },
             waterEntries: export.waterEntries.map {
                 WaterEntry(id: stableUUID($0.id), timestamp: date($0.drankAt), millilitres: $0.amountMl)
             },
-            weightEntries: export.weights.map {
-                WeightEntry(id: stableUUID($0.id), date: date($0.recordedAt), kilograms: $0.weightKg)
-            },
+            weightEntries: weights,
             routines: export.medications.map {
                 MedicationRoutine(
                     id: stableUUID($0.id),
@@ -90,7 +93,9 @@ public enum CloudJournalMapper {
         case .keepCloud:
             var document = cloud.document
             document.theme = local.theme
-            document.profile.weightKilograms = local.profile.weightKilograms
+            if document.profile.weightKilograms == nil {
+                document.profile.weightKilograms = local.profile.weightKilograms
+            }
             document.profile.manualMacroTargets = local.profile.manualMacroTargets
             document.dailyNotes = local.dailyNotes
             document.cycle = local.cycle

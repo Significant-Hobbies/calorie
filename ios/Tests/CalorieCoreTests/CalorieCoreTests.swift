@@ -129,6 +129,8 @@ final class CalorieCoreTests: XCTestCase {
         XCTAssertEqual(snapshot.document.foodEntries.first?.meal, .breakfast)
         XCTAssertEqual(snapshot.document.foodEntries.first?.nutrients.fat, 0)
         XCTAssertEqual(snapshot.document.weightEntries.first?.kilograms, 72.4)
+        XCTAssertEqual(snapshot.document.profile.weightKilograms, 72.4)
+        XCTAssertEqual(snapshot.document.weightEntries.count, 2)
         XCTAssertEqual(snapshot.document.syncState, .synced)
     }
 
@@ -177,7 +179,7 @@ final class CalorieCoreTests: XCTestCase {
         let reconciled = CloudJournalMapper.reconcile(local: local, cloud: cloud, choice: .keepCloud)
 
         XCTAssertEqual(reconciled.theme, .dark)
-        XCTAssertEqual(reconciled.profile.weightKilograms, 71.5)
+        XCTAssertEqual(reconciled.profile.weightKilograms, 72.4)
         XCTAssertEqual(reconciled.profile.manualMacroTargets?.protein, 140)
         XCTAssertEqual(reconciled.dailyNotes["2026-08-11"], "Keep this private note.")
         XCTAssertEqual(reconciled.cycle.typicalCycleDays, 29)
@@ -261,7 +263,10 @@ final class CalorieCoreTests: XCTestCase {
       "waterEntries": [{"id":"33333333-3333-4333-8333-333333333333","amountMl":750,"drankAt":1700035200000}],
       "medications": [{"id":"44444444-4444-4444-8444-444444444444","name":"Morning routine","schedule":"morning","createdAt":1700000000000,"archivedAt":null}],
       "medicationCheckIns": [{"id":"55555555-5555-4555-8555-555555555555","medicationId":"44444444-4444-4444-8444-444444444444","takenOn":"2026-08-11","takenAt":1700035200000}],
-      "weights": [{"id":"66666666-6666-4666-8666-666666666666","weightKg":72.4,"recordedAt":1700035200000}],
+      "weights": [
+        {"id":"66666666-6666-4666-8666-666666666666","weightKg":72.4,"recordedAt":1700035200000},
+        {"id":"77777777-7777-4777-8777-777777777777","weightKg":73.1,"recordedAt":1699948800000}
+      ],
       "cycleSessions": []
     }
     """#
