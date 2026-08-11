@@ -34,6 +34,8 @@ targets:
       path: Sources/Calorie/Info.plist
       properties:
         CFBundleDisplayName: Calorie
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         CFBundleURLTypes:
           - CFBundleTypeRole: Editor
             CFBundleURLSchemes:

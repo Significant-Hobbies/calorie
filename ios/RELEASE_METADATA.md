@@ -19,7 +19,7 @@ Preparation only. No App Store Connect record has been created.
 ## Store copy
 
 **Subtitle**
-A food journal that shows its work
+A journal that shows its work
 
 **Promotional text**
 Log familiar food in seconds, see four nutrients and useful timing, and keep every estimate transparent.
