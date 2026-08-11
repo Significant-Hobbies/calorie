@@ -10,6 +10,8 @@ export type AuthBindings = {
   BETTER_AUTH_SECRET?: string;
   GOOGLE_CLIENT_ID?: string;
   GOOGLE_CLIENT_SECRET?: string;
+  AUTH0_ISSUER?: string;
+  AUTH0_MCP_AUDIENCE?: string;
   APPLE_CLIENT_ID?: string;
   APPLE_CLIENT_SECRET?: string;
   APPLE_APP_BUNDLE_IDENTIFIER?: string;

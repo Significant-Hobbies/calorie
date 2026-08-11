@@ -5,7 +5,9 @@
   "compatibility_date": "2026-07-25",
   "compatibility_flags": ["nodejs_compat"],
   "vars": {
-    "APPLE_APP_BUNDLE_IDENTIFIER": "com.significanthobbies.calorie"
+    "APPLE_APP_BUNDLE_IDENTIFIER": "com.significanthobbies.calorie",
+    "AUTH0_ISSUER": "https://dev-0suel086hm1blvg7.us.auth0.com/",
+    "AUTH0_MCP_AUDIENCE": "https://mcp.significanthobbies.com/calorie/mcp"
   },
   "routes": [
     {
