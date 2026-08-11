@@ -31,6 +31,10 @@ export function isGoogleConfigured(env: AuthBindings) {
 }
 
 export function isAppleConfigured(env: AuthBindings) {
+  return Boolean(env.APPLE_APP_BUNDLE_IDENTIFIER?.trim());
+}
+
+export function isAppleWebConfigured(env: AuthBindings) {
   return Boolean(
     env.APPLE_CLIENT_ID?.trim() &&
       env.APPLE_CLIENT_SECRET?.trim() &&
@@ -44,6 +48,7 @@ export function createAuth(env: AuthBindings, requestUrl: string) {
   const secret =
     env.BETTER_AUTH_SECRET ??
     (isLocalUrl(baseURL) ? 'calorie-local-dev-secret-never-use-in-production' : undefined);
+  const appleBundleIdentifier = env.APPLE_APP_BUNDLE_IDENTIFIER?.trim() ?? '';
 
   return betterAuth({
     database: drizzleAdapter(drizzle(env.DB), {
@@ -61,9 +66,9 @@ export function createAuth(env: AuthBindings, requestUrl: string) {
       ...(isAppleConfigured(env)
         ? {
             apple: {
-              clientId: env.APPLE_CLIENT_ID?.trim() ?? '',
+              clientId: env.APPLE_CLIENT_ID?.trim() || appleBundleIdentifier,
               clientSecret: env.APPLE_CLIENT_SECRET?.trim() ?? '',
-              appBundleIdentifier: env.APPLE_APP_BUNDLE_IDENTIFIER?.trim() ?? '',
+              appBundleIdentifier: appleBundleIdentifier,
             },
           }
         : {}),

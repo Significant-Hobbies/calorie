@@ -37,6 +37,7 @@ import {
   type AuthBindings,
   createAuth,
   isAppleConfigured,
+  isAppleWebConfigured,
   isGoogleConfigured,
 } from './server/auth';
 import {
@@ -117,6 +118,7 @@ app.get('/api/health', (c) =>
     auth: {
       googleConfigured: isGoogleConfigured(c.env),
       appleConfigured: isAppleConfigured(c.env),
+      appleWebConfigured: isAppleWebConfigured(c.env),
     },
     storage: 'd1',
   })
@@ -126,6 +128,7 @@ app.get('/api/auth/config', (c) =>
   c.json({
     googleConfigured: isGoogleConfigured(c.env),
     appleConfigured: isAppleConfigured(c.env),
+    appleWebConfigured: isAppleWebConfigured(c.env),
   })
 );
 
@@ -134,7 +137,7 @@ app.on(['GET', 'POST'], '/api/auth/*', async (c) => {
   if (path.endsWith('/sign-in/social') && c.req.method === 'POST') {
     const body = await c.req.raw
       .clone()
-      .json<{ provider?: unknown }>()
+      .json<{ idToken?: unknown; provider?: unknown }>()
       .catch(() => null);
     const provider = body?.provider;
     if (provider === 'google' && !isGoogleConfigured(c.env)) {
@@ -151,6 +154,15 @@ app.on(['GET', 'POST'], '/api/auth/*', async (c) => {
         {
           code: 'OAUTH_NOT_CONFIGURED',
           message: 'Apple sign-in is not configured in this environment.',
+        },
+        503
+      );
+    }
+    if (provider === 'apple' && !body?.idToken && !isAppleWebConfigured(c.env)) {
+      return c.json(
+        {
+          code: 'OAUTH_NOT_CONFIGURED',
+          message: 'Apple browser sign-in is not configured in this environment.',
         },
         503
       );

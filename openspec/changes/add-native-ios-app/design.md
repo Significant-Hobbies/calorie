@@ -33,7 +33,7 @@ Energy targets, macro ranges, serving scaling, nutrient totals, and time estimat
 
 ### Explicit Apple linking with a native session
 
-`SignInWithAppleButton` obtains an Apple identity token and nonce through AuthenticationServices. Better Auth validates the token for the app bundle identifier and the native client stores the returned bearer session only in Keychain. Apple email is display/contact metadata only; the stable provider subject owns the link.
+`SignInWithAppleButton` obtains an Apple identity token and nonce through AuthenticationServices. Better Auth validates the token against Apple's public keys and the app bundle identifier; this native path does not require a Services ID or client-secret JWT. Browser-based Apple OAuth remains disabled unless those separate credentials are configured. The native client stores the returned bearer session only in Keychain. Apple email is display/contact metadata only; the stable provider subject owns the link.
 
 An existing owner selects **Connect existing Calorie data** first. `ASWebAuthenticationSession` proves control of the existing Google-backed Calorie account. A Worker callback exchanges that browser session for a single-use, five-minute native handoff code, never puts a reusable session in a callback URL, and consumes the code exactly once. The authenticated native session then explicitly links the Apple token to that user. Better Auth implicit email linking stays disabled, including when Apple returns the same real email.
 

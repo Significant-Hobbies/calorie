@@ -4,6 +4,9 @@
   "main": "src/worker.ts",
   "compatibility_date": "2026-07-25",
   "compatibility_flags": ["nodejs_compat"],
+  "vars": {
+    "APPLE_APP_BUNDLE_IDENTIFIER": "com.significanthobbies.calorie"
+  },
   "routes": [
     {
       "pattern": "calorie.significanthobbies.com",
@@ -30,12 +33,5 @@
   "observability": {
     "enabled": true,
     "head_sampling_rate": 0.1
-  },
-  "secrets": {
-    "required": [
-      "APPLE_CLIENT_ID",
-      "APPLE_CLIENT_SECRET",
-      "APPLE_APP_BUNDLE_IDENTIFIER"
-    ]
   }
 }
