@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { DASHBOARD_FOODS_QUERY } from './worker';
+import { DASHBOARD_FOODS_QUERY } from './server/queries';
 
 describe('dashboard food query', () => {
   it('returns every active food owned by the user in selector order', () => {
