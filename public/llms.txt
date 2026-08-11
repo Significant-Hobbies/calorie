@@ -4,7 +4,7 @@ Calorie is a private, mobile-first food, water, and weight journal.
 
 ## Public surface
 
-- [Calorie](https://calorie.significanthobbies.com/) explains the product and provides Google sign-in.
+- [Calorie](https://calorie.significanthobbies.com/) explains the product, optional Google sign-in, and native Apple account linking.
 - The signed-in app logs reusable foods, calories, carbs, protein, fibre, water, and weight.
 - Timing estimates are deterministic and link to the [Mifflin-St Jeor energy equation](https://pubmed.ncbi.nlm.nih.gov/2305711/) and other published methodology inside the app.
 

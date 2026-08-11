@@ -5,8 +5,10 @@ journal. It tracks calories, carbs, protein, and fibre, then gives deterministic
 sleep, exercise-timing, fasting-window, and goal guidance without using AI.
 
 The app is local-first: **Start on this device** works without an account and
-keeps the journal in versioned browser storage. Google sign-in is optional and
-enables private Cloudflare D1 sync when the cloud bindings are configured.
+keeps the journal in versioned browser or iPhone storage. Google sign-in is
+optional on the web. The native client can explicitly link Sign in with Apple
+to an existing Google-backed journal and enable private Cloudflare D1 sync when
+the cloud bindings are configured.
 
 Production target: `https://calorie.significanthobbies.com`
 
@@ -36,13 +38,17 @@ pnpm exec wrangler deploy --dry-run
 
 ## Cloud mode
 
-The Worker uses Better Auth with Google and a D1 database. Before a production
+The Worker uses Better Auth with Google, optional Apple ID-token verification,
+bearer sessions for the native client, and a D1 database. Before a production
 deployment, create the D1 database, place its real database ID in
 `wrangler.jsonc`, and configure these Worker secrets outside the repository:
 
 - `GOOGLE_CLIENT_ID`
 - `GOOGLE_CLIENT_SECRET`
 - `BETTER_AUTH_SECRET`
+- `APPLE_CLIENT_ID`
+- `APPLE_CLIENT_SECRET`
+- `APPLE_APP_BUNDLE_IDENTIFIER`
 
 Apply the numbered D1 migrations to the target database only as an explicit
 deployment step. `0002_personalized_daily_care.sql` adds private medication
@@ -53,6 +59,9 @@ Production uses a dedicated Google web client with
 `https://calorie.significanthobbies.com` as its JavaScript origin and
 `https://calorie.significanthobbies.com/api/auth/callback/google` as its
 callback. Only the standard OpenID Connect identity scopes are requested.
+Native Apple credentials are verified for `com.significanthobbies.calorie`.
+Implicit email linking is disabled; existing owners authenticate their Google
+account first, then link the verified Apple provider identity explicitly.
 
 ## How recommendations work
 

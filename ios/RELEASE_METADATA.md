@@ -29,7 +29,7 @@ Calorie is a small, private food journal for the moments right after you eat. Re
 
 Daily targets can be entered manually or estimated with a published equation profile. Every timing suggestion names its recorded inputs and rule, and clearly remains an estimate—not medical advice.
 
-Logging works locally without an account. Review days and weeks, meal timing, trends, familiar and custom foods, and export or preview-replace your journal whenever you choose.
+Logging works locally without an account. Optionally connect an existing Calorie journal, link Sign in with Apple, and reconcile cloud and iPhone records with an explicit preview. Review days and weeks, meal timing, trends, familiar and custom foods, and export your journal whenever you choose.
 
 **Keywords**
 food journal,calories,protein,macros,nutrition,meal log,water,timing,weight
@@ -44,8 +44,10 @@ food journal,calories,protein,macros,nutrition,meal log,water,timing,weight
 - Tracking: none
 - Third-party advertising: none
 - Local nutrition and routine data: remains on device in local-only mode
+- Optional cloud mode: account identifier, name, email or Apple relay address, nutrition journal, water, weight, and routine check-ins are linked to the account for app functionality
+- Sign in with Apple: uses Apple's stable provider identifier; email equality is not used for account ownership
 - Medication routines: names and daily boolean check-ins only; no dosage or medical advice
-- App Store Connect answer for this build: “No, we do not collect data from this app”
+- App Store Connect draft: disclose contact info, user ID, and health/fitness journal data as linked to the user and used only for optional app functionality; confirm against the current questionnaire before TestFlight review
 - IDFA: not used
 
 ## Age rating draft
@@ -59,7 +61,7 @@ Confirm the rating produced by App Store Connect's current questionnaire.
 
 ## Review notes draft
 
-The app can be used without an account. The sample data demonstrates daily logging and progress. Medication is limited to user-named routines and a daily checkbox; the app does not store dosage or provide medication guidance.
+The app can be used without an account. A fresh journal contains reusable food templates but no fabricated personal meals, water, weight, routines, or notes. Existing web users choose **Connect existing Calorie data**, authenticate with Google once, link Apple explicitly, and then choose cloud, iPhone, or merge. Medication is limited to user-named routines and a daily checkbox; the app does not store dosage or provide medication guidance.
 
 ## Screenshots and release
 

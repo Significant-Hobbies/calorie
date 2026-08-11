@@ -2,6 +2,14 @@ import XCTest
 @testable import CalorieCore
 
 final class CalorieCoreTests: XCTestCase {
+    func testFreshJournalHasFoodsButNoPretendPersonalHistory() {
+        XCTAssertFalse(CalorieDocument.starter.foods.isEmpty)
+        XCTAssertTrue(CalorieDocument.starter.foodEntries.isEmpty)
+        XCTAssertTrue(CalorieDocument.starter.waterEntries.isEmpty)
+        XCTAssertTrue(CalorieDocument.starter.weightEntries.isEmpty)
+        XCTAssertTrue(CalorieDocument.starter.routines.isEmpty)
+    }
+
     func testManualTargetsRemainManual() throws {
         let profile = Profile(manualCalorieTarget: 2_250, manualMacroTargets: nil)
         let result = try XCTUnwrap(TargetCalculator.targets(for: profile))
@@ -111,4 +119,150 @@ final class CalorieCoreTests: XCTestCase {
         XCTAssertEqual(restored.cycle.typicalCycleDays, 29)
         XCTAssertEqual(restored.dailyNotes[DateKey.string(date)], "Recovery felt steady.")
     }
+
+    func testCloudExportMapsCurrentJournalWithoutInventingFat() throws {
+        let snapshot = try CloudJournalMapper.decode(Data(Self.cloudExport.utf8))
+
+        XCTAssertEqual(snapshot.document.profile.name, "Sarthak")
+        XCTAssertEqual(snapshot.counts.foodEntries, 1)
+        XCTAssertEqual(snapshot.document.foodEntries.first?.foodName, "Greek yoghurt")
+        XCTAssertEqual(snapshot.document.foodEntries.first?.meal, .breakfast)
+        XCTAssertEqual(snapshot.document.foodEntries.first?.nutrients.fat, 0)
+        XCTAssertEqual(snapshot.document.weightEntries.first?.kilograms, 72.4)
+        XCTAssertEqual(snapshot.document.syncState, .synced)
+    }
+
+    func testJournalMergeKeepsUniqueCloudAndIPhoneRecords() throws {
+        let cloud = try CloudJournalMapper.decode(Data(Self.cloudExport.utf8))
+        var local = CalorieDocument()
+        local.foods = [Food(name: "Paneer bowl", servingName: "1 bowl", nutrients: Nutrients(calories: 500))]
+        local.foodEntries = [
+            FoodEntry(
+                foodID: local.foods[0].id,
+                foodName: local.foods[0].name,
+                meal: .lunch,
+                timestamp: Date(timeIntervalSince1970: 1_700_040_000),
+                servings: 1,
+                nutrients: local.foods[0].nutrients
+            ),
+        ]
+
+        let merged = CloudJournalMapper.reconcile(local: local, cloud: cloud, choice: .merge)
+
+        XCTAssertEqual(merged.foods.count, 2)
+        XCTAssertEqual(merged.foodEntries.count, 2)
+        XCTAssertEqual(merged.syncState, .pending)
+    }
+
+    func testKeepCloudPreservesFieldsTheCloudCannotRepresent() throws {
+        let cloud = try CloudJournalMapper.decode(Data(Self.cloudExport.utf8))
+        var local = CalorieDocument()
+        local.theme = .dark
+        local.profile.weightKilograms = 71.5
+        local.profile.manualMacroTargets = Nutrients(calories: 2_100, protein: 140, carbohydrates: 230, fat: 65, fibre: 30)
+        local.dailyNotes = ["2026-08-11": "Keep this private note."]
+        local.cycle = CycleContext(enabled: true, latestPeriodStart: Date(timeIntervalSince1970: 1_700_000_000), typicalCycleDays: 29)
+        local.foods = cloud.document.foods.map { food in
+            var copy = food
+            copy.nutrients.fat = 12
+            return copy
+        }
+        local.foodEntries = cloud.document.foodEntries.map { entry in
+            var copy = entry
+            copy.meal = .snack
+            copy.nutrients.fat = 9
+            return copy
+        }
+
+        let reconciled = CloudJournalMapper.reconcile(local: local, cloud: cloud, choice: .keepCloud)
+
+        XCTAssertEqual(reconciled.theme, .dark)
+        XCTAssertEqual(reconciled.profile.weightKilograms, 71.5)
+        XCTAssertEqual(reconciled.profile.manualMacroTargets?.protein, 140)
+        XCTAssertEqual(reconciled.dailyNotes["2026-08-11"], "Keep this private note.")
+        XCTAssertEqual(reconciled.cycle.typicalCycleDays, 29)
+        XCTAssertEqual(reconciled.foods.first?.nutrients.fat, 12)
+        XCTAssertEqual(reconciled.foodEntries.first?.meal, .snack)
+        XCTAssertEqual(reconciled.foodEntries.first?.nutrients.fat, 9)
+        XCTAssertEqual(reconciled.syncState, .synced)
+    }
+
+    func testSyncIntentsSurviveRelaunchAndCompactSnapshots() async throws {
+        let fileURL = FileManager.default.temporaryDirectory
+            .appending(path: UUID().uuidString)
+            .appending(path: "sync-intents.json")
+        let deletedID = UUID()
+        let firstStore = SyncIntentStore(fileURL: fileURL)
+        try await firstStore.enqueue(.deleteFoodEntry(deletedID))
+        try await firstStore.enqueue(.snapshot(CalorieDocument.sample))
+        var newer = CalorieDocument.sample
+        newer.foodEntries = []
+        try await firstStore.enqueue(.snapshot(newer))
+
+        let restored = try await SyncIntentStore(fileURL: fileURL).pending()
+
+        XCTAssertEqual(restored.count, 2)
+        XCTAssertEqual(restored.first?.operation, .deleteFoodEntry(deletedID))
+        XCTAssertEqual(restored.last?.operation, .snapshot(newer))
+    }
+
+    private static let cloudExport = #"""
+    {
+      "schema": "calorie-journal-backup",
+      "version": 2,
+      "generatedAt": "2026-08-11T10:00:00.000Z",
+      "profile": {
+        "userId": "owner-1",
+        "displayName": "Sarthak",
+        "units": "metric",
+        "ageYears": 30,
+        "genderIdentity": null,
+        "equationProfile": "male",
+        "heightCm": 175,
+        "activityLevel": "moderate",
+        "goal": "maintain",
+        "targetWeightKg": null,
+        "manualCalorieTarget": 2100,
+        "manualCalorieRange": [2000, 2200],
+        "wakeTime": "07:00",
+        "sleepHours": 8,
+        "fastingThresholdHours": 12,
+        "waterTargetMl": 2500,
+        "dailyActionOrder": ["food", "water", "weight", "creatine"],
+        "dailyActionHidden": [],
+        "onboardingComplete": true
+      },
+      "foods": [{
+        "id": "11111111-1111-4111-8111-111111111111",
+        "name": "Greek yoghurt",
+        "servingMode": "per_unit",
+        "unitLabel": "bowl",
+        "defaultAmount": 1,
+        "calories": 410,
+        "carbsG": 48,
+        "proteinG": 29,
+        "fibreG": 7,
+        "favourite": true,
+        "lastUsedAt": 1700000000000,
+        "archivedAt": null
+      }],
+      "entries": [{
+        "id": "22222222-2222-4222-8222-222222222222",
+        "foodId": "11111111-1111-4111-8111-111111111111",
+        "foodName": "Greek yoghurt",
+        "amount": 1,
+        "unitLabel": "bowl",
+        "calories": 410,
+        "carbsG": 48,
+        "proteinG": 29,
+        "fibreG": 7,
+        "eatenAt": 1700000000000
+      }],
+      "waterEntries": [{"id":"33333333-3333-4333-8333-333333333333","amountMl":750,"drankAt":1700035200000}],
+      "medications": [{"id":"44444444-4444-4444-8444-444444444444","name":"Morning routine","schedule":"morning","createdAt":1700000000000,"archivedAt":null}],
+      "medicationCheckIns": [{"id":"55555555-5555-4555-8555-555555555555","medicationId":"44444444-4444-4444-8444-444444444444","takenOn":"2026-08-11","takenAt":1700035200000}],
+      "weights": [{"id":"66666666-6666-4666-8666-666666666666","weightKg":72.4,"recordedAt":1700035200000}],
+      "cycleSessions": []
+    }
+    """#
 }

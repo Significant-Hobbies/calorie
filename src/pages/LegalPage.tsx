@@ -14,22 +14,22 @@ export function LegalPage({ kind }: { kind: 'privacy' | 'terms' }) {
       <article>
         <p className="eyebrow">Calorie</p>
         <h1>{privacy ? 'Privacy policy' : 'Terms of use'}</h1>
-        <p className="legal-date">Effective 25 July 2026</p>
+        <p className="legal-date">Effective 11 August 2026</p>
 
         {privacy ? (
           <>
             <h2>The short version</h2>
             <p>
               Calorie is a private food, water, and weight journal. You can use it entirely on your
-              device without an account. If you choose Google sign-in, your journal is stored in a
-              private Cloudflare database linked to your account.
+              device without an account. If you connect Google or Sign in with Apple, your journal
+              is stored in a private Cloudflare database linked to your Calorie account.
             </p>
             <h2>Data we process</h2>
             <p>
               Local mode stores profile answers, foods, meals, water, and weight only in this
-              browser. Google mode also receives your Google account identifier, name, email
-              address, and profile image, and stores journal data in the cloud so it can follow your
-              account.
+              browser or iPhone. Cloud mode also receives a provider account identifier, name, email
+              address or Apple relay address, and optional profile image. Apple identity is linked
+              by its verified stable identifier, never by guessing from an email match.
             </p>
             <h2>How data is used</h2>
             <p>
@@ -41,7 +41,7 @@ export function LegalPage({ kind }: { kind: 'privacy' | 'terms' }) {
             <p>
               You can leave local mode or sign out at any time. Clearing browser storage removes
               local-mode data from that browser. Cloud data remains private to the signed-in account
-              until deletion tooling is provided or a deletion request is fulfilled.
+              until you delete the cloud account in the iPhone app or request deletion.
             </p>
             <h2>Health information</h2>
             <p>
@@ -54,7 +54,7 @@ export function LegalPage({ kind }: { kind: 'privacy' | 'terms' }) {
             <h2>Using Calorie</h2>
             <p>
               You may use Calorie for personal food, water, weight, and routine tracking. Keep
-              access to your device and Google account secure, and do not misuse the service or
+              access to your device and connected account secure, and do not misuse the service or
               interfere with its operation.
             </p>
             <h2>Estimates, not medical advice</h2>

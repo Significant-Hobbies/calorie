@@ -30,5 +30,12 @@
   "observability": {
     "enabled": true,
     "head_sampling_rate": 0.1
+  },
+  "secrets": {
+    "required": [
+      "APPLE_CLIENT_ID",
+      "APPLE_CLIENT_SECRET",
+      "APPLE_APP_BUNDLE_IDENTIFIER"
+    ]
   }
 }

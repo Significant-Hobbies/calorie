@@ -33,7 +33,19 @@ import type {
   WaterEntry,
   WeightEntry,
 } from './lib/types';
-import { type AuthBindings, createAuth, isGoogleConfigured } from './server/auth';
+import {
+  type AuthBindings,
+  createAuth,
+  isAppleConfigured,
+  isGoogleConfigured,
+} from './server/auth';
+import {
+  consumeNativeHandoff,
+  createNativeHandoffCode,
+  isAllowedNativeCallback,
+  NATIVE_AUTH_CALLBACK,
+  saveNativeHandoff,
+} from './server/native-handoff';
 import { authenticateReadToken, createReadToken, hashReadToken } from './server/read-tokens';
 
 type AppBindings = AuthBindings;
@@ -102,7 +114,10 @@ function conditionalJson<T>(
 app.get('/api/health', (c) =>
   c.json({
     ok: true,
-    auth: { googleConfigured: isGoogleConfigured(c.env) },
+    auth: {
+      googleConfigured: isGoogleConfigured(c.env),
+      appleConfigured: isAppleConfigured(c.env),
+    },
     storage: 'd1',
   })
 );
@@ -110,21 +125,103 @@ app.get('/api/health', (c) =>
 app.get('/api/auth/config', (c) =>
   c.json({
     googleConfigured: isGoogleConfigured(c.env),
+    appleConfigured: isAppleConfigured(c.env),
   })
 );
 
-app.on(['GET', 'POST'], '/api/auth/*', (c) => {
+app.on(['GET', 'POST'], '/api/auth/*', async (c) => {
   const path = new URL(c.req.url).pathname;
-  if (path.endsWith('/sign-in/social') && c.req.method === 'POST' && !isGoogleConfigured(c.env)) {
-    return c.json(
-      {
-        code: 'OAUTH_NOT_CONFIGURED',
-        message: 'Google sign-in is not configured in this environment.',
-      },
-      503
-    );
+  if (path.endsWith('/sign-in/social') && c.req.method === 'POST') {
+    const body = await c.req.raw
+      .clone()
+      .json<{ provider?: unknown }>()
+      .catch(() => null);
+    const provider = body?.provider;
+    if (provider === 'google' && !isGoogleConfigured(c.env)) {
+      return c.json(
+        {
+          code: 'OAUTH_NOT_CONFIGURED',
+          message: 'Google sign-in is not configured in this environment.',
+        },
+        503
+      );
+    }
+    if (provider === 'apple' && !isAppleConfigured(c.env)) {
+      return c.json(
+        {
+          code: 'OAUTH_NOT_CONFIGURED',
+          message: 'Apple sign-in is not configured in this environment.',
+        },
+        503
+      );
+    }
   }
   return createAuth(c.env, c.req.url).handler(c.req.raw);
+});
+
+app.get('/api/native/auth/google/start', async (c) => {
+  if (!isGoogleConfigured(c.env)) {
+    return c.json({ code: 'OAUTH_NOT_CONFIGURED', message: 'Google sign-in is unavailable.' }, 503);
+  }
+  const callback = c.req.query('callback') ?? NATIVE_AUTH_CALLBACK;
+  if (!isAllowedNativeCallback(callback)) {
+    return c.json(
+      { code: 'INVALID_CALLBACK', message: 'The native callback is not allowed.' },
+      400
+    );
+  }
+  const completeURL = new URL('/api/native/auth/google/complete', c.req.url);
+  completeURL.searchParams.set('callback', callback);
+  const result = await createAuth(c.env, c.req.url).api.signInSocial({
+    body: {
+      provider: 'google',
+      callbackURL: completeURL.toString(),
+      errorCallbackURL: completeURL.toString(),
+    },
+    headers: c.req.raw.headers,
+  });
+  if (!result.url) {
+    return c.json({ code: 'OAUTH_START_FAILED', message: 'Google sign-in could not start.' }, 502);
+  }
+  return c.redirect(result.url);
+});
+
+app.get('/api/native/auth/google/complete', async (c) => {
+  const callback = c.req.query('callback') ?? NATIVE_AUTH_CALLBACK;
+  if (!isAllowedNativeCallback(callback)) {
+    return c.json(
+      { code: 'INVALID_CALLBACK', message: 'The native callback is not allowed.' },
+      400
+    );
+  }
+  const session = await createAuth(c.env, c.req.url).api.getSession({
+    headers: c.req.raw.headers,
+  });
+  const redirect = new URL(callback);
+  if (!session?.session.token) {
+    redirect.searchParams.set('error', 'google_auth_failed');
+    return c.redirect(redirect.toString());
+  }
+  const code = createNativeHandoffCode();
+  await saveNativeHandoff(c.env.DB, code, session.session.token);
+  redirect.searchParams.set('code', code);
+  return c.redirect(redirect.toString());
+});
+
+app.post('/api/native/auth/exchange', async (c) => {
+  const body = await c.req.json<{ code?: unknown }>().catch(() => null);
+  const code = typeof body?.code === 'string' ? body.code.trim() : '';
+  if (code.length < 32 || code.length > 128) {
+    return c.json({ code: 'INVALID_HANDOFF', message: 'The sign-in handoff is invalid.' }, 400);
+  }
+  const token = await consumeNativeHandoff(c.env.DB, code);
+  if (!token) {
+    return c.json(
+      { code: 'EXPIRED_HANDOFF', message: 'The sign-in handoff expired or was already used.' },
+      401
+    );
+  }
+  return c.json({ token });
 });
 
 app.use('/api/app/*', async (c, next) => {

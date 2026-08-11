@@ -19,7 +19,15 @@
 
 ## 4. Accounts And Quality
 
-- [ ] 4.1 Add isolated native authentication, Keychain session storage, sync intents/status/conflicts, sign out, and deletion controls
-- [x] 4.2 Complete Light/Dark/System, Dynamic Type, VoiceOver, Reduce Motion, contrast, empty/error/loading states, and native polish review
+- [x] 4.1a Configure optional Apple ID-token verification, disable implicit email linking, and add bearer-session support without embedding credentials
+- [x] 4.1b Add a bounded, single-use Google-to-native session handoff for owners connecting an existing journal
+- [x] 4.1c Add native Sign in with Apple, explicit existing-account linking, and Keychain session persistence
+- [x] 4.1d Map the cloud export into a reconciliation preview with keep-cloud, keep-iPhone, and deterministic merge choices
+- [x] 4.1e Persist and replay owner-scoped sync intents for supported local writes, with visible pending/conflict/failure states
+- [x] 4.1f Add sign-out and confirmed account-deletion controls that preserve the local journal unless the owner separately resets it
+- [x] 4.1g Cover auth configuration, handoff expiry/single-use behavior, DTO mapping, merge behavior, Keychain boundaries, and offline intent retention in automated tests
+- [x] 4.2a Complete the existing Light/Dark/System, Dynamic Type, VoiceOver, Reduce Motion, contrast, empty/error/loading states, and native polish review
+- [ ] 4.2b Capture and review the new account/reconciliation states in Light, Dark, accessibility Dynamic Type, and VoiceOver without exposing production credentials
 - [x] 4.3 Add release metadata, privacy/support copy, simulator screenshots, and documented device-only checks
-- [x] 4.4 Run strict OpenSpec validation, tests, Release simulator build, personal-team archive, and signature verification without upload
+- [x] 4.4a Run strict OpenSpec validation, automated tests, and the Release simulator build
+- [x] 4.4b Produce a fresh personal-team archive and verify its Apple entitlement signature after the App ID capability is enabled, without upload

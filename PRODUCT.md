@@ -12,8 +12,10 @@ web
 
 The primary user is someone logging food with one hand, often immediately
 after eating, and checking progress in short bursts throughout the day. The
-first user is the owner. The default journal stays in browser storage with no
-account; a Google-authenticated D1 journal is an optional cloud-backed mode.
+first user is the owner. The default journal stays on the device with no
+account; a Google-authenticated D1 journal is an optional cloud-backed mode,
+and the native client can explicitly link Sign in with Apple to that same
+journal without relying on email matching.
 
 ## Product Purpose
 

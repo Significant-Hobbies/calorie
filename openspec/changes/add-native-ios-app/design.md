@@ -31,9 +31,35 @@ Profile, foods, entries, water, routines, check-ins, weights, cycle context, pre
 
 Energy targets, macro ranges, serving scaling, nutrient totals, and time estimates are pure functions with visible input/rule descriptions. Screens never invent guidance. This supports snapshot-like unit tests and ensures a no-estimate path remains valid.
 
-### Optional account adapter using native browser authentication
+### Explicit Apple linking with a native session
 
-`ASWebAuthenticationSession` connects to existing Better Auth routes and URLSession handles existing JSON contracts. Tokens or session material live only in Keychain. Local mutations append durable sync intents; the adapter reports pending, synced, conflict, and error states. No secret or service credential is embedded.
+`SignInWithAppleButton` obtains an Apple identity token and nonce through AuthenticationServices. Better Auth validates the token for the app bundle identifier and the native client stores the returned bearer session only in Keychain. Apple email is display/contact metadata only; the stable provider subject owns the link.
+
+An existing owner selects **Connect existing Calorie data** first. `ASWebAuthenticationSession` proves control of the existing Google-backed Calorie account. A Worker callback exchanges that browser session for a single-use, five-minute native handoff code, never puts a reusable session in a callback URL, and consumes the code exactly once. The authenticated native session then explicitly links the Apple token to that user. Better Auth implicit email linking stays disabled, including when Apple returns the same real email.
+
+```mermaid
+sequenceDiagram
+    participant Phone as Calorie iPhone
+    participant Apple as Sign in with Apple
+    participant Auth as Better Auth Worker
+    participant Google as Existing Google login
+    participant D1 as Private D1 journal
+    Phone->>Google: Prove existing account in ASWebAuthenticationSession
+    Google->>Auth: Existing authenticated browser session
+    Auth-->>Phone: One-use native handoff code
+    Phone->>Auth: Exchange code; store bearer session in Keychain
+    Phone->>Apple: Request native Apple credential
+    Apple-->>Phone: Verified ID token + stable subject
+    Phone->>Auth: Explicitly link Apple to authenticated user
+    Auth->>D1: Read the same owner-scoped journal
+    Auth-->>Phone: Reconciliation preview
+```
+
+### Local-first reconciliation and durable intents
+
+The native adapter downloads the versioned cloud export and maps it into the native document without fabricating unavailable fields. The first reconciliation offers keep-cloud, keep-iPhone, or deterministic merge. Merge is ID-based for foods, entries, water, weights, routines, and check-ins; the most recently modified representation wins only where both contracts expose a reliable timestamp, while profile conflicts remain an explicit choice.
+
+After connection, supported local mutations save first, append a durable sync intent, then attempt the existing owner-scoped REST contract. Successful writes remove their intent; offline, authentication, and server failures retain it and set a visible pending/failed state. Sign out removes the Keychain session but preserves the local journal and pending work. Account deletion requires confirmation and routes through Better Auth so the auth user and D1-owned rows cascade together.
 
 ### Preserve-mode visual adaptation
 
@@ -47,6 +73,9 @@ Bundle identifier is `com.significanthobbies.calorie`; version starts at `1.0.0`
 
 - [Nutrition contracts can drift between clients] → Centralize native DTOs, compare fixture outputs, and label source/provenance in calculations.
 - [Offline and account histories can conflict] → Never silently discard a dirty local journal; show deterministic conflict choices and last-sync status.
+- [Apple email can be hidden, changed, or absent after first authorization] → Key identity to the verified Apple subject and require explicit proof before linking an existing Google journal.
+- [A browser callback can leak a reusable credential] → Return only a short-lived one-use handoff code and store the resulting bearer session in Keychain.
+- [Native and web journal shapes are not identical] → Preserve exact source records, map only supported fields, disclose local-only fields, and cover fixtures in both TypeScript and Swift tests.
 - [Dense trend views can become inaccessible] → Pair every chart with a textual summary and test accessibility categories.
 - [Simulator cannot validate camera-free real-device ergonomics, notifications, or Keychain/account callbacks fully] → Record them as device-only release checks.
 
@@ -54,8 +83,9 @@ Bundle identifier is `com.significanthobbies.calorie`; version starts at `1.0.0`
 
 1. Add the iOS project beside the web app with no service changes.
 2. Implement and test local journal parity, calculations, import/export, and accessibility.
-3. Validate account DTOs against non-mutating fixtures.
-4. Capture simulator evidence and create a personal-team archive.
-5. Stop before App Store Connect.
+3. Add the optional Apple/Google linking contract and validate account DTOs against non-mutating fixtures.
+4. Verify Keychain persistence, one-use handoff, reconciliation choices, offline intent retention, sign out, and deletion without touching production data.
+5. Capture simulator evidence and create a personal-team archive.
+6. Stop before App Store Connect and production credential/config changes.
 
 Removing `ios/` rolls back the change without affecting web users or server data.

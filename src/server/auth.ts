@@ -1,5 +1,6 @@
 import { betterAuth } from 'better-auth';
 import { drizzleAdapter } from 'better-auth/adapters/drizzle';
+import { bearer } from 'better-auth/plugins';
 import { drizzle } from 'drizzle-orm/d1';
 import { account, session, user, verification } from './schema';
 
@@ -9,6 +10,9 @@ export type AuthBindings = {
   BETTER_AUTH_SECRET?: string;
   GOOGLE_CLIENT_ID?: string;
   GOOGLE_CLIENT_SECRET?: string;
+  APPLE_CLIENT_ID?: string;
+  APPLE_CLIENT_SECRET?: string;
+  APPLE_APP_BUNDLE_IDENTIFIER?: string;
 };
 
 const LOCAL_ORIGINS = [
@@ -24,6 +28,14 @@ function isLocalUrl(url: string) {
 
 export function isGoogleConfigured(env: AuthBindings) {
   return Boolean(env.GOOGLE_CLIENT_ID?.trim() && env.GOOGLE_CLIENT_SECRET?.trim());
+}
+
+export function isAppleConfigured(env: AuthBindings) {
+  return Boolean(
+    env.APPLE_CLIENT_ID?.trim() &&
+      env.APPLE_CLIENT_SECRET?.trim() &&
+      env.APPLE_APP_BUNDLE_IDENTIFIER?.trim()
+  );
 }
 
 export function createAuth(env: AuthBindings, requestUrl: string) {
@@ -46,8 +58,33 @@ export function createAuth(env: AuthBindings, requestUrl: string) {
         clientSecret: env.GOOGLE_CLIENT_SECRET?.trim() ?? '',
         scope: ['openid', 'email', 'profile'],
       },
+      ...(isAppleConfigured(env)
+        ? {
+            apple: {
+              clientId: env.APPLE_CLIENT_ID?.trim() ?? '',
+              clientSecret: env.APPLE_CLIENT_SECRET?.trim() ?? '',
+              appBundleIdentifier: env.APPLE_APP_BUNDLE_IDENTIFIER?.trim() ?? '',
+            },
+          }
+        : {}),
     },
-    trustedOrigins: [...new Set([baseURL, ...LOCAL_ORIGINS])],
+    account: {
+      accountLinking: {
+        enabled: true,
+        disableImplicitLinking: true,
+        trustedProviders: ['google', 'apple'],
+        allowDifferentEmails: true,
+      },
+    },
+    user: {
+      deleteUser: {
+        enabled: true,
+      },
+    },
+    plugins: [bearer()],
+    trustedOrigins: [
+      ...new Set([baseURL, ...LOCAL_ORIGINS, 'https://appleid.apple.com', 'calorie://auth']),
+    ],
     rateLimit: {
       enabled: false,
     },

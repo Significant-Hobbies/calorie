@@ -1,3 +1,4 @@
+import AuthenticationServices
 import CalorieCore
 import Charts
 import SwiftUI
@@ -249,10 +250,13 @@ private struct CustomFoodView: View {
 
 struct YouView: View {
     @Environment(AppModel.self) private var model
+    @Environment(\.colorScheme) private var colorScheme
     @State private var isProfilePresented = false
     @State private var isImporterPresented = false
     @State private var showReset = false
+    @State private var showDeleteAccount = false
     @State private var isRoutineManagerPresented = false
+    @State private var appleNonce = AppleNonce.make()
 
     var body: some View {
         @Bindable var model = model
@@ -298,15 +302,7 @@ struct YouView: View {
                         .foregroundStyle(.secondary)
                 }
                 youSection("Account & sync") {
-                    Label("Local journal active", systemImage: "iphone.gen3")
-                        .font(.headline).frame(minHeight: 44)
-                    Text("Everything on Today works without an account. Cloud status will never imply local entries are uploaded until synchronization completes.")
-                        .font(.subheadline).foregroundStyle(.secondary)
-                    Link(destination: URL(string: "https://calorie.significanthobbies.com")!) {
-                        Label("Open Calorie account", systemImage: "safari")
-                            .frame(maxWidth: .infinity, minHeight: 48)
-                    }
-                    .buttonStyle(.bordered)
+                    accountControls
                 }
                 youSection("Your data") {
                     ShareLink(item: CalorieExportPayload(document: model.document), preview: SharePreview("Calorie journal")) {
@@ -350,6 +346,144 @@ struct YouView: View {
         .confirmationDialog("Reset local Calorie data?", isPresented: $showReset) {
             Button("Reset journal", role: .destructive) { Task { await model.resetLocalData() } }
             Button("Cancel", role: .cancel) {}
+        }
+        .confirmationDialog(
+            "Delete your Calorie cloud account?",
+            isPresented: $showDeleteAccount,
+            titleVisibility: .visible
+        ) {
+            Button("Delete cloud account", role: .destructive) {
+                Task { await model.deleteCloudAccount() }
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("Cloud data and linked sign-ins will be deleted. Your journal on this iPhone will remain until you reset it separately.")
+        }
+    }
+
+    @ViewBuilder
+    private var accountControls: some View {
+        if let account = model.account {
+            Label(
+                account.hasApple ? "Apple sign-in connected" : "Existing journal connected",
+                systemImage: account.hasApple ? "checkmark.icloud.fill" : "person.crop.circle.badge.checkmark"
+            )
+            .font(.headline)
+            .frame(minHeight: 44)
+            if !account.name.isEmpty, account.name != account.email {
+                Text(account.name)
+                    .font(.subheadline.weight(.semibold))
+            }
+            Text(account.email)
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+                .textSelection(.enabled)
+            if account.hasApple {
+                Text("This account uses Apple's stable private identifier. Sharing or hiding your email does not change which journal opens.")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                HStack {
+                    Label(syncStatusText, systemImage: syncStatusSymbol)
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                    Spacer()
+                    Button(model.document.syncState == .conflict ? "Resolve journals" : "Sync now") {
+                        Task { await model.syncNow() }
+                    }
+                        .font(.caption.weight(.bold))
+                        .frame(minHeight: 44)
+                }
+                Button { Task { await model.signOut() } } label: {
+                    Label("Sign out", systemImage: "rectangle.portrait.and.arrow.right")
+                        .frame(maxWidth: .infinity, minHeight: 48)
+                }
+                .buttonStyle(.bordered)
+                Button(role: .destructive) { showDeleteAccount = true } label: {
+                    Label("Delete cloud account", systemImage: "person.crop.circle.badge.minus")
+                        .frame(maxWidth: .infinity, minHeight: 48)
+                }
+            } else {
+                Text("Finish once with Apple. After that, Apple sign-in opens this same journal—not a second account.")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                appleButton
+            }
+        } else {
+            Label("On this iPhone", systemImage: "iphone.gen3")
+                .font(.headline)
+                .frame(minHeight: 44)
+            Text("Already use Calorie on the web? Connect that journal first, then add Apple. Email matching is never used to guess ownership.")
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+            Button { Task { await model.connectExistingAccount() } } label: {
+                Label("Connect existing Calorie data", systemImage: "arrow.triangle.2.circlepath.icloud")
+                    .frame(maxWidth: .infinity, minHeight: 48)
+            }
+            .buttonStyle(BotanicalButtonStyle())
+            Text("Starting fresh? Continue with Apple to create a new private cloud journal.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            appleButton
+        }
+        if model.isAccountWorking {
+            ProgressView("Securing your account…")
+                .frame(maxWidth: .infinity, minHeight: 44)
+        }
+        if let notice = model.accountNotice {
+            Label(notice, systemImage: "checkmark.circle.fill")
+                .font(.caption)
+                .foregroundStyle(CaloriePalette.moss)
+                .accessibilityLabel("Account status: \(notice)")
+        }
+    }
+
+    private var appleButton: some View {
+        SignInWithAppleButton(.continue) { request in
+            appleNonce = AppleNonce.make()
+            request.requestedScopes = [.fullName, .email]
+            request.nonce = AppleNonce.digest(appleNonce)
+        } onCompletion: { result in
+            guard
+                case let .success(authorization) = result,
+                let credential = authorization.credential as? ASAuthorizationAppleIDCredential,
+                let tokenData = credential.identityToken,
+                let token = String(data: tokenData, encoding: .utf8)
+            else {
+                if case let .failure(error) = result { model.message = error.localizedDescription }
+                return
+            }
+            let payload = AppleIdentityPayload(
+                identityToken: token,
+                nonce: appleNonce,
+                email: credential.email,
+                firstName: credential.fullName?.givenName,
+                lastName: credential.fullName?.familyName
+            )
+            Task { await model.completeAppleSignIn(payload) }
+        }
+        .signInWithAppleButtonStyle(colorScheme == .dark ? .white : .black)
+        .frame(maxWidth: .infinity, minHeight: 48)
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .disabled(model.isAccountWorking)
+    }
+
+    private var syncStatusText: String {
+        switch model.document.syncState {
+        case .localOnly: "On this iPhone"
+        case .pending: model.pendingSyncCount == 1 ? "1 change pending" : "\(model.pendingSyncCount) changes pending"
+        case .synced: "Up to date"
+        case .conflict: "Choice required"
+        case .failed: "Sync needs attention"
+        }
+    }
+
+    private var syncStatusSymbol: String {
+        switch model.document.syncState {
+        case .localOnly: "iphone.gen3"
+        case .pending: "arrow.triangle.2.circlepath.icloud"
+        case .synced: "checkmark.icloud.fill"
+        case .conflict: "arrow.triangle.branch"
+        case .failed: "exclamationmark.icloud.fill"
         }
     }
 
@@ -487,7 +621,7 @@ private struct ProfileEditorView: View {
     }
 }
 
-private func botanicalHeader(_ title: String, subtitle: String) -> some View {
+func botanicalHeader(_ title: String, subtitle: String) -> some View {
     VStack(alignment: .leading, spacing: 9) {
         HStack { LeafMark(size: 34); Text("CALORIE").font(.caption.weight(.heavy)).tracking(1.3) }
         Text(title).font(.system(.largeTitle, design: .rounded, weight: .bold))

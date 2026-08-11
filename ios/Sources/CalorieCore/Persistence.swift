@@ -14,7 +14,7 @@ public actor CalorieStore {
     }
 
     public func load() throws -> CalorieDocument {
-        guard FileManager.default.fileExists(atPath: fileURL.path) else { return .sample }
+        guard FileManager.default.fileExists(atPath: fileURL.path) else { return .starter }
         let data = try Data(contentsOf: fileURL)
         let document = try Self.decoder.decode(CalorieDocument.self, from: data)
         guard document.schemaVersion == 1 else { throw CalorieError.unsupportedSchema(document.schemaVersion) }
