@@ -46,9 +46,11 @@ deployment, create the D1 database, place its real database ID in
 - `GOOGLE_CLIENT_ID`
 - `GOOGLE_CLIENT_SECRET`
 - `BETTER_AUTH_SECRET`
-- `APPLE_CLIENT_ID`
-- `APPLE_CLIENT_SECRET`
-- `APPLE_APP_BUNDLE_IDENTIFIER`
+
+Native Sign in with Apple verifies the Apple ID token against Apple's public
+keys and the tracked `APPLE_APP_BUNDLE_IDENTIFIER`. Browser-based Apple OAuth
+is not required by the iPhone client; enabling it later additionally requires
+`APPLE_CLIENT_ID` and `APPLE_CLIENT_SECRET` Worker secrets.
 
 Apply the numbered D1 migrations to the target database only as an explicit
 deployment step. `0002_personalized_daily_care.sql` adds private medication
@@ -59,7 +61,7 @@ Production uses a dedicated Google web client with
 `https://calorie.significanthobbies.com` as its JavaScript origin and
 `https://calorie.significanthobbies.com/api/auth/callback/google` as its
 callback. Only the standard OpenID Connect identity scopes are requested.
-Native Apple credentials are verified for `com.significanthobbies.calorie`.
+Native Apple ID tokens are verified for `com.significanthobbies.calorie`.
 Implicit email linking is disabled; existing owners authenticate their Google
 account first, then link the verified Apple provider identity explicitly.
 
