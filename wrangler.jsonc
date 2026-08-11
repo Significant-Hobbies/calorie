@@ -7,7 +7,7 @@
   "vars": {
     "APPLE_APP_BUNDLE_IDENTIFIER": "com.significanthobbies.calorie",
     "AUTH0_ISSUER": "https://dev-0suel086hm1blvg7.us.auth0.com/",
-    "AUTH0_MCP_AUDIENCE": "https://calorie-mcp.significanthobbies.com/calorie/mcp"
+    "AUTH0_MCP_AUDIENCE": "https://mcp.significanthobbies.com/calorie/mcp"
   },
   "routes": [
     {

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { findCalorieUserByGoogleId, verifyCalorieAuth0Subject } from './auth0-mcp';
 
 const issuer = 'https://fleet-test.us.auth0.com/';
-const audience = 'https://calorie-mcp.significanthobbies.com/calorie/mcp';
+const audience = 'https://mcp.significanthobbies.com/calorie/mcp';
 
 function base64url(value: Uint8Array | string): string {
   const bytes = typeof value === 'string' ? new TextEncoder().encode(value) : value;
@@ -61,7 +61,7 @@ describe('Calorie Auth0 MCP verification', () => {
       'google-user-1'
     );
     for (const overrides of [
-      { aud: 'https://reader-mcp.significanthobbies.com/reader/mcp' },
+      { aud: 'https://mcp.significanthobbies.com/reader/mcp' },
       { scope: 'reader.read' },
       { sub: 'auth0|not-google' },
       { exp: Math.floor(Date.now() / 1000) + 7_200 },
