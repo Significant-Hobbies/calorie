@@ -32,6 +32,11 @@ full sets/reps workout-programming system.
 
 ## Timeline
 
+- 2026-08-11 — prepared the first native SwiftUI iPhone beta with complete
+  local-first food and daily-care logging, transparent guidance, progress,
+  data transfer, accessibility, simulator coverage, App Store metadata, and a
+  personal-team signed archive path; native account synchronization remains
+  tracked separately
 - 2026-08-11 — finalized the food-first mobile Today hierarchy and actionable
   Progress insights with equal 7/30-day comparisons, visible target/sample
   context, accessible progressive chart disclosure, modal focus containment,
@@ -82,11 +87,17 @@ full sets/reps workout-programming system.
 
 ## Products
 
+- Native SwiftUI iPhone beta under `ios/`; App Store Connect/TestFlight
+  transport remains manual
 - Installable local-first web app
 - Production Worker — `https://calorie.significanthobbies.com`
 
 ## Features (shipped)
 
+- Native iPhone journal with local onboarding, food/water/weight/routine
+  capture, transparent calculations and guidance, progress/history, food
+  management, data transfer, appearance and accessibility support, simulator
+  tests, and personal-team archiving
 - Shared Ultracite lint baseline with a clean 87-file check
 - Three-step answer-aware onboarding with reload-safe drafts and visible goal math
 - Fully account-free local journal with versioned browser storage

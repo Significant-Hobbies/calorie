@@ -1,0 +1,24 @@
+# Calorie for iPhone
+
+A native SwiftUI nutrition journal for iOS 17 and later. It uses Apple frameworks only, keeps daily logging useful offline, and exposes the inputs and rule behind each estimate.
+
+## Local checks
+
+```bash
+./scripts/check.sh
+```
+
+## Personal-team archive
+
+```bash
+CALORIE_ARCHIVE_PATH=/private/tmp/Calorie.xcarchive ./scripts/archive.sh
+```
+
+The script is locked to personal team `8F7LXHTJZR`, verifies the local signature, and contains no upload step.
+
+## Device-only checks before submission
+
+- Complete one-handed food logging, editing, deletion/undo, water, and routines on a physical iPhone.
+- Verify largest Dynamic Type, VoiceOver chart summaries, Light/Dark/System, and Reduce Motion on hardware.
+- Verify account callback, Keychain persistence, airplane-mode reconciliation, and notification behavior after native account sync is enabled.
+- Confirm final screenshots, support/privacy URLs, age rating, nutrition/medical disclaimers, and App Privacy answers in App Store Connect before upload.
