@@ -2,7 +2,7 @@
   "$schema": "fleet.design-review.v1",
   "version": 1,
   "project": "calorie",
-  "target": "Progress 24-hour weekly calendar",
+  "target": "Calorie mobile logging and actionable Progress insights",
   "mode": "preserve",
   "register": "product",
   "context": {
@@ -14,26 +14,21 @@
     "probes": [],
     "selected": "existing-design",
     "approval": "not-required",
-    "before": ".fleet/design-evidence/calendar-time-grid/before-calendar.png"
+    "before": "artifacts/design/before.png"
   },
   "evidence": {
     "screenshots": [
       {
         "width": 390,
-        "path": "artifacts/design/calendar-time-grid-after-390.png"
+        "path": "artifacts/design/mobile-insights/after-390.png"
       },
       {
         "width": 768,
-        "path": "artifacts/design/calendar-time-grid-after-768.png"
+        "path": "artifacts/design/mobile-insights/after-768.png"
       },
       {
         "width": 1440,
-        "path": "artifacts/design/calendar-time-grid-after-1440.png"
-      },
-      {
-        "width": 1440,
-        "theme": "dark",
-        "path": "artifacts/design/calendar-time-grid-after-1440-dark.png"
+        "path": "artifacts/design/mobile-insights/after-1440.png"
       }
     ],
     "projectCheck": {
@@ -45,7 +40,7 @@
       "maximum": 40
     },
     "audit": {
-      "score": 19,
+      "score": 20,
       "maximum": 20
     },
     "unresolved": {
@@ -58,7 +53,7 @@
     }
   },
   "ownerFeedback": {
-    "decision": "keep",
-    "note": "Owner approved release on 2026-08-10."
+    "decision": "delegated",
+    "note": "Owner delegated sequential issue completion and preserve-mode closeout; current four-destination product truth was verified from the later shipped commit and PROJECT_STATUS.md."
   }
 }

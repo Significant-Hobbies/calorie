@@ -1,10 +1,15 @@
-## ADDED Requirements
+# actionable-insights Specification
+
+## Purpose
+Define factual, data-bounded nutrition insights for recorded food history.
+
+## Requirements
 
 ### Requirement: Actionable nutrition insights
 The system SHALL summarize a selected 7-day or 30-day food-history window with food patterns, available target coverage, logging confidence, and one informational practical takeaway derived only from the user’s recorded data.
 
 #### Scenario: Logged history is available
-- **WHEN** the user opens Insights with at least one food entry in the selected window
+- **WHEN** the user opens Progress Trends with at least one food entry in the selected window
 - **THEN** the system shows the number of logged days and entries, food-pattern evidence, and a clearly labeled informational takeaway
 
 #### Scenario: Sparse history
@@ -19,7 +24,7 @@ The system SHALL show coverage against each available calorie, protein, fibre, a
 - **THEN** the system omits those measures from coverage and states that only configured targets are included
 
 ### Requirement: Neutral historical comparison
-The system SHALL show a selected-window comparison only when an equal prior period is available from recorded data and SHALL describe differences neutrally without medical or moral conclusions.
+The system SHALL request one equal prior bounded period, show a selected-window comparison only when recorded food is available in both periods, label the selected period accurately, and describe differences neutrally without medical or moral conclusions.
 
 #### Scenario: Prior period unavailable
 - **WHEN** the history payload does not include a complete comparable earlier period

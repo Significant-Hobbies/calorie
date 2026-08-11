@@ -40,13 +40,16 @@
     --moss-200: #dbe8d5;
     --moss-100: #edf4e9;
     --cherry: #db5b56;
+    --cherry-ink: #943a36;
     --cherry-soft: #fae5e2;
     --amber: #e0a245;
     --amber-ink: #865d1c;
+    --recommendation-ink: #8b6225;
     --amber-soft: #fbefd8;
     --sky: #4d8fa7;
     --sky-soft: #e2f1f4;
     --plum: #6b4d73;
+    --plum-ink: #644d69;
     --plum-soft: #eee7f0;
     --paper: #ffffff;
     --white: #ffffff;
@@ -91,13 +94,16 @@
     --moss-200: #354c34;
     --moss-100: #223223;
     --cherry: #ef7b72;
+    --cherry-ink: #ffb4ad;
     --cherry-soft: #3d2524;
     --amber: #e7b660;
     --amber-ink: #e7b660;
+    --recommendation-ink: #e7b660;
     --amber-soft: #362f20;
     --sky: #70b5cc;
     --sky-soft: #20343a;
     --plum: #b89fc0;
+    --plum-ink: #d9bee0;
     --plum-soft: #302934;
     --paper: #101512;
     --white: #182019;
@@ -163,6 +169,10 @@
     clip: rect(0, 0, 0, 0);
     white-space: nowrap;
     border: 0;
+  }
+
+  .accessible-chart-table {
+    contain: inline-size;
   }
 
   .skip-link {
@@ -262,7 +272,7 @@
 
   .button-danger {
     background: var(--cherry-soft);
-    color: #943a36;
+    color: var(--cherry-ink);
   }
 
   .button-large {
@@ -471,7 +481,6 @@
   }
 
   .daily-actions {
-    order: -2;
     display: grid;
     gap: 14px;
     padding: 18px;
@@ -724,7 +733,7 @@
 
   .nutrient-calories {
     background: var(--cherry-soft);
-    color: #8c3935;
+    color: var(--cherry-ink);
   }
 
   .nutrient-carbs {
@@ -739,7 +748,7 @@
 
   .nutrient-fibre {
     background: var(--plum-soft);
-    color: #644d69;
+    color: var(--plum-ink);
   }
 
   .remaining-panel {
@@ -1030,8 +1039,8 @@
   }
 
   .medication-actions .icon-button {
-    width: 40px;
-    height: 40px;
+    width: 44px;
+    height: 44px;
   }
 
   .medication-check {
@@ -1173,7 +1182,7 @@
     place-items: center;
     border-radius: 13px;
     background: var(--amber-soft);
-    color: #8b6225;
+    color: var(--recommendation-ink);
   }
 
   .recommendation-row:nth-of-type(3) .recommendation-icon {
@@ -3468,14 +3477,6 @@
   }
 }
 
-.today-heading {
-  order: -3;
-}
-
-.quick-section {
-  order: -1;
-}
-
 .quick-section .section-heading {
   align-items: center;
 }
@@ -3527,6 +3528,38 @@
   box-shadow: none;
 }
 
+.progress-view-intro {
+  min-height: 58px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+}
+
+.progress-view-intro > svg {
+  width: 22px;
+  height: 22px;
+  flex: none;
+  color: var(--moss-700);
+}
+
+.progress-view-intro > div {
+  display: grid;
+  gap: 1px;
+}
+
+.progress-view-intro strong {
+  font-size: 0.875rem;
+}
+
+.progress-view-intro span {
+  color: var(--ink-soft);
+  font-size: 0.75rem;
+}
+
 .insights-focus {
   display: flex;
   align-items: flex-start;
@@ -3556,6 +3589,14 @@
   font-size: 1.25rem;
   line-height: 1.25;
   letter-spacing: -0.03em;
+}
+
+.insights-focus-basis {
+  display: block;
+  margin-top: 8px;
+  color: var(--ink-soft);
+  font-size: 0.75rem;
+  font-weight: 500;
 }
 
 .insights-confidence {
@@ -3664,6 +3705,25 @@
   font-weight: var(--weight-strong);
 }
 
+.coverage-label > span {
+  min-width: 0;
+  display: grid;
+  gap: 1px;
+}
+
+.coverage-label b {
+  font-size: 0.875rem;
+}
+
+.coverage-label small {
+  overflow: hidden;
+  color: var(--ink-soft);
+  font-size: 0.75rem;
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .coverage-list svg {
   width: 17px;
   height: 17px;
@@ -3695,6 +3755,69 @@
   border: 1px solid var(--line);
   border-radius: var(--radius-lg);
   background: var(--white);
+}
+
+.trend-charts-foldout {
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--white);
+}
+
+.trend-charts-foldout > summary {
+  min-height: 72px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 18px;
+  list-style: none;
+}
+
+.trend-charts-foldout > summary::-webkit-details-marker {
+  display: none;
+}
+
+.trend-charts-foldout > summary > span:first-child {
+  display: grid;
+  gap: 2px;
+}
+
+.trend-charts-foldout > summary small,
+.trend-charts-foldout > summary > span:last-child {
+  color: var(--ink-soft);
+  font-size: 0.75rem;
+}
+
+.trend-charts-foldout > summary > span:last-child {
+  color: var(--moss-700);
+  font-weight: var(--weight-strong);
+}
+
+.trend-charts-foldout .when-open {
+  display: none;
+}
+
+.trend-charts-foldout[open] .when-closed {
+  display: none;
+}
+
+.trend-charts-foldout[open] .when-open {
+  display: inline;
+}
+
+.trend-charts-foldout[open] > summary {
+  border-bottom: 1px solid var(--line);
+}
+
+.trend-charts-content {
+  display: none;
+  gap: 20px;
+  padding: 18px;
+}
+
+.trend-charts-foldout[open] > .trend-charts-content {
+  display: grid;
 }
 
 .insights-foldout > summary {

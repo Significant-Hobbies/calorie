@@ -20,7 +20,7 @@ import {
   Wheat,
   X,
 } from 'lucide-react';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { type KeyboardEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { NutrientDensityBadge } from '../components/NutrientDensityBadge';
 import {
   addFoodEntry,
@@ -168,6 +168,10 @@ export function TodayPage({
   const [waterTime, setWaterTime] = useState('');
   const entryFoodSelectRef = useRef<HTMLSelectElement>(null);
   const entryNameInputRef = useRef<HTMLInputElement>(null);
+  const entrySheetRef = useRef<HTMLElement>(null);
+  const entrySheetBackdropRef = useRef<HTMLDivElement>(null);
+  const entrySheetOpenerRef = useRef<HTMLElement | null>(null);
+  const pageStackRef = useRef<HTMLDivElement>(null);
   const weightInputRef = useRef<HTMLInputElement>(null);
   const dailyActionsRef = useRef<HTMLElement>(null);
   const previousIncompleteRef = useRef<DailyActionKey[] | null>(null);
@@ -194,9 +198,72 @@ export function TodayPage({
 
   useEffect(() => {
     if (!entrySheetOpen) return;
+    entrySheetOpenerRef.current =
+      document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const inertTargets = [
+      document.querySelector<HTMLElement>('.app-header'),
+      document.querySelector<HTMLElement>('.offline-banner'),
+      document.querySelector<HTMLElement>('.desktop-nav'),
+      document.querySelector<HTMLElement>('.bottom-nav'),
+      ...Array.from(pageStackRef.current?.children ?? []).filter(
+        (element): element is HTMLElement =>
+          element instanceof HTMLElement && element !== entrySheetBackdropRef.current
+      ),
+    ].filter((element): element is HTMLElement => Boolean(element));
+    const inertState = inertTargets.map((element) => ({
+      element,
+      wasInert: element.hasAttribute('inert'),
+    }));
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    for (const { element } of inertState) element.setAttribute('inert', '');
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      for (const { element, wasInert } of inertState) {
+        if (!wasInert) element.removeAttribute('inert');
+      }
+      const opener = entrySheetOpenerRef.current;
+      entrySheetOpenerRef.current = null;
+      window.requestAnimationFrame(() => opener?.focus());
+    };
+  }, [entrySheetOpen]);
+
+  useEffect(() => {
+    if (!entrySheetOpen) return;
     if (entryDraft?.mode === 'direct') entryNameInputRef.current?.focus();
     else entryFoodSelectRef.current?.focus();
   }, [entryDraft?.mode, entrySheetOpen]);
+
+  const handleEntrySheetKeyDown = (event: KeyboardEvent<HTMLElement>) => {
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      setEntryDraft(null);
+      return;
+    }
+    if (event.key !== 'Tab') return;
+    const sheet = entrySheetRef.current;
+    if (!sheet) return;
+    const focusable = Array.from(
+      sheet.querySelectorAll<HTMLElement>(
+        'button:not(:disabled), input:not(:disabled), select:not(:disabled), textarea:not(:disabled), [href], [tabindex]:not([tabindex="-1"])'
+      )
+    ).filter((element) => !element.hasAttribute('hidden'));
+    if (!focusable.length) {
+      event.preventDefault();
+      sheet.focus();
+      return;
+    }
+    const first = focusable[0];
+    const last = focusable.at(-1);
+    if (event.shiftKey && document.activeElement === first) {
+      event.preventDefault();
+      last?.focus();
+    } else if (!event.shiftKey && document.activeElement === last) {
+      event.preventDefault();
+      first.focus();
+    }
+  };
 
   useEffect(() => {
     if (!weightEditorOpen) return;
@@ -940,8 +1007,66 @@ export function TodayPage({
     },
   ];
 
+  const loggingLaunchpad = (
+    <section className="quick-section logging-launchpad" aria-labelledby="quick-food-title">
+      <div className="section-heading">
+        <div>
+          <p className="launchpad-kicker">Your journal</p>
+          <h2 id="quick-food-title">Log food now</h2>
+          <p>Start with a usual food, or add anything else.</p>
+        </div>
+        <div className="launchpad-actions">
+          <button
+            className="button button-primary button-compact"
+            type="button"
+            onClick={openNewEntry}
+          >
+            <Plus size={18} aria-hidden="true" />
+            Log food
+          </button>
+          <button className="text-button" type="button" onClick={onOpenFoods}>
+            Manage
+          </button>
+        </div>
+      </div>
+      <div className="quick-foods">
+        {quickFoods.slice(0, 4).map((food) => (
+          <button
+            key={food.id}
+            className="quick-food"
+            type="button"
+            disabled={Boolean(pendingId)}
+            onClick={() => void quickAdd(food)}
+          >
+            <span className="food-glyph" aria-hidden="true">
+              <Apple size={20} />
+            </span>
+            <span>
+              <strong>{food.name}</strong>
+              <small>
+                {food.defaultAmount} {food.servingMode === 'per_100g' ? 'g' : food.unitLabel}
+              </small>
+            </span>
+            <Plus size={18} aria-hidden="true" />
+          </button>
+        ))}
+        {dashboard.foods.length === 0 ? (
+          <button className="quick-food quick-food-empty" type="button" onClick={onOpenFoods}>
+            <span className="food-glyph">
+              <Plus size={20} />
+            </span>
+            <span>
+              <strong>Save your first food</strong>
+              <small>Then it becomes a one-tap shortcut</small>
+            </span>
+          </button>
+        ) : null}
+      </div>
+    </section>
+  );
+
   return (
-    <div className="page-stack">
+    <div className="page-stack" ref={pageStackRef}>
       <header className="page-heading today-heading">
         <div>
           <p>
@@ -971,6 +1096,8 @@ export function TodayPage({
           </button>
         </div>
       ) : null}
+
+      {loggingLaunchpad}
 
       {incompleteActions.length ? (
         <section
@@ -1185,62 +1312,6 @@ export function TodayPage({
           )}
         </section>
       ) : null}
-
-      <section className="quick-section logging-launchpad" aria-labelledby="quick-food-title">
-        <div className="section-heading">
-          <div>
-            <p className="launchpad-kicker">Your journal</p>
-            <h2 id="quick-food-title">Log food now</h2>
-            <p>Start with a usual food, or add anything else.</p>
-          </div>
-          <div className="launchpad-actions">
-            <button
-              className="button button-primary button-compact"
-              type="button"
-              onClick={openNewEntry}
-            >
-              <Plus size={18} aria-hidden="true" />
-              Log food
-            </button>
-            <button className="text-button" type="button" onClick={onOpenFoods}>
-              Manage
-            </button>
-          </div>
-        </div>
-        <div className="quick-foods">
-          {quickFoods.slice(0, 4).map((food) => (
-            <button
-              key={food.id}
-              className="quick-food"
-              type="button"
-              disabled={Boolean(pendingId)}
-              onClick={() => void quickAdd(food)}
-            >
-              <span className="food-glyph" aria-hidden="true">
-                <Apple size={20} />
-              </span>
-              <span>
-                <strong>{food.name}</strong>
-                <small>
-                  {food.defaultAmount} {food.servingMode === 'per_100g' ? 'g' : food.unitLabel}
-                </small>
-              </span>
-              <Plus size={18} aria-hidden="true" />
-            </button>
-          ))}
-          {dashboard.foods.length === 0 ? (
-            <button className="quick-food quick-food-empty" type="button" onClick={onOpenFoods}>
-              <span className="food-glyph">
-                <Plus size={20} />
-              </span>
-              <span>
-                <strong>Save your first food</strong>
-                <small>Then it becomes a one-tap shortcut</small>
-              </span>
-            </button>
-          ) : null}
-        </div>
-      </section>
 
       <section className="water-panel" aria-labelledby="water-title">
         <div className="water-main">
@@ -1605,12 +1676,15 @@ export function TodayPage({
       </section>
 
       {entryDraft ? (
-        <div className="sheet-backdrop">
+        <div className="sheet-backdrop" ref={entrySheetBackdropRef}>
           <section
             className="edit-sheet entry-sheet"
+            ref={entrySheetRef}
             role="dialog"
             aria-modal="true"
             aria-labelledby="entry-sheet-title"
+            tabIndex={-1}
+            onKeyDown={handleEntrySheetKeyDown}
           >
             <div className="sheet-handle" aria-hidden="true" />
             <header>

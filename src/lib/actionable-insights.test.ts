@@ -69,12 +69,43 @@ describe('analyzeActionableInsights', () => {
 
     expect(result.confidence).toEqual({ loggedDays: 2, windowDays: 3, isSparse: false });
     expect(result.coverage).toEqual([
-      { key: 'calories', label: 'Calories', averagePercent: 75 },
-      { key: 'protein', label: 'Protein', averagePercent: 75 },
-      { key: 'water', label: 'Water', averagePercent: 75 },
+      {
+        key: 'calories',
+        label: 'Calories',
+        averagePercent: 75,
+        targetDescription: '2,000 kcal daily limit',
+      },
+      {
+        key: 'protein',
+        label: 'Protein',
+        averagePercent: 75,
+        targetDescription: '120 g daily floor',
+      },
+      {
+        key: 'water',
+        label: 'Water',
+        averagePercent: 75,
+        targetDescription: '2,000 ml daily target',
+      },
     ]);
     expect(result.takeaway).toBe(
-      'Calories had the lowest average target coverage across your logged days (75%). Check your saved foods if you want to close that gap today.'
+      'Calories had the lowest average target coverage across your logged days (75%). Treat that as context—calories are a limit, not a target to fill.'
+    );
+  });
+
+  it('uses a target-specific action when water is least covered', () => {
+    const result = analyzeActionableInsights({
+      days: [
+        day('2026-01-01', { calories: 2000, proteinG: 120, fibreG: 28, waterMl: 500 }),
+        day('2026-01-02', { calories: 2000, proteinG: 120, fibreG: 28, waterMl: 1000 }),
+      ],
+      entries: [entry('one', new Date(2026, 0, 1, 12)), entry('two', new Date(2026, 0, 2, 12))],
+      target: target(),
+      waterTargetMl: 2000,
+    });
+
+    expect(result.takeaway).toBe(
+      'Water had the lowest average target coverage across your logged days (38%). Log drinks as you go if water is missing from today’s journal.'
     );
   });
 

@@ -6,7 +6,12 @@ export type InsightCoverageKey = 'calories' | 'protein' | 'fibre' | 'water';
 
 export type ActionableInsights = {
   confidence: { loggedDays: number; windowDays: number; isSparse: boolean };
-  coverage: Array<{ key: InsightCoverageKey; label: string; averagePercent: number }>;
+  coverage: Array<{
+    key: InsightCoverageKey;
+    label: string;
+    averagePercent: number;
+    targetDescription: string;
+  }>;
   variety: { distinctFoods: number; repeatedFoods: number; totalOccasions: number };
   comparison: { averageCaloriesDelta: number; direction: 'higher' | 'lower' | 'steady' } | null;
   takeaway: string;
@@ -47,25 +52,35 @@ export function analyzeActionableInsights(input: Input): ActionableInsights {
     label: string;
     target: number | null;
     value: (day: HistoryDay) => number;
+    targetDescription: (target: number) => string;
   }> = [
     {
       key: 'calories',
       label: 'Calories',
       target: input.target.calorieTarget,
       value: (day) => day.calories,
+      targetDescription: (target) => `${target.toLocaleString()} kcal daily limit`,
     },
     {
       key: 'protein',
       label: 'Protein',
       target: input.target.proteinRangeG?.[0] ?? null,
       value: (day) => day.proteinG,
+      targetDescription: (target) => `${target.toLocaleString()} g daily floor`,
     },
-    { key: 'fibre', label: 'Fibre', target: input.target.fibreTargetG, value: (day) => day.fibreG },
+    {
+      key: 'fibre',
+      label: 'Fibre',
+      target: input.target.fibreTargetG,
+      value: (day) => day.fibreG,
+      targetDescription: (target) => `${target.toLocaleString()} g daily target`,
+    },
     {
       key: 'water',
       label: 'Water',
       target: input.waterTargetMl || null,
       value: (day) => day.waterMl,
+      targetDescription: (target) => `${target.toLocaleString()} ml daily target`,
     },
   ];
   const coverage = coverageCandidates.flatMap((item) => {
@@ -77,7 +92,14 @@ export function analyzeActionableInsights(input: Input): ActionableInsights {
         0
       ) / loggedDays.length
     );
-    return [{ key: item.key, label: item.label, averagePercent }];
+    return [
+      {
+        key: item.key,
+        label: item.label,
+        averagePercent,
+        targetDescription: item.targetDescription(dailyTarget),
+      },
+    ];
   });
   const repeatedFoods = analytics.byOccasions.filter((item) => item.occasions > 1).length;
   const previousLoggedDates = loggedDayKeys(input.previousEntries ?? [], input.previousDays ?? []);
@@ -102,10 +124,16 @@ export function analyzeActionableInsights(input: Input): ActionableInsights {
   const leastCovered = [...coverage].sort(
     (left, right) => left.averagePercent - right.averagePercent
   )[0];
+  const coverageAction: Record<InsightCoverageKey, string> = {
+    calories: 'Treat that as context—calories are a limit, not a target to fill.',
+    protein: 'Check your saved foods for a usual protein option if that would help today.',
+    fibre: 'Check your saved foods for a usual fibre option if that would help today.',
+    water: 'Log drinks as you go if water is missing from today’s journal.',
+  };
   const takeaway = confidence.isSparse
     ? 'Log food on another day to make your patterns clearer.'
     : leastCovered
-      ? `${leastCovered.label} had the lowest average target coverage across your logged days (${leastCovered.averagePercent}%). Check your saved foods if you want to close that gap today.`
+      ? `${leastCovered.label} had the lowest average target coverage across your logged days (${leastCovered.averagePercent}%). ${coverageAction[leastCovered.key]}`
       : analytics.byOccasions[0]
         ? `${analytics.byOccasions[0].foodName} was your most repeated food: ${analytics.byOccasions[0].occasions} logged occasion${analytics.byOccasions[0].occasions === 1 ? '' : 's'}.`
         : 'Keep logging normally to make your patterns clearer.';

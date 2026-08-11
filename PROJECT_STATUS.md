@@ -32,6 +32,10 @@ full sets/reps workout-programming system.
 
 ## Timeline
 
+- 2026-08-11 — finalized the food-first mobile Today hierarchy and actionable
+  Progress insights with equal 7/30-day comparisons, visible target/sample
+  context, accessible progressive chart disclosure, modal focus containment,
+  safe 320px reflow, and composed dark-mode contrast
 - 2026-08-11 — removed the private-cloud dashboard's 20-food cap so the food
   selector exposes every active food owned by the signed-in user while
   preserving recent-use and alphabetical ordering; backdated food saves and
@@ -113,8 +117,11 @@ full sets/reps workout-programming system.
   best close the day's largest gap
 - Four prominent daily logging prompts that disappear as weight, supplements,
   food, and water are completed
-- Food analytics in Progress with most-logged and biggest-calorie-contributor
-  rankings over 7- and 30-day windows
+- Food analytics in Progress with logged-day confidence, configured-target
+  coverage, equal prior-window comparisons, one practical takeaway, and
+  retained food rankings over 7- and 30-day windows
+- Food-first Today hierarchy with reusable quick picks before lower-frequency
+  daily prompts and a keyboard-contained entry sheet
 - Last-used quick picks on Today replacing the favourite pin
 - Installable PWA shell, recent cloud-state cache, and queued offline writes
 - System, Light, and composed botanical Dark appearance modes
@@ -122,6 +129,6 @@ full sets/reps workout-programming system.
 
 ## Work queue
 
-Open work is tracked only in [GitHub Issues](https://github.com/sarthakagrawal927/calorie/issues).
+Open work is tracked only in [GitHub Issues](https://github.com/Significant-Hobbies/calorie/issues).
 An open issue is a to-do, a linked pull request is in progress, and merge plus
 issue closure makes the work done.

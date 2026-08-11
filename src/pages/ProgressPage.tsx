@@ -36,6 +36,7 @@ import {
   isSameMonth,
   isSameWeek,
   localDateKey,
+  previousWindowDateKeys,
   shiftMonth,
   shiftWeek,
   startOfWeek,
@@ -133,6 +134,10 @@ export function ProgressPage({ userId }: { userId: string }) {
   const [history, setHistory] = useState<HistoryResponse | null>(() =>
     trendHistorySessionCache.get(progressRangeCacheKey(userId, '7'))
   );
+  const [comparisonHistory, setComparisonHistory] = useState<{
+    rangeDays: 7 | 30;
+    history: HistoryResponse;
+  } | null>(null);
   const [calendarHistory, setCalendarHistory] = useState<HistoryResponse | null>(() =>
     calendarHistorySessionCache.get(progressRangeCacheKey(userId, initialCalendarDates))
   );
@@ -141,6 +146,8 @@ export function ProgressPage({ userId }: { userId: string }) {
   const [calendarMode, setCalendarMode] = useState<HistoryCalendarMode>(initialCalendarMode);
   const [calendarFilter, setCalendarFilter] = useState<WeeklyJournalFilter>('all');
   const desktopCalendarMode = useRef<HistoryCalendarMode>('week');
+  const activeTrendRange = useRef<7 | 30>(7);
+  activeTrendRange.current = rangeDays;
   const [selectedDate, setSelectedDate] = useState(() => localDateKey(today));
   const [dashboard, setDashboard] = useState<Dashboard | null>(sessionSnapshot.dashboard);
   const [cycleHistory, setCycleHistory] = useState<CycleHistoryResponse | null>(
@@ -173,17 +180,30 @@ export function ProgressPage({ userId }: { userId: string }) {
     async (days: 7 | 30) => {
       setError(null);
       const key = progressRangeCacheKey(userId, String(days));
+      const comparisonDates = previousWindowDateKeys(today, days);
+      const comparisonKey = progressRangeCacheKey(userId, comparisonDates);
       const cached = trendHistorySessionCache.get(key);
-      if (cached) setHistory(cached);
+      const cachedComparison = calendarHistorySessionCache.get(comparisonKey);
+      if (cached && activeTrendRange.current === days) setHistory(cached);
+      if (cachedComparison && activeTrendRange.current === days) {
+        setComparisonHistory({ rangeDays: days, history: cachedComparison });
+      }
       try {
-        const nextHistory = await getHistory(days);
+        const [nextHistory, nextComparison] = await Promise.all([
+          getHistory(days),
+          getCalendarHistory(comparisonDates),
+        ]);
         trendHistorySessionCache.set(key, nextHistory);
-        setHistory(nextHistory);
+        calendarHistorySessionCache.set(comparisonKey, nextComparison);
+        if (activeTrendRange.current === days) {
+          setHistory(nextHistory);
+          setComparisonHistory({ rangeDays: days, history: nextComparison });
+        }
       } catch (caught) {
         setError(caught instanceof Error ? caught.message : 'Progress could not load.');
       }
     },
-    [userId]
+    [today, userId]
   );
 
   const calendarDateKeys = useMemo(
@@ -294,14 +314,15 @@ export function ProgressPage({ userId }: { userId: string }) {
     const days = history.days.slice(-rangeDays);
     const dates = new Set(days.map((day) => day.date));
     const entries = entriesInDays(history.entries ?? [], dates);
-    const previousDays =
-      rangeDays === 7 && history.days.length >= 14 ? history.days.slice(-14, -7) : [];
+    const previousSource =
+      comparisonHistory?.rangeDays === rangeDays ? comparisonHistory.history : null;
+    const previousDays = previousSource?.days ?? [];
     const previousEntries = entriesInDays(
-      history.entries ?? [],
+      previousSource?.entries ?? [],
       new Set(previousDays.map((day) => day.date))
     );
     return { days, entries, previousDays, previousEntries };
-  }, [history, rangeDays]);
+  }, [comparisonHistory, history, rangeDays]);
 
   const analytics = useMemo(
     () => (selected ? analyzeFoodAnalytics(selected.entries) : null),
@@ -317,6 +338,15 @@ export function ProgressPage({ userId }: { userId: string }) {
           })
         : null,
     [dashboard, selected]
+  );
+  const focusCoverage = useMemo(
+    () =>
+      insights
+        ? [...insights.coverage].sort(
+            (left, right) => left.averagePercent - right.averagePercent
+          )[0]
+        : null,
+    [insights]
   );
 
   const saveWeight = async () => {
@@ -548,6 +578,22 @@ export function ProgressPage({ userId }: { userId: string }) {
         )
       ) : (
         <>
+          <section className="progress-view-intro" aria-live="polite">
+            {viewMode === 'calendar' ? (
+              <CalendarDays aria-hidden="true" />
+            ) : (
+              <Activity aria-hidden="true" />
+            )}
+            <div>
+              <strong>{viewMode === 'calendar' ? 'Calendar journal' : 'Nutrition trends'}</strong>
+              <span>
+                {viewMode === 'calendar'
+                  ? 'Browse entries and check-ins by date.'
+                  : 'Compare logged patterns and configured targets.'}
+              </span>
+            </div>
+          </section>
+
           <section className="cycle-overview" aria-labelledby="cycle-overview-title">
             <header>
               <div>
@@ -665,6 +711,13 @@ export function ProgressPage({ userId }: { userId: string }) {
                       window
                     </p>
                     <h2 id="insights-focus-title">{insights.takeaway}</h2>
+                    {focusCoverage ? (
+                      <small className="insights-focus-basis">
+                        {focusCoverage.targetDescription} · average across{' '}
+                        {insights.confidence.loggedDays} logged day
+                        {insights.confidence.loggedDays === 1 ? '' : 's'}
+                      </small>
+                    ) : null}
                   </div>
                   <span
                     className={
@@ -673,7 +726,9 @@ export function ProgressPage({ userId }: { userId: string }) {
                         : 'insights-confidence'
                     }
                   >
-                    {insights.confidence.isSparse ? 'Early signal' : 'Pattern forming'}
+                    {insights.confidence.isSparse
+                      ? 'Limited sample'
+                      : `${insights.confidence.loggedDays}/${rangeDays} days logged`}
                   </span>
                 </section>
               )}
@@ -746,90 +801,104 @@ export function ProgressPage({ userId }: { userId: string }) {
                     </article>
                   </section>
 
-                  <TrendChart days={history.days} dashboard={dashboard} rangeDays={rangeDays} />
-
-                  <section className="chart-card" aria-labelledby="intake-chart-title">
-                    <header>
-                      <div>
-                        <p>Daily calories</p>
-                        <h2 id="intake-chart-title">A gentle rhythm</h2>
-                      </div>
+                  <details className="trend-charts-foldout">
+                    <summary>
                       <span>
-                        {dashboard.target.calorieRange
-                          ? `Range ${dashboard.target.calorieRange[0].toLocaleString()}–${dashboard.target.calorieRange[1].toLocaleString()}`
-                          : 'No range set'}
+                        <strong>Daily charts</strong>
+                        <small>Calories, macros, water, weight, and meal timing</small>
                       </span>
-                    </header>
-                    <div
-                      className="bar-chart"
-                      role="img"
-                      aria-label={`Calorie intake for the last ${rangeDays} days. ${inRangeCount} logged day${inRangeCount === 1 ? '' : 's'} ${inRangeCount === 1 ? 'was' : 'were'} within the estimate.`}
-                    >
-                      {history.days.map((day, index) => {
-                        const height = day.calories
-                          ? Math.max(8, (day.calories / chartMax) * 100)
-                          : 3;
-                        const inRange =
-                          Boolean(dashboard.target.calorieRange) &&
-                          day.calories >= (dashboard.target.calorieRange?.[0] ?? 0) &&
-                          day.calories <=
-                            (dashboard.target.calorieRange?.[1] ?? Number.POSITIVE_INFINITY);
-                        const showLabel = rangeDays === 7 || index % 5 === 0 || index === 29;
-                        return (
-                          <div className="bar-column" key={day.date}>
-                            <span
-                              className={inRange ? 'bar is-in-range' : 'bar'}
-                              style={{ height: `${height}%` }}
-                              title={`${day.date}: ${Math.round(day.calories)} kcal${inRange ? ', within estimate' : ''}`}
-                            />
-                            <small>{showLabel ? shortDay(day.date) : ''}</small>
+                      <span aria-hidden="true">
+                        <span className="when-closed">Explore</span>
+                        <span className="when-open">Collapse</span>
+                      </span>
+                    </summary>
+                    <div className="trend-charts-content">
+                      <TrendChart days={history.days} dashboard={dashboard} rangeDays={rangeDays} />
+
+                      <section className="chart-card" aria-labelledby="intake-chart-title">
+                        <header>
+                          <div>
+                            <p>Daily calories</p>
+                            <h2 id="intake-chart-title">A gentle rhythm</h2>
                           </div>
-                        );
-                      })}
+                          <span>
+                            {dashboard.target.calorieRange
+                              ? `Range ${dashboard.target.calorieRange[0].toLocaleString()}–${dashboard.target.calorieRange[1].toLocaleString()}`
+                              : 'No range set'}
+                          </span>
+                        </header>
+                        <div
+                          className="bar-chart"
+                          role="img"
+                          aria-label={`Calorie intake for the last ${rangeDays} days. ${inRangeCount} logged day${inRangeCount === 1 ? '' : 's'} ${inRangeCount === 1 ? 'was' : 'were'} within the estimate.`}
+                        >
+                          {history.days.map((day, index) => {
+                            const height = day.calories
+                              ? Math.max(8, (day.calories / chartMax) * 100)
+                              : 3;
+                            const inRange =
+                              Boolean(dashboard.target.calorieRange) &&
+                              day.calories >= (dashboard.target.calorieRange?.[0] ?? 0) &&
+                              day.calories <=
+                                (dashboard.target.calorieRange?.[1] ?? Number.POSITIVE_INFINITY);
+                            const showLabel = rangeDays === 7 || index % 5 === 0 || index === 29;
+                            return (
+                              <div className="bar-column" key={day.date}>
+                                <span
+                                  className={inRange ? 'bar is-in-range' : 'bar'}
+                                  style={{ height: `${height}%` }}
+                                  title={`${day.date}: ${Math.round(day.calories)} kcal${inRange ? ', within estimate' : ''}`}
+                                />
+                                <small>{showLabel ? shortDay(day.date) : ''}</small>
+                              </div>
+                            );
+                          })}
+                        </div>
+                        <AccessibleChartTable
+                          caption={`Calorie values for the last ${rangeDays} days`}
+                          columns={['Date', 'Calories (kcal)', 'Estimate status']}
+                          rows={history.days.map((day) => {
+                            const inRange =
+                              Boolean(dashboard.target.calorieRange) &&
+                              day.calories > 0 &&
+                              day.calories >= (dashboard.target.calorieRange?.[0] ?? 0) &&
+                              day.calories <=
+                                (dashboard.target.calorieRange?.[1] ?? Number.POSITIVE_INFINITY);
+                            return [
+                              day.date,
+                              Math.round(day.calories),
+                              day.calories === 0
+                                ? 'No entry'
+                                : inRange
+                                  ? 'Within estimate'
+                                  : 'Outside estimate',
+                            ];
+                          })}
+                        />
+                        <p className="chart-note">
+                          <span className="range-key" aria-hidden="true" />
+                          {inRangeCount} logged day{inRangeCount === 1 ? '' : 's'} sat inside your
+                          estimate. Other days are context—not failures.
+                        </p>
+                      </section>
+
+                      <MacroStackedChart days={history.days} rangeDays={rangeDays} />
+
+                      <WaterChart
+                        days={history.days}
+                        targetMl={dashboard.profile.waterTargetMl}
+                        rangeDays={rangeDays}
+                      />
+
+                      {visibleWeights.length >= 2 ? (
+                        <WeightChart weights={visibleWeights} profile={dashboard.profile} />
+                      ) : null}
+
+                      {mealTiming ? (
+                        <MealTimingInsights analysis={mealTiming} rangeDays={rangeDays} />
+                      ) : null}
                     </div>
-                    <AccessibleChartTable
-                      caption={`Calorie values for the last ${rangeDays} days`}
-                      columns={['Date', 'Calories (kcal)', 'Estimate status']}
-                      rows={history.days.map((day) => {
-                        const inRange =
-                          Boolean(dashboard.target.calorieRange) &&
-                          day.calories > 0 &&
-                          day.calories >= (dashboard.target.calorieRange?.[0] ?? 0) &&
-                          day.calories <=
-                            (dashboard.target.calorieRange?.[1] ?? Number.POSITIVE_INFINITY);
-                        return [
-                          day.date,
-                          Math.round(day.calories),
-                          day.calories === 0
-                            ? 'No entry'
-                            : inRange
-                              ? 'Within estimate'
-                              : 'Outside estimate',
-                        ];
-                      })}
-                    />
-                    <p className="chart-note">
-                      <span className="range-key" aria-hidden="true" />
-                      {inRangeCount} logged day{inRangeCount === 1 ? '' : 's'} sat inside your
-                      estimate. Other days are context—not failures.
-                    </p>
-                  </section>
-
-                  <MacroStackedChart days={history.days} rangeDays={rangeDays} />
-
-                  <WaterChart
-                    days={history.days}
-                    targetMl={dashboard.profile.waterTargetMl}
-                    rangeDays={rangeDays}
-                  />
-
-                  {visibleWeights.length >= 2 ? (
-                    <WeightChart weights={visibleWeights} profile={dashboard.profile} />
-                  ) : null}
-
-                  {mealTiming ? (
-                    <MealTimingInsights analysis={mealTiming} rangeDays={rangeDays} />
-                  ) : null}
+                  </details>
                 </>
               ) : null}
 
@@ -873,14 +942,14 @@ export function ProgressPage({ userId }: { userId: string }) {
                         )}
                         Average logged calories were{' '}
                         {insights.comparison.direction === 'steady'
-                          ? 'close to the prior 7-day window.'
-                          : `${Math.abs(insights.comparison.averageCaloriesDelta).toLocaleString()} kcal ${insights.comparison.direction} than the prior 7-day window.`}
+                          ? `close to the prior ${rangeDays}-day window.`
+                          : `${Math.abs(insights.comparison.averageCaloriesDelta).toLocaleString()} kcal ${insights.comparison.direction} than the prior ${rangeDays}-day window.`}
                       </p>
-                    ) : rangeDays === 30 ? (
+                    ) : (
                       <p className="insights-comparison">
-                        A prior 30-day comparison needs a longer history window.
+                        No logged food is available in the prior {rangeDays}-day window yet.
                       </p>
-                    ) : null}
+                    )}
                   </section>
 
                   <section className="insights-coverage" aria-labelledby="coverage-title">
@@ -905,7 +974,10 @@ export function ProgressPage({ userId }: { userId: string }) {
                               ) : (
                                 <Flame aria-hidden="true" />
                               )}
-                              <span>{item.label}</span>
+                              <span>
+                                <b>{item.label}</b>
+                                <small>{item.targetDescription}</small>
+                              </span>
                             </div>
                             <strong>{item.averagePercent}%</strong>
                             <div className="coverage-track" aria-hidden="true">

@@ -54,6 +54,16 @@ export function weekDateKeys(date: Date) {
   });
 }
 
+export function previousWindowDateKeys(reference: Date, rangeDays: 7 | 30) {
+  const firstDay = new Date(reference.getFullYear(), reference.getMonth(), reference.getDate(), 12);
+  firstDay.setDate(firstDay.getDate() - (rangeDays * 2 - 1));
+  return Array.from({ length: rangeDays }, (_, index) => {
+    const day = new Date(firstDay);
+    day.setDate(day.getDate() + index);
+    return localDateKey(day);
+  });
+}
+
 export function shiftWeek(date: Date, amount: number) {
   const shifted = startOfWeek(date);
   shifted.setDate(shifted.getDate() + amount * 7);

@@ -6,6 +6,7 @@ import {
   isSameMonth,
   isSameWeek,
   localDateKey,
+  previousWindowDateKeys,
   shiftMonth,
   shiftWeek,
   startOfWeek,
@@ -79,5 +80,18 @@ describe('calendar history helpers', () => {
       '2026-03-07',
       '2026-03-08',
     ]);
+  });
+
+  it('builds the equal window immediately before the selected trend period', () => {
+    expect(previousWindowDateKeys(new Date(2026, 7, 11, 12), 7)).toEqual([
+      '2026-07-29',
+      '2026-07-30',
+      '2026-07-31',
+      '2026-08-01',
+      '2026-08-02',
+      '2026-08-03',
+      '2026-08-04',
+    ]);
+    expect(previousWindowDateKeys(new Date(2026, 7, 11, 12), 30)).toHaveLength(30);
   });
 });
