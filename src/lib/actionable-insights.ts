@@ -2,7 +2,7 @@ import { localDateKey } from './calendar';
 import { analyzeFoodAnalytics } from './food-analytics';
 import type { FoodEntry, HistoryDay, NutritionTarget } from './types';
 
-export type InsightCoverageKey = 'calories' | 'protein' | 'fibre' | 'water';
+type InsightCoverageKey = 'calories' | 'protein' | 'fibre' | 'water';
 
 export type ActionableInsights = {
   confidence: { loggedDays: number; windowDays: number; isSparse: boolean };

@@ -78,7 +78,7 @@ export function transitionCycleSessions(input: {
   ];
 }
 
-export function validateCycleStartDate(
+function validateCycleStartDate(
   startOn: string,
   today: string,
   previousEndOn: string | null

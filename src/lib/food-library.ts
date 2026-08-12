@@ -35,7 +35,7 @@ export function detachFoodDefinition(entries: FoodEntry[], foodId: string): Food
   return entries.map((entry) => (entry.foodId === foodId ? { ...entry, foodId: null } : entry));
 }
 
-export function isArchivedFood(food: Food): boolean {
+function isArchivedFood(food: Food): boolean {
   return food.archivedAt !== null;
 }
 

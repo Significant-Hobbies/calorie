@@ -32,7 +32,7 @@ export async function readCachedDashboard(userId: string): Promise<Dashboard | n
  * Returns a stale dashboard cache if one exists, regardless of age. Used for
  * stale-while-revalidate: serve immediately, refresh in background.
  */
-export async function readStaleDashboard(userId: string): Promise<Dashboard | null> {
+async function readStaleDashboard(userId: string): Promise<Dashboard | null> {
   return readCachedDashboard(userId);
 }
 

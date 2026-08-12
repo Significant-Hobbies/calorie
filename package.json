@@ -20,8 +20,21 @@
     "typecheck": "tsc --noEmit -p tsconfig.app.json && tsc --noEmit -p tsconfig.worker.json",
     "lint": "biome check .",
     "format": "biome format --write .",
+    "format:check": "biome format .",
     "test": "vitest run",
-    "check": "pnpm lint && pnpm typecheck && pnpm test && pnpm build"
+    "test:coverage": "vitest run --coverage",
+    "knip": "knip --no-exit-code --reporter symbols",
+    "knip:strict": "knip --reporter symbols",
+    "quality:unused": "node scripts/check-code-health.mjs unused",
+    "quality:complexity": "node scripts/check-code-health.mjs complexity",
+    "quality:duplication": "node scripts/check-code-health.mjs duplication",
+    "quality:cycles": "node scripts/check-code-health.mjs cycles",
+    "quality:dependencies": "node scripts/check-code-health.mjs dependencies",
+    "quality:suppressions": "node scripts/check-code-health.mjs suppressions",
+    "quality:hygiene": "node scripts/check-code-health.mjs hygiene",
+    "quality:native": "node scripts/check-native-code-health.mjs",
+    "quality": "pnpm format:check && pnpm lint && pnpm typecheck && pnpm test:coverage && pnpm quality:unused && pnpm quality:complexity && pnpm quality:duplication && pnpm quality:cycles && pnpm quality:dependencies && pnpm quality:suppressions && pnpm build && pnpm quality:hygiene",
+    "check": "pnpm quality"
   },
   "dependencies": {
     "better-auth": "1.6.25",
@@ -34,17 +47,20 @@
   },
   "devDependencies": {
     "@biomejs/biome": "2.5.5",
-    "@cloudflare/workers-types": "5.20260727.1",
+    "@cloudflare/workers-types": "5.20260812.1",
     "@types/react": "19.2.17",
     "@types/react-dom": "19.2.3",
     "@vitejs/plugin-react-swc": "4.3.2",
+    "@vitest/coverage-v8": "4.1.10",
     "concurrently": "9.2.1",
+    "jscpd": "5.0.14",
+    "knip": "6.29.0",
     "lightningcss": "1.33.0",
     "typescript": "6.0.3",
     "ultracite": "7.10.2",
-    "vite": "8.1.5",
+    "vite": "8.2.1",
     "vitest": "4.1.10",
-    "wrangler": "4.114.0"
+    "wrangler": "4.121.0"
   },
   "pnpm": {
     "overrides": {

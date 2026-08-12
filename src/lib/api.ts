@@ -22,8 +22,6 @@ import {
   demoSaveProfile,
   demoSetFoodArchived,
   demoUpdateCycleStart,
-  demoUpdateWater,
-  demoUpdateWeight,
 } from './demo';
 import {
   type FoodLifecycle,
@@ -54,8 +52,6 @@ import {
   localSaveProfile,
   localSetFoodArchived,
   localUpdateCycleStart,
-  localUpdateWater,
-  localUpdateWeight,
 } from './local-store';
 import {
   cacheDashboard,
@@ -221,7 +217,7 @@ export async function getBootstrap(): Promise<AppBootstrap | null> {
   }
 }
 
-export async function getProfile(): Promise<UserProfile> {
+async function getProfile(): Promise<UserProfile> {
   if (isDemo()) return normalizeProfile(demoDashboard().profile);
   if (isLocalMode()) return normalizeProfile(localProfile());
   try {
@@ -251,7 +247,7 @@ export async function saveProfile(
   return saved;
 }
 
-export function localDayRange(date = new Date()) {
+function localDayRange(date = new Date()) {
   const start = new Date(date);
   start.setHours(0, 0, 0, 0);
   const end = new Date(start);
@@ -406,8 +402,8 @@ export async function addWater(input: WaterEntry) {
 }
 
 export async function updateWater(input: WaterEntry) {
-  if (isDemo()) return demoUpdateWater(input);
-  if (isLocalMode()) return localUpdateWater(input);
+  if (isDemo()) return demoAddWater(input);
+  if (isLocalMode()) return localAddWater(input);
   const saved = await writeOffline<WaterEntry>({
     id: `update-water:${input.id}:${Date.now()}`,
     path: `/api/app/water/${input.id}`,
@@ -507,8 +503,8 @@ export async function addWeight(input: WeightEntry) {
 }
 
 export async function updateWeight(input: WeightEntry) {
-  if (isDemo()) return demoUpdateWeight(input);
-  if (isLocalMode()) return localUpdateWeight(input);
+  if (isDemo()) return demoAddWeight(input);
+  if (isLocalMode()) return localAddWeight(input);
   const saved = await writeOffline<WeightEntry>({
     id: `update-weight:${input.id}:${Date.now()}`,
     path: `/api/app/weights/${input.id}`,

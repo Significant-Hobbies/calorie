@@ -301,7 +301,7 @@ export function calculateGymGuidance(entries: FoodEntry[], now = Date.now()): Gy
   };
 }
 
-export function timeToMinutes(time: string): number {
+function timeToMinutes(time: string): number {
   const [hours, minutes] = time.split(':').map(Number);
   return hours * 60 + minutes;
 }

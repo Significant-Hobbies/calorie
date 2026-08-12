@@ -34,6 +34,12 @@ full sets/reps workout-programming system.
 
 ## Timeline
 
+- 2026-08-12 — adopted the Fleet code-health contract as the single CI gate:
+  whole-source web and native coverage, unused code, cross-language complexity,
+  exact duplication, import/target cycles, severe advisories, suppression
+  markers, web/native builds, and repository hygiene now have explicit
+  non-regression floors or ceilings; removed unused exports and duplicate
+  aliases, and targeted tool updates reduced high advisories from two to zero
 - 2026-08-11 — released native Sign in with Apple, explicit linking to an
   existing Google-owned journal, deterministic iPhone/cloud reconciliation,
   durable offline sync intents, and single-use Google-to-native handoffs; D1
@@ -100,6 +106,9 @@ full sets/reps workout-programming system.
 
 ## Features (shipped)
 
+- CI-enforced mixed web/native Fleet code-health ratchets across whole-source
+  coverage, dead code, complexity, duplication, cycles, dependency advisories,
+  suppression markers, builds, and repository hygiene
 - Native iPhone and iPad journal with local onboarding, food/water/weight/routine
   capture, transparent calculations and guidance, progress/history, food
   management, data transfer, appearance and accessibility support, simulator

@@ -48,11 +48,3 @@ export function xPositions(count: number, width: number, pad: number): number[] 
 }
 
 export type SeriesKey = 'calories' | 'protein' | 'carbs' | 'fibre' | 'water';
-
-export const SERIES_LABELS: Record<SeriesKey, string> = {
-  calories: 'Calories',
-  protein: 'Protein',
-  carbs: 'Carbs',
-  fibre: 'Fibre',
-  water: 'Water',
-};
