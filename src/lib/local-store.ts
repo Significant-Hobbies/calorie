@@ -305,9 +305,6 @@ export function localAddWeight(input: WeightEntry) {
   return input;
 }
 
-export const localUpdateWater = localAddWater;
-export const localUpdateWeight = localAddWeight;
-
 export function localDeleteWeight(id: string) {
   const state = readState();
   state.weights = state.weights.filter((entry) => entry.id !== id);

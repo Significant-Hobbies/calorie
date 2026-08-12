@@ -383,9 +383,6 @@ export function demoAddWeight(input: WeightEntry) {
   return input;
 }
 
-export const demoUpdateWater = demoAddWater;
-export const demoUpdateWeight = demoAddWeight;
-
 export function demoDeleteWeight(id: string) {
   weights = weights.filter((entry) => entry.id !== id);
 }

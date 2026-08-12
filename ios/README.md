@@ -8,6 +8,10 @@ A native SwiftUI nutrition journal for iOS 17 and later. It uses Apple framework
 ./scripts/check.sh
 ```
 
+From the repository root, `pnpm quality:native` selects an available iPhone
+simulator, runs the same tests and Release build, and enforces the checked-in
+production Swift coverage floor. CI runs this command on macOS.
+
 ## Personal-team archive
 
 ```bash

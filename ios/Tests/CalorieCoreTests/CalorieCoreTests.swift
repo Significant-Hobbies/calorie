@@ -121,12 +121,17 @@ final class CalorieCoreTests: XCTestCase {
     }
 
     func testCloudExportMapsCurrentJournalWithoutInventingFat() throws {
-        let snapshot = try CloudJournalMapper.decode(Data(Self.cloudExport.utf8))
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = try XCTUnwrap(TimeZone(secondsFromGMT: 0))
+        let snapshot = try CloudJournalMapper.decode(
+            Data(Self.cloudExport.utf8),
+            calendar: calendar
+        )
 
         XCTAssertEqual(snapshot.document.profile.name, "Sarthak")
         XCTAssertEqual(snapshot.counts.foodEntries, 1)
         XCTAssertEqual(snapshot.document.foodEntries.first?.foodName, "Greek yoghurt")
-        XCTAssertEqual(snapshot.document.foodEntries.first?.meal, .breakfast)
+        XCTAssertEqual(snapshot.document.foodEntries.first?.meal, .snack)
         XCTAssertEqual(snapshot.document.foodEntries.first?.nutrients.fat, 0)
         XCTAssertEqual(snapshot.document.weightEntries.first?.kilograms, 72.4)
         XCTAssertEqual(snapshot.document.profile.weightKilograms, 72.4)

@@ -1,7 +1,7 @@
 import { round, scaleNutrients } from './recommendations';
 import type { Food, NutritionTarget } from './types';
 
-export type MacroCompletionSuggestion = {
+type MacroCompletionSuggestion = {
   food: Food;
   calories: number;
   proteinG: number;

@@ -12,7 +12,7 @@ migrations, or credential changes.
 - **Stack:** Vite + React + TypeScript, Cloudflare Worker, D1, Better Auth with Google
 - **Package manager:** pnpm
 - **Local dev:** `pnpm dev`
-- **Checks:** `pnpm check`
+- **Checks:** `pnpm quality` (alias: `pnpm check`); `pnpm quality:native` on macOS
 - **Deploy:** `pnpm deploy` (manual only)
 
 ## Product rules

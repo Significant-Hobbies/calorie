@@ -36,7 +36,10 @@ public enum JournalReconciliationChoice: Equatable, Sendable {
 }
 
 public enum CloudJournalMapper {
-    public static func decode(_ data: Data) throws -> CloudJournalSnapshot {
+    public static func decode(
+        _ data: Data,
+        calendar: Calendar = .current
+    ) throws -> CloudJournalSnapshot {
         let export = try JSONDecoder().decode(CloudExport.self, from: data)
         guard export.schema == "calorie-journal-backup", export.version == 2 else {
             throw CalorieError.unsupportedSchema(export.version)
@@ -52,7 +55,9 @@ public enum CloudJournalMapper {
         let document = CalorieDocument(
             profile: profile,
             foods: foods,
-            foodEntries: export.entries.map { mapEntry($0, food: $0.foodId.flatMap { foodByID[$0] }) },
+            foodEntries: export.entries.map {
+                mapEntry($0, food: $0.foodId.flatMap { foodByID[$0] }, calendar: calendar)
+            },
             waterEntries: export.waterEntries.map {
                 WaterEntry(id: stableUUID($0.id), timestamp: date($0.drankAt), millilitres: $0.amountMl)
             },
@@ -201,7 +206,11 @@ public enum CloudJournalMapper {
         )
     }
 
-    private static func mapEntry(_ entry: CloudEntry, food: CloudFood?) -> FoodEntry {
+    private static func mapEntry(
+        _ entry: CloudEntry,
+        food: CloudFood?,
+        calendar: Calendar
+    ) -> FoodEntry {
         let servings: Double
         if let food, food.servingMode == "per_100g", food.defaultAmount > 0 {
             servings = entry.amount / food.defaultAmount
@@ -213,7 +222,7 @@ public enum CloudJournalMapper {
             id: stableUUID(entry.id),
             foodID: stableUUID(entry.foodId ?? "direct:\(entry.id)"),
             foodName: entry.foodName,
-            meal: meal(for: timestamp),
+            meal: meal(for: timestamp, calendar: calendar),
             timestamp: timestamp,
             servings: max(0.01, servings),
             nutrients: Nutrients(
@@ -226,8 +235,8 @@ public enum CloudJournalMapper {
         )
     }
 
-    private static func meal(for date: Date) -> Meal {
-        switch Calendar.current.component(.hour, from: date) {
+    private static func meal(for date: Date, calendar: Calendar) -> Meal {
+        switch calendar.component(.hour, from: date) {
         case 0..<11: .breakfast
         case 11..<16: .lunch
         case 16..<21: .dinner

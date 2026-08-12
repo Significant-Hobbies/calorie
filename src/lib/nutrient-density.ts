@@ -1,6 +1,6 @@
 import type { Nutrients } from './types';
 
-export type NutrientDensityLevel = 'high' | 'medium' | 'low' | 'unavailable';
+type NutrientDensityLevel = 'high' | 'medium' | 'low' | 'unavailable';
 
 export type NutrientDensity = {
   level: NutrientDensityLevel;
@@ -10,7 +10,7 @@ export type NutrientDensity = {
   explanation: string;
 };
 
-export const NUTRIENT_DENSITY_CAVEAT =
+const NUTRIENT_DENSITY_CAVEAT =
   'Based only on tracked protein and fibre per 100 kcal. It does not assess vitamins, minerals, ingredients, or overall health quality.';
 
 function rounded(value: number) {
