@@ -118,6 +118,25 @@ describe('Calorie MCP routes', () => {
     expect(body.page).toMatchObject({ total: 3, nextOffset: null });
   });
 
+  it('accepts at most 366 inclusive history days and rejects a wider range', async () => {
+    const { db } = fakeDatabase();
+    const accepted = await app.fetch(
+      readRequest('/api/mcp/history?start=2025-01-01&end=2026-01-01&timezone=UTC'),
+      { DB: db } as never
+    );
+    const rejected = await app.fetch(
+      readRequest('/api/mcp/history?start=2025-01-01&end=2026-01-02&timezone=UTC'),
+      { DB: db } as never
+    );
+
+    expect(accepted.status).toBe(200);
+    expect(rejected.status).toBe(400);
+    await expect(rejected.json()).resolves.toMatchObject({
+      code: 'VALIDATION_ERROR',
+      message: 'Choose a history range of one year or less.',
+    });
+  });
+
   it('reads only the target columns needed for a daily response', async () => {
     const { db, calls } = fakeDatabase();
     const response = await app.fetch(readRequest('/api/mcp/daily?date=2026-08-01&timezone=UTC'), {
