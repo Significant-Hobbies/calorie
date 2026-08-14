@@ -61,6 +61,67 @@ export type CycleAnalysis = {
   statusReason: string;
 };
 
+function resolveCycleStatus(
+  enoughIntake: boolean,
+  enoughWeight: boolean,
+  hasCalorieRange: boolean,
+  calorieAligned: boolean,
+  directionAligned: boolean
+): { status: CycleAnalysis['status']; statusReason: string } {
+  if (!enoughIntake || !enoughWeight || !hasCalorieRange) {
+    if (!hasCalorieRange) {
+      return {
+        status: 'insufficient_data',
+        statusReason: 'Set a calorie range to compare this cycle with its plan.',
+      };
+    }
+    return {
+      status: 'insufficient_data',
+      statusReason: 'Log at least four food days and two weights spanning seven days.',
+    };
+  }
+  if (calorieAligned && directionAligned) {
+    return {
+      status: 'on_track',
+      statusReason:
+        'Logged intake is inside your saved range and measured weight direction matches this cycle.',
+    };
+  }
+  if (!calorieAligned && !directionAligned) {
+    return {
+      status: 'review_target',
+      statusReason:
+        'Logged intake is outside your saved range and measured weight direction differs from this cycle.',
+    };
+  }
+  return {
+    status: 'insufficient_data',
+    statusReason: 'Intake and weight signals are mixed, so more context is needed.',
+  };
+}
+
+function isCalorieAligned(
+  enoughIntake: boolean,
+  averageCalories: number | null,
+  range: [number, number] | null
+): boolean {
+  if (!enoughIntake || !range || averageCalories === null) return false;
+  return averageCalories >= range[0] && averageCalories <= range[1];
+}
+
+function calorieDeltaFromPlan(
+  averageCalories: number | null,
+  midpoint: number | null
+): number | null {
+  if (averageCalories === null || midpoint === null) return null;
+  return rounded(averageCalories - midpoint);
+}
+
+function proteinCoverage(averageProtein: number | null, floor: number | null): number | null {
+  if (averageProtein === null || floor === null) return null;
+  return rounded((averageProtein / floor) * 100);
+}
+
 export function analyzeCyclePeriod(period: CyclePeriodData, today: string): CycleAnalysis {
   const endBoundary = period.session.endOn ?? today;
   const elapsedDays = Math.max(
@@ -82,34 +143,22 @@ export function analyzeCyclePeriod(period: CyclePeriodData, today: string): Cycl
   const rate = weeklyWeightRate(orderedWeights);
   const enoughIntake = loggedDays >= 4 && averageCaloriesValue !== null;
   const enoughWeight = rate !== null;
-  const calorieAligned = Boolean(
-    enoughIntake &&
-      period.session.calorieRange &&
-      averageCaloriesValue !== null &&
-      averageCaloriesValue >= period.session.calorieRange[0] &&
-      averageCaloriesValue <= period.session.calorieRange[1]
+  const calorieAligned = isCalorieAligned(
+    enoughIntake,
+    averageCaloriesValue,
+    period.session.calorieRange
   );
   const directionAligned = enoughWeight
     ? weightDirectionAligned(period.session.cycle, rate)
     : false;
 
-  let status: CycleAnalysis['status'] = 'insufficient_data';
-  let statusReason = 'Log at least four food days and two weights spanning seven days.';
-  if (enoughIntake && enoughWeight && period.session.calorieRange) {
-    if (calorieAligned && directionAligned) {
-      status = 'on_track';
-      statusReason =
-        'Logged intake is inside your saved range and measured weight direction matches this cycle.';
-    } else if (!calorieAligned && !directionAligned) {
-      status = 'review_target';
-      statusReason =
-        'Logged intake is outside your saved range and measured weight direction differs from this cycle.';
-    } else {
-      statusReason = 'Intake and weight signals are mixed, so more context is needed.';
-    }
-  } else if (!period.session.calorieRange) {
-    statusReason = 'Set a calorie range to compare this cycle with its plan.';
-  }
+  const { status, statusReason } = resolveCycleStatus(
+    enoughIntake,
+    enoughWeight,
+    Boolean(period.session.calorieRange),
+    calorieAligned,
+    directionAligned
+  );
 
   return {
     cycle: period.session.cycle,
@@ -120,14 +169,8 @@ export function analyzeCyclePeriod(period: CyclePeriodData, today: string): Cycl
     coveragePercent: rounded((loggedDays / elapsedDays) * 100),
     averageCalories: averageCaloriesValue === null ? null : rounded(averageCaloriesValue),
     averageProteinG: averageProteinValue === null ? null : rounded(averageProteinValue),
-    calorieDeltaFromPlan:
-      averageCaloriesValue === null || calorieMidpoint === null
-        ? null
-        : rounded(averageCaloriesValue - calorieMidpoint),
-    proteinCoveragePercent:
-      averageProteinValue === null || proteinFloor === null
-        ? null
-        : rounded((averageProteinValue / proteinFloor) * 100),
+    calorieDeltaFromPlan: calorieDeltaFromPlan(averageCaloriesValue, calorieMidpoint),
+    proteinCoveragePercent: proteinCoverage(averageProteinValue, proteinFloor),
     weightChangeKg: weightChange === null ? null : rounded(weightChange, 1),
     weeklyWeightRateKg: rate,
     weightCount: orderedWeights.length,
