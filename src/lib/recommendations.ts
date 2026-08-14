@@ -252,30 +252,26 @@ export function calculateCompletedFasts(
 }
 
 export function calculateGymGuidance(entries: FoodEntry[], now = Date.now()): GymGuidance {
-  let recent:
-    | {
-        entry: FoodEntry;
-        startAt: number;
-        endAt: number;
-        minutes: readonly [number, number];
-      }
-    | undefined;
+  let recentEntry: FoodEntry | undefined;
+  let recentStartAt = 0;
+  let recentEndAt = 0;
+  let recentStartMinutes = 0;
+  let recentEndMinutes = 0;
 
   for (const entry of entries) {
     if (entry.carbsG < 10 || entry.eatenAt > now) continue;
-    const minutes: readonly [number, number] =
-      entry.carbsG <= 20 ? [30, 90] : entry.carbsG <= 50 ? [60, 150] : [90, 240];
-    const endAt = entry.eatenAt + minutes[1] * 60 * 1000;
-    if (endAt < now || (recent && recent.entry.eatenAt >= entry.eatenAt)) continue;
-    recent = {
-      entry,
-      startAt: entry.eatenAt + minutes[0] * 60 * 1000,
-      endAt,
-      minutes,
-    };
+    const endMinutes = entry.carbsG <= 20 ? 90 : entry.carbsG <= 50 ? 150 : 240;
+    const endAt = entry.eatenAt + endMinutes * 60 * 1000;
+    if (endAt < now || (recentEntry && recentEntry.eatenAt >= entry.eatenAt)) continue;
+    const startMinutes = entry.carbsG <= 20 ? 30 : entry.carbsG <= 50 ? 60 : 90;
+    recentEntry = entry;
+    recentStartAt = entry.eatenAt + startMinutes * 60 * 1000;
+    recentEndAt = endAt;
+    recentStartMinutes = startMinutes;
+    recentEndMinutes = endMinutes;
   }
 
-  if (!recent) {
+  if (!recentEntry) {
     return {
       state: 'no-recent-carbs',
       startAt: null,
@@ -287,17 +283,16 @@ export function calculateGymGuidance(entries: FoodEntry[], now = Date.now()): Gy
     };
   }
 
-  const [startMinutes, endMinutes] = recent.minutes;
-  const phase = now >= recent.startAt ? 'active' : 'upcoming';
+  const phase = now >= recentStartAt ? 'active' : 'upcoming';
 
   return {
     state: 'window',
-    startAt: recent.startAt,
-    endAt: recent.endAt,
-    carbsG: round(recent.entry.carbsG, 1),
-    sourceEntry: recent.entry.foodName,
+    startAt: recentStartAt,
+    endAt: recentEndAt,
+    carbsG: round(recentEntry.carbsG, 1),
+    sourceEntry: recentEntry.foodName,
     phase,
-    explanation: `${round(recent.entry.carbsG)} g carbs in ${recent.entry.foodName} suggests a broad ${startMinutes}–${endMinutes} minute post-meal window${phase === 'active' ? ' that is active now' : ''}.`,
+    explanation: `${round(recentEntry.carbsG)} g carbs in ${recentEntry.foodName} suggests a broad ${recentStartMinutes}–${recentEndMinutes} minute post-meal window${phase === 'active' ? ' that is active now' : ''}.`,
   };
 }
 
