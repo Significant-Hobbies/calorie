@@ -1,5 +1,7 @@
 node_modules/
 dist/
+/privacy.html
+/changelog.html
 .dev.vars
 .env*
 .wrangler/
