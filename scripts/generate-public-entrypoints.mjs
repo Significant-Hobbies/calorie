@@ -44,7 +44,10 @@ if (import.meta.url === pathToFileURL(process.argv[1]).href) {
   const indexHtml = await readFile(new URL('../index.html', import.meta.url), 'utf8');
   await Promise.all(
     PUBLIC_ENTRYPOINTS.map((entry) =>
-      writeFile(new URL(`../${entry.file}`, import.meta.url), renderPublicEntrypoint(indexHtml, entry))
+      writeFile(
+        new URL(`../${entry.file}`, import.meta.url),
+        renderPublicEntrypoint(indexHtml, entry)
+      )
     )
   );
 
