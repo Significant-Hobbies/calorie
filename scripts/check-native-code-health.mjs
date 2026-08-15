@@ -106,7 +106,7 @@ try {
         `${(minimumProductionCoverage * 100).toFixed(2)}%`
     );
   }
-  console.log('Native gate: 16 unit tests, 3 UI tests, release build, and coverage pass.');
+  console.log('Native gate: 22 unit tests, 3 UI tests, release build, and coverage pass.');
 } catch (error) {
   console.error(error instanceof Error ? error.message : String(error));
   process.exit(1);

@@ -6,9 +6,9 @@ sleep, exercise-timing, fasting-window, and goal guidance without using AI.
 
 The app is local-first: **Start on this device** works without an account and
 keeps the journal in versioned browser or iPhone storage. Google sign-in is
-optional on the web. The native client can explicitly link Sign in with Apple
-to an existing Google-backed journal and enable private Cloudflare D1 sync when
-the cloud bindings are configured.
+optional on the web. The native client can connect that same Google-backed
+journal directly for private Cloudflare D1 sync and optionally link Sign in
+with Apple as another way to reopen it.
 
 Production target: `https://calorie.significanthobbies.com`
 
@@ -63,7 +63,8 @@ Production uses a dedicated Google web client with
 callback. Only the standard OpenID Connect identity scopes are requested.
 Native Apple ID tokens are verified for `com.significanthobbies.calorie`.
 Implicit email linking is disabled; existing owners authenticate their Google
-account first, then link the verified Apple provider identity explicitly.
+account to sync directly, then may explicitly link the verified Apple provider
+identity without changing journals.
 
 ## How recommendations work
 

@@ -21,15 +21,16 @@ final class AppModel {
     private(set) var cloudSnapshot: CloudJournalSnapshot?
     var isReconciliationPresented = false
     private(set) var pendingSyncCount = 0
+    private(set) var isSyncing = false
 
     private let store: CalorieStore
-    private let accountClient: NativeAccountClient
+    private let accountClient: any NativeAccountServing
     private let syncStore: SyncIntentStore
     private let webAuthentication = WebAuthenticationCoordinator()
 
     init(
         store: CalorieStore = CalorieStore(),
-        accountClient: NativeAccountClient = NativeAccountClient(),
+        accountClient: any NativeAccountServing = NativeAccountClient(),
         syncStore: SyncIntentStore = SyncIntentStore()
     ) {
         self.store = store
@@ -60,10 +61,12 @@ final class AppModel {
             if ProcessInfo.processInfo.arguments.contains("--quick-log-demo") { isQuickLogPresented = true }
             account = try? await accountClient.restoreAccount()
             pendingSyncCount = (try? await syncStore.pending().count) ?? 0
-            if account?.hasApple == true, document.syncState == .localOnly {
-                await prepareCloudReconciliation()
-            } else if account != nil, pendingSyncCount > 0 {
-                await syncNow()
+            if account != nil {
+                if document.syncState == .localOnly {
+                    await prepareCloudReconciliation()
+                } else {
+                    await syncNow()
+                }
             }
         } catch {
             document = .starter
@@ -78,7 +81,7 @@ final class AppModel {
     }
 
     func delete(_ entry: FoodEntry) async {
-        await mutate(deletions: [.deleteFoodEntry(entry.id)]) { document in
+        await mutate { document in
             lastDeletedEntry = try document.deleteEntry(entry.id)
         }
         message = "Entry removed. Undo is available below."
@@ -119,10 +122,7 @@ final class AppModel {
     }
 
     func toggleRoutine(_ routine: MedicationRoutine) async {
-        let deletion = document.routineCheckIns.first {
-            $0.routineID == routine.id && Calendar.current.isDate($0.date, inSameDayAs: selectedDate)
-        }.map { SyncOperation.deleteRoutineCheckIn($0.id) }
-        await mutate(deletions: deletion.map { [$0] } ?? []) {
+        await mutate {
             $0.toggleRoutine(routine.id, on: selectedDate)
         }
     }
@@ -155,10 +155,7 @@ final class AppModel {
     }
 
     func saveDailyContext(weightKilograms: Double?, note: String, cycle: CycleContext) async {
-        let removedWeights = document.weightEntries
-            .filter { Calendar.current.isDate($0.date, inSameDayAs: selectedDate) }
-            .map { SyncOperation.deleteWeightEntry($0.id) }
-        await mutate(deletions: removedWeights) { document in
+        await mutate { document in
             let calendar = Calendar.current
             document.weightEntries.removeAll { calendar.isDate($0.date, inSameDayAs: selectedDate) }
             if let weightKilograms, weightKilograms > 0 {
@@ -212,10 +209,13 @@ final class AppModel {
     func confirmImport() async {
         guard let importPreview else { return }
         do {
+            let previous = document
             try await store.replace(with: importPreview)
             document = importPreview
             if account != nil {
-                try await syncStore.enqueue(.snapshot(importPreview))
+                for operation in CloudJournalDiff.operations(from: previous, to: importPreview) {
+                    try await syncStore.enqueue(operation)
+                }
                 await syncNow()
             }
             self.importPreview = nil
@@ -248,7 +248,8 @@ final class AppModel {
                 let code = components.queryItems?.first(where: { $0.name == "code" })?.value
             else { throw NativeAccountError.invalidCallback }
             account = try await accountClient.exchangeGoogleHandoff(code)
-            accountNotice = "Existing journal connected. Add Apple once so future Apple sign-ins open this journal."
+            accountNotice = "Cloud journal connected. Apple sign-in is optional."
+            await prepareCloudReconciliation()
         } catch {
             message = accountErrorMessage(error, recovery: "Try connecting your existing journal again.")
         }
@@ -310,7 +311,9 @@ final class AppModel {
             try await store.save(next)
             document = next
             if choice != .keepCloud {
-                try await syncStore.enqueue(.snapshot(next))
+                for operation in CloudJournalDiff.operations(from: cloudSnapshot.document, to: next) {
+                    try await syncStore.enqueue(operation)
+                }
                 await syncNow()
             }
             self.cloudSnapshot = nil
@@ -352,27 +355,46 @@ final class AppModel {
     }
 
     func syncNow() async {
-        guard account != nil else { return }
+        guard account != nil, !isSyncing else { return }
         if document.syncState == .conflict {
             await resumeReconciliation()
             return
         }
+        isSyncing = true
+        defer { isSyncing = false }
         do {
-            let pending = try await syncStore.pending()
-            pendingSyncCount = pending.count
-            for intent in pending {
-                try await accountClient.apply(intent)
-                try await syncStore.complete(intent.id)
-                pendingSyncCount -= 1
+            while true {
+                let pending = try await syncStore.pending()
+                pendingSyncCount = pending.count
+                for intent in pending {
+                    try await accountClient.apply(intent)
+                    try await syncStore.complete(intent.id)
+                    pendingSyncCount -= 1
+                }
+                guard try await syncStore.pending().isEmpty else { continue }
+                let cloud = try CloudJournalMapper.decode(await accountClient.cloudExport())
+                guard try await syncStore.pending().isEmpty else { continue }
+                let refreshed = CloudJournalMapper.reconcile(
+                    local: document,
+                    cloud: cloud,
+                    choice: .keepCloud
+                )
+                document = refreshed
+                try await store.save(refreshed)
+                guard try await syncStore.pending().isEmpty else { continue }
+                break
             }
-            document.syncState = .synced
-            document.lastSyncedAt = .now
-            try await store.save(document)
         } catch {
+            pendingSyncCount = (try? await syncStore.pending().count) ?? pendingSyncCount
             document.syncState = pendingSyncCount > 0 ? .pending : .failed
             try? await store.save(document)
             message = accountErrorMessage(error, recovery: "Your changes are saved on this device and cloud sync can be retried.")
         }
+    }
+
+    func refreshFromCloud() async {
+        guard !isLoading, account != nil else { return }
+        await syncNow()
     }
 
     private func accountErrorMessage(_ error: Error, recovery: String) -> String {
@@ -380,19 +402,18 @@ final class AppModel {
         return "\(detail) \(recovery)"
     }
 
-    private func mutate(
-        deletions: [SyncOperation] = [],
-        _ operation: (inout CalorieDocument) throws -> Void
-    ) async {
+    private func mutate(_ operation: (inout CalorieDocument) throws -> Void) async {
         do {
+            let previous = document
             var next = document
             try operation(&next)
             if account != nil { next.syncState = .pending }
             try await store.save(next)
             document = next
             if account != nil {
-                for deletion in deletions { try await syncStore.enqueue(deletion) }
-                try await syncStore.enqueue(.snapshot(next))
+                for operation in CloudJournalDiff.operations(from: previous, to: next) {
+                    try await syncStore.enqueue(operation)
+                }
                 pendingSyncCount = (try await syncStore.pending()).count
                 await syncNow()
             }

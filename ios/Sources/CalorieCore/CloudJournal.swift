@@ -188,7 +188,7 @@ public enum CloudJournalMapper {
 
     private static func mapFood(_ food: CloudFood) -> Food {
         let scale = food.servingMode == "per_100g" ? food.defaultAmount / 100 : 1
-        return Food(
+        var result = Food(
             id: stableUUID(food.id),
             name: food.name,
             servingName: food.unitLabel,
@@ -204,6 +204,9 @@ public enum CloudJournalMapper {
             isArchived: food.archivedAt != nil,
             isCustom: true
         )
+        result.isPackaged = food.isPackaged
+        result.labels = food.labels
+        return result
     }
 
     private static func mapEntry(
@@ -218,7 +221,7 @@ public enum CloudJournalMapper {
             servings = entry.amount
         }
         let timestamp = date(entry.eatenAt)
-        return FoodEntry(
+        var result = FoodEntry(
             id: stableUUID(entry.id),
             foodID: stableUUID(entry.foodId ?? "direct:\(entry.id)"),
             foodName: entry.foodName,
@@ -233,6 +236,9 @@ public enum CloudJournalMapper {
                 fibre: entry.fibreG
             )
         )
+        result.isPackaged = entry.isPackaged
+        result.labels = entry.labels
+        return result
     }
 
     private static func meal(for date: Date, calendar: Calendar) -> Meal {
@@ -304,6 +310,8 @@ private struct CloudFood: Decodable {
     let fibreG: Double
     let favourite: Bool
     let archivedAt: Double?
+    let isPackaged: Bool?
+    let labels: [String]?
 }
 
 private struct CloudEntry: Decodable {
@@ -316,6 +324,8 @@ private struct CloudEntry: Decodable {
     let proteinG: Double
     let fibreG: Double
     let eatenAt: Double
+    let isPackaged: Bool?
+    let labels: [String]?
 }
 
 private struct CloudWater: Decodable { let id: String; let amountMl: Int; let drankAt: Double }

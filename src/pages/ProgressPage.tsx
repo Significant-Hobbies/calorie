@@ -117,7 +117,7 @@ function FoodRanking({
   );
 }
 
-export function ProgressPage({ userId }: { userId: string }) {
+export function ProgressPage({ userId, cloudRevision }: { userId: string; cloudRevision: number }) {
   const today = useMemo(() => new Date(), []);
   const sessionSnapshot = getProgressSessionSnapshot(userId);
   const initialCalendarMode: HistoryCalendarMode = window.matchMedia('(min-width: 1000px)').matches
@@ -238,18 +238,18 @@ export function ProgressPage({ userId }: { userId: string }) {
 
   useEffect(() => {
     void loadDashboard();
-  }, [loadDashboard]);
+  }, [loadDashboard, cloudRevision]);
 
   useEffect(() => {
     if (viewMode === 'trends') void loadTrends(rangeDays);
-  }, [viewMode, rangeDays, loadTrends]);
+  }, [viewMode, rangeDays, loadTrends, cloudRevision]);
 
   useEffect(() => {
     if (viewMode !== 'calendar') return;
     const cached = calendarHistorySessionCache.get(calendarDateKeySignature);
     if (cached) setCalendarHistory(cached);
     void loadCalendar(calendarDateKeys);
-  }, [viewMode, calendarDateKeySignature, loadCalendar]);
+  }, [viewMode, calendarDateKeySignature, loadCalendar, cloudRevision]);
 
   useEffect(() => {
     const media = window.matchMedia('(min-width: 1000px)');

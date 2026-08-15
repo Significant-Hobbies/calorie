@@ -38,7 +38,7 @@ function nutrientSummary(food: Food) {
   return `${Math.round(food.calories)} kcal · ${Math.round(food.carbsG)}C · ${Math.round(food.proteinG)}P · ${Math.round(food.fibreG)}F · ${basis}`;
 }
 
-export function FoodsPage() {
+export function FoodsPage({ cloudRevision }: { cloudRevision: number }) {
   const [foods, setFoods] = useState<Food[]>([]);
   const [query, setQuery] = useState('');
   const [sort, setSort] = useState<FoodSortKey>('recent');
@@ -65,7 +65,7 @@ export function FoodsPage() {
       .finally(() => setLoading(false));
   }, []);
 
-  useEffect(() => loadFoods(lifecycle), [lifecycle, loadFoods]);
+  useEffect(() => loadFoods(lifecycle), [lifecycle, loadFoods, cloudRevision]);
 
   useEffect(() => {
     if (foodSheetOpen) nameInputRef.current?.focus();
