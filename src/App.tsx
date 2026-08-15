@@ -1,7 +1,8 @@
-import { lazy, type ReactNode, Suspense, useEffect, useState } from 'react';
+import { lazy, type ReactNode, Suspense, useEffect, useRef, useState } from 'react';
 import { AppMark } from './components/AppMark';
 import { AppShell, type AppTab } from './components/AppShell';
-import { getBootstrap, startOfflineRetry } from './lib/api';
+import { getBootstrap, refreshCloudState, startOfflineRetry } from './lib/api';
+import { initPosthog, trackPageView } from './lib/analytics';
 import type { AppSession } from './lib/auth-client';
 import type { UserProfile } from './lib/types';
 import { ChangelogPage } from './pages/ChangelogPage';
@@ -35,6 +36,14 @@ export default function App() {
   const [tab, setTab] = useState<AppTab>(() =>
     new URLSearchParams(location.search).get('quick') === 'food' ? 'foods' : 'today'
   );
+  const [cloudRevision, setCloudRevision] = useState(0);
+  const lastCloudRefresh = useRef(0);
+
+  useEffect(() => {
+    const cleanup = initPosthog();
+    trackPageView();
+    return cleanup;
+  }, []);
 
   useEffect(() => {
     if (legalKind || isChangelog) return;
@@ -61,6 +70,44 @@ export default function App() {
     })();
     return stopRetry;
   }, [isChangelog, legalKind]);
+
+  const readyUserId = state.status === 'ready' ? state.session.user.id : null;
+  useEffect(() => {
+    if (!readyUserId) return;
+    const refresh = async () => {
+      if (document.visibilityState !== 'visible' || !navigator.onLine) return;
+      const now = Date.now();
+      if (now - lastCloudRefresh.current < 1_000) return;
+      lastCloudRefresh.current = now;
+      try {
+        if (!(await refreshCloudState(readyUserId))) return;
+        const bootstrap = await getBootstrap();
+        if (!bootstrap) {
+          setState({ status: 'signed-out' });
+          return;
+        }
+        setState({
+          status: bootstrap.profile.onboardingComplete ? 'ready' : 'onboarding',
+          session: bootstrap.session,
+          profile: bootstrap.profile,
+        });
+        setCloudRevision((revision) => revision + 1);
+      } catch {
+        // Keep the usable current view; its normal loading and offline states remain authoritative.
+      }
+    };
+    const refreshWhenVisible = () => {
+      if (document.visibilityState === 'visible') void refresh();
+    };
+    window.addEventListener('focus', refresh);
+    window.addEventListener('online', refresh);
+    document.addEventListener('visibilitychange', refreshWhenVisible);
+    return () => {
+      window.removeEventListener('focus', refresh);
+      window.removeEventListener('online', refresh);
+      document.removeEventListener('visibilitychange', refreshWhenVisible);
+    };
+  }, [readyUserId]);
 
   if (legalKind) return <LegalPage kind={legalKind} />;
   if (isChangelog) return <ChangelogPage />;
@@ -107,19 +154,24 @@ export default function App() {
   switch (tab) {
     case 'today':
       content = (
-        <TodayPage onOpenFoods={() => setTab('foods')} onOpenSettings={() => setTab('you')} />
+        <TodayPage
+          cloudRevision={cloudRevision}
+          onOpenFoods={() => setTab('foods')}
+          onOpenSettings={() => setTab('you')}
+        />
       );
       break;
     case 'progress':
-      content = <ProgressPage key={state.session.user.id} userId={state.session.user.id} />;
+      content = <ProgressPage cloudRevision={cloudRevision} userId={state.session.user.id} />;
       break;
     case 'foods':
-      content = <FoodsPage />;
+      content = <FoodsPage cloudRevision={cloudRevision} />;
       break;
     case 'you':
       content = (
         <SettingsPage
           profile={state.profile}
+          cloudRevision={cloudRevision}
           onProfileChange={(profile) => setState({ ...state, profile })}
         />
       );

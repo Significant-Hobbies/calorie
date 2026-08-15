@@ -29,7 +29,7 @@ Calorie is a small, private food journal for the moments right after you eat. Re
 
 Daily targets can be entered manually or estimated with a published equation profile. Every timing suggestion names its recorded inputs and rule, and clearly remains an estimate—not medical advice.
 
-Logging works locally without an account. Optionally connect an existing Calorie journal, link Sign in with Apple, and reconcile cloud and device records with an explicit preview. Review days and weeks, meal timing, trends, familiar and custom foods, and export your journal whenever you choose.
+Logging works locally without an account. Optionally connect an existing Calorie journal and reconcile cloud and device records with an explicit preview. Sign in with Apple can be linked later as another way to open the same journal. Review days and weeks, meal timing, trends, familiar and custom foods, and export your journal whenever you choose.
 
 **Keywords**
 food journal,calories,protein,macros,nutrition,meal log,water,timing,weight
@@ -75,7 +75,7 @@ Confirm the rating produced by App Store Connect's current questionnaire.
 
 ## Review notes draft
 
-The app can be used without an account. A fresh journal contains reusable food templates but no fabricated personal meals, water, weight, routines, or notes. Existing web users choose **Connect existing Calorie data**, authenticate with Google once, link Apple explicitly, and then choose cloud, device, or merge. Medication is limited to user-named routines and a daily checkbox; the app does not store dosage or provide medication guidance.
+The app can be used without an account. A fresh journal contains reusable food templates but no fabricated personal meals, water, weight, routines, or notes. Existing web users choose **Connect existing Calorie data**, authenticate with Google once, and then choose cloud, device, or merge. Apple sign-in is an optional additional login for that same journal. Medication is limited to user-named routines and a daily checkbox; the app does not store dosage or provide medication guidance.
 
 ## Screenshots and release
 

@@ -75,9 +75,11 @@ const storedWeight = (value: string, imperial: boolean) => {
 
 export function SettingsPage({
   profile,
+  cloudRevision,
   onProfileChange,
 }: {
   profile: UserProfile;
+  cloudRevision: number;
   onProfileChange: (profile: UserProfile) => void;
 }) {
   const [draft, setDraft] = useState(profile);
@@ -101,7 +103,11 @@ export function SettingsPage({
         setCycleStartOn(history.active.session.startOn);
       })
       .catch(() => undefined);
-  }, []);
+  }, [cloudRevision]);
+
+  useEffect(() => {
+    if (openSection === null) setDraft(profile);
+  }, [openSection, profile]);
 
   useEffect(
     () =>

@@ -47,6 +47,8 @@ public struct Food: Codable, Equatable, Identifiable, Sendable {
     public var isFavorite: Bool
     public var isArchived: Bool
     public var isCustom: Bool
+    public var isPackaged: Bool? = nil
+    public var labels: [String]? = nil
 
     public init(
         id: UUID = UUID(),
@@ -84,6 +86,8 @@ public struct FoodEntry: Codable, Equatable, Identifiable, Sendable {
     public var timestamp: Date
     public var servings: Double
     public var nutrients: Nutrients
+    public var isPackaged: Bool? = nil
+    public var labels: [String]? = nil
 
     public init(
         id: UUID = UUID(),

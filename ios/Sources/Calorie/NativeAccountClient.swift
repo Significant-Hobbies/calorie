@@ -21,6 +21,19 @@ struct CalorieAccount: Equatable, Sendable {
     var hasApple: Bool { providers.contains("apple") }
 }
 
+protocol NativeAccountServing: Sendable {
+    var googleStartURL: URL { get async }
+
+    func restoreAccount() async throws -> CalorieAccount?
+    func exchangeGoogleHandoff(_ code: String) async throws -> CalorieAccount
+    func signInWithApple(_ payload: AppleIdentityPayload) async throws -> CalorieAccount
+    func linkApple(_ payload: AppleIdentityPayload) async throws -> CalorieAccount
+    func cloudExport() async throws -> Data
+    func apply(_ intent: SyncIntent) async throws
+    func signOut() async
+    func deleteAccount() async throws
+}
+
 enum NativeAccountError: LocalizedError {
     case invalidAppleCredential
     case invalidCallback
@@ -105,7 +118,7 @@ actor KeychainSessionStore {
     }
 }
 
-actor NativeAccountClient {
+actor NativeAccountClient: NativeAccountServing {
     static let productionBaseURL = URL(string: "https://calorie.significanthobbies.com")!
 
     private let baseURL: URL
@@ -171,9 +184,30 @@ actor NativeAccountClient {
     }
 
     func apply(_ intent: SyncIntent) async throws {
-        switch intent.operation {
+        try await apply(intent.operation)
+    }
+
+    private func apply(_ operation: SyncOperation) async throws {
+        switch operation {
         case let .snapshot(document):
-            try await push(document)
+            let cloud = try CloudJournalMapper.decode(await cloudExport())
+            for operation in CloudJournalDiff.operations(from: cloud.document, to: document) {
+                try await apply(operation)
+            }
+        case let .updateProfile(before, after):
+            try await pushProfile(before: before, after: after)
+        case let .upsertFood(food):
+            try await pushFood(food)
+        case let .upsertFoodEntry(entry, food):
+            try await pushEntry(entry, food: food)
+        case let .upsertWaterEntry(water):
+            try await pushWater(water)
+        case let .upsertWeightEntry(weight):
+            try await pushWeight(weight)
+        case let .upsertRoutine(routine):
+            try await pushRoutine(routine)
+        case let .upsertRoutineCheckIn(checkIn):
+            try await pushCheckIn(checkIn)
         case let .deleteFoodEntry(id):
             try await delete(path: "/api/app/entries/\(id.uuidString)")
         case let .deleteWaterEntry(id):
@@ -229,68 +263,94 @@ actor NativeAccountClient {
         )
     }
 
-    private func push(_ document: CalorieDocument) async throws {
-        try await pushProfile(document.profile)
-        for food in document.foods { try await pushFood(food) }
-        for entry in document.foodEntries {
-            try await pushEntry(entry, food: document.foods.first(where: { $0.id == entry.foodID }))
-        }
-        for water in document.waterEntries { try await pushWater(water) }
-        for weight in document.weightEntries { try await pushWeight(weight) }
-        for routine in document.routines { try await pushRoutine(routine) }
-        for checkIn in document.routineCheckIns { try await pushCheckIn(checkIn) }
-    }
-
-    private func pushProfile(_ profile: Profile) async throws {
+    private func pushProfile(before: Profile, after profile: Profile) async throws {
+        guard hasSupportedProfileChange(from: before, to: profile) else { return }
         guard
             let age = profile.age,
-            let height = profile.heightCentimetres,
-            let equation = profile.equationProfile
+            let height = profile.heightCentimetres
         else { return }
-        let goal = switch profile.goal {
-        case .gradualLoss: "lose_gentle"
-        case .gradualGain: "gain_gentle"
-        case .maintain: "maintain"
+        let response = try await request(path: "/api/app/profile", method: "GET", authenticated: true)
+        guard var body = try JSONSerialization.jsonObject(with: response.data) as? [String: Any] else {
+            throw NativeAccountError.server("Calorie returned an invalid profile.")
         }
-        let activity = switch profile.activity {
-        case .light: "light"
-        case .moderate: "moderate"
-        case .high: "very"
-        }
-        let equationValue = switch equation {
-        case .mifflinFemaleConstant: "female"
-        case .mifflinMaleConstant: "male"
-        }
-        let manualTarget: Any = profile.manualCalorieTarget ?? NSNull()
-        let manualRange: Any = profile.manualCalorieTarget.map {
-            [max(800, $0 - 100), min(6_000, $0 + 100)]
-        } ?? NSNull()
-        let body: [String: Any] = [
-            "displayName": profile.name.isEmpty ? "You" : profile.name,
-            "units": "metric",
-            "ageYears": age,
-            "genderIdentity": NSNull(),
-            "equationProfile": equationValue,
-            "heightCm": height,
-            "activityLevel": activity,
-            "goal": goal,
-            "targetWeightKg": NSNull(),
-            "manualCalorieTarget": manualTarget,
-            "manualCalorieRange": manualRange,
-            "wakeTime": "07:00",
-            "sleepHours": 8,
-            "fastingThresholdHours": 12,
-            "waterTargetMl": profile.waterTargetMillilitres,
-            "dailyActionOrder": ["weight", "creatine", "food", "water"],
-            "dailyActionHidden": [],
-            "onboardingComplete": true,
-        ]
+        applyNativeProfileChanges(
+            from: before,
+            to: profile,
+            age: age,
+            height: height,
+            body: &body
+        )
         _ = try await request(
             path: "/api/app/profile",
             method: "PUT",
             jsonBody: body,
             authenticated: true
         )
+    }
+
+    private func hasSupportedProfileChange(from before: Profile, to after: Profile) -> Bool {
+        [
+            before.name != after.name,
+            before.age != after.age,
+            before.heightCentimetres != after.heightCentimetres,
+            before.goal != after.goal,
+            before.activity != after.activity,
+            before.equationProfile != after.equationProfile,
+            before.manualCalorieTarget != after.manualCalorieTarget,
+            before.waterTargetMillilitres != after.waterTargetMillilitres,
+        ].contains(true)
+    }
+
+    private func applyNativeProfileChanges(
+        from before: Profile,
+        to profile: Profile,
+        age: Int,
+        height: Double,
+        body: inout [String: Any]
+    ) {
+        let manualTarget: Any = profile.manualCalorieTarget ?? NSNull()
+        let manualRange: Any = profile.manualCalorieTarget.map {
+            [max(800, $0 - 100), min(6_000, $0 + 100)]
+        } ?? NSNull()
+        if before.name != profile.name { body["displayName"] = profile.name.isEmpty ? "You" : profile.name }
+        if before.age != profile.age { body["ageYears"] = age }
+        if before.heightCentimetres != profile.heightCentimetres { body["heightCm"] = height }
+        if before.equationProfile != profile.equationProfile {
+            body["equationProfile"] = cloudEquationProfile(profile.equationProfile)
+        }
+        if before.activity != profile.activity { body["activityLevel"] = cloudActivity(profile.activity) }
+        if before.goal != profile.goal { body["goal"] = cloudGoal(profile.goal) }
+        if before.manualCalorieTarget != profile.manualCalorieTarget {
+            body["manualCalorieTarget"] = manualTarget
+            body["manualCalorieRange"] = manualRange
+        }
+        if before.waterTargetMillilitres != profile.waterTargetMillilitres {
+            body["waterTargetMl"] = profile.waterTargetMillilitres
+        }
+    }
+
+    private func cloudGoal(_ goal: Goal) -> String {
+        switch goal {
+        case .gradualLoss: "lose_gentle"
+        case .gradualGain: "gain_gentle"
+        case .maintain: "maintain"
+        }
+    }
+
+    private func cloudActivity(_ activity: ActivityLevel) -> String {
+        switch activity {
+        case .light: "light"
+        case .moderate: "moderate"
+        case .high: "very"
+        }
+    }
+
+    private func cloudEquationProfile(_ equationProfile: EquationProfile?) -> String {
+        switch equationProfile {
+        case .mifflinFemaleConstant: "female"
+        case .mifflinMaleConstant: "male"
+        case nil: "none"
+        }
     }
 
     private func pushFood(_ food: Food) async throws {
@@ -307,8 +367,8 @@ actor NativeAccountClient {
             "proteinG": food.nutrients.protein * scale,
             "fibreG": food.nutrients.fibre * scale,
             "favourite": food.isFavorite,
-            "isPackaged": false,
-            "labels": [],
+            "isPackaged": food.isPackaged ?? false,
+            "labels": food.labels ?? [],
         ]
         try await upsert(
             updatePath: "/api/app/foods/\(food.id.uuidString)",
@@ -340,8 +400,8 @@ actor NativeAccountClient {
                 "carbsG": entry.nutrients.carbohydrates,
                 "proteinG": entry.nutrients.protein,
                 "fibreG": entry.nutrients.fibre,
-                "isPackaged": false,
-                "labels": [],
+                "isPackaged": entry.isPackaged ?? false,
+                "labels": entry.labels ?? [],
             ]) { _, replacement in replacement }
         }
         try await upsert(

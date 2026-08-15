@@ -3,6 +3,7 @@ import SwiftUI
 
 @main
 struct CalorieApp: App {
+    @Environment(\.scenePhase) private var scenePhase
     @State private var model = AppModel()
 
     var body: some Scene {
@@ -11,6 +12,10 @@ struct CalorieApp: App {
                 .environment(model)
                 .preferredColorScheme(model.preferredColorScheme)
                 .task { await model.load() }
+                .onChange(of: scenePhase) { _, phase in
+                    guard phase == .active else { return }
+                    Task { await model.refreshFromCloud() }
+                }
         }
     }
 }

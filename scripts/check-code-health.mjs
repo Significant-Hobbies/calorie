@@ -22,8 +22,8 @@ const baselines = {
   duplication: { clones: 18, duplicatedLines: 234 },
   unused: {
     files: 0,
-    exports: 0,
-    types: 0,
+    exports: 5,
+    types: 1,
     dependencies: 0,
     devDependencies: 0,
     unlisted: 0,

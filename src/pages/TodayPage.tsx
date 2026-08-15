@@ -144,9 +144,11 @@ function toLocalInput(timestamp: number) {
 }
 
 export function TodayPage({
+  cloudRevision,
   onOpenFoods,
   onOpenSettings,
 }: {
+  cloudRevision: number;
   onOpenFoods: () => void;
   onOpenSettings: () => void;
 }) {
@@ -188,7 +190,7 @@ export function TodayPage({
 
   useEffect(() => {
     void load();
-  }, [load]);
+  }, [load, cloudRevision]);
 
   useEffect(() => {
     if (!undo) return;

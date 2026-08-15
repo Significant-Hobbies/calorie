@@ -365,8 +365,8 @@ struct YouView: View {
     private var accountControls: some View {
         if let account = model.account {
             Label(
-                account.hasApple ? "Apple sign-in connected" : "Existing journal connected",
-                systemImage: account.hasApple ? "checkmark.icloud.fill" : "person.crop.circle.badge.checkmark"
+                "Cloud journal connected",
+                systemImage: "checkmark.icloud.fill"
             )
             .font(.headline)
             .frame(minHeight: 44)
@@ -378,33 +378,37 @@ struct YouView: View {
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
                 .textSelection(.enabled)
+            Text("Your supported journal records sync with your private Calorie account in Cloudflare D1. Apple is only an optional sign-in method.")
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+            HStack {
+                Label(syncStatusText, systemImage: syncStatusSymbol)
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.secondary)
+                Spacer()
+                Button(model.document.syncState == .conflict ? "Resolve journals" : "Sync now") {
+                    Task { await model.syncNow() }
+                }
+                .font(.caption.weight(.bold))
+                .frame(minHeight: 44)
+                .disabled(model.isAccountWorking)
+            }
+            Button { Task { await model.signOut() } } label: {
+                Label("Sign out", systemImage: "rectangle.portrait.and.arrow.right")
+                    .frame(maxWidth: .infinity, minHeight: 48)
+            }
+            .buttonStyle(.bordered)
+            Button(role: .destructive) { showDeleteAccount = true } label: {
+                Label("Delete cloud account", systemImage: "person.crop.circle.badge.minus")
+                    .frame(maxWidth: .infinity, minHeight: 48)
+            }
             if account.hasApple {
-                Text("This account uses Apple's stable private identifier. Sharing or hiding your email does not change which journal opens.")
+                Text("Apple sign-in is linked to this same cloud journal. Sharing or hiding your Apple email does not change which journal opens.")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
-                HStack {
-                    Label(syncStatusText, systemImage: syncStatusSymbol)
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(.secondary)
-                    Spacer()
-                    Button(model.document.syncState == .conflict ? "Resolve journals" : "Sync now") {
-                        Task { await model.syncNow() }
-                    }
-                        .font(.caption.weight(.bold))
-                        .frame(minHeight: 44)
-                }
-                Button { Task { await model.signOut() } } label: {
-                    Label("Sign out", systemImage: "rectangle.portrait.and.arrow.right")
-                        .frame(maxWidth: .infinity, minHeight: 48)
-                }
-                .buttonStyle(.bordered)
-                Button(role: .destructive) { showDeleteAccount = true } label: {
-                    Label("Delete cloud account", systemImage: "person.crop.circle.badge.minus")
-                        .frame(maxWidth: .infinity, minHeight: 48)
-                }
             } else {
-                Text("Finish once with Apple. After that, Apple sign-in opens this same journal—not a second account.")
-                    .font(.subheadline)
+                Text("Optional: add Apple sign-in for a native way to reopen this same cloud journal.")
+                    .font(.caption)
                     .foregroundStyle(.secondary)
                 appleButton
             }
@@ -412,7 +416,7 @@ struct YouView: View {
             Label("On this device", systemImage: "ipad.and.iphone")
                 .font(.headline)
                 .frame(minHeight: 44)
-            Text("Already use Calorie on the web? Connect that journal first, then add Apple. Email matching is never used to guess ownership.")
+            Text("Already use Calorie on the web? Connect that cloud journal directly. Apple sign-in is optional and email matching is never used to guess ownership.")
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
             Button { Task { await model.connectExistingAccount() } } label: {

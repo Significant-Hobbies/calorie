@@ -133,6 +133,10 @@ final class CalorieCoreTests: XCTestCase {
         XCTAssertEqual(snapshot.document.foodEntries.first?.foodName, "Greek yoghurt")
         XCTAssertEqual(snapshot.document.foodEntries.first?.meal, .snack)
         XCTAssertEqual(snapshot.document.foodEntries.first?.nutrients.fat, 0)
+        XCTAssertEqual(snapshot.document.foods.first?.isPackaged, true)
+        XCTAssertEqual(snapshot.document.foods.first?.labels, ["breakfast", "high-protein"])
+        XCTAssertEqual(snapshot.document.foodEntries.first?.isPackaged, true)
+        XCTAssertEqual(snapshot.document.foodEntries.first?.labels, ["breakfast"])
         XCTAssertEqual(snapshot.document.weightEntries.first?.kilograms, 72.4)
         XCTAssertEqual(snapshot.document.profile.weightKilograms, 72.4)
         XCTAssertEqual(snapshot.document.weightEntries.count, 2)
@@ -213,6 +217,54 @@ final class CalorieCoreTests: XCTestCase {
         XCTAssertEqual(restored.last?.operation, .snapshot(newer))
     }
 
+    func testJournalDiffQueuesOnlyChangedCloudRecords() throws {
+        let cloud = try CloudJournalMapper.decode(Data(Self.cloudExport.utf8)).document
+        var local = cloud
+        let water = WaterEntry(timestamp: Date(timeIntervalSince1970: 1_800_000_000), millilitres: 400)
+        local.waterEntries.append(water)
+        local.dailyNotes["2026-08-16"] = "Device-only note"
+        local.theme = .dark
+
+        XCTAssertEqual(CloudJournalDiff.operations(from: cloud, to: local), [.upsertWaterEntry(water)])
+    }
+
+    func testGranularSyncIntentsCompactByRecord() async throws {
+        let fileURL = FileManager.default.temporaryDirectory
+            .appending(path: UUID().uuidString)
+            .appending(path: "sync-intents.json")
+        let store = SyncIntentStore(fileURL: fileURL)
+        let id = UUID()
+        try await store.enqueue(.upsertWaterEntry(WaterEntry(id: id, timestamp: .now, millilitres: 250)))
+        try await store.enqueue(.upsertWaterEntry(WaterEntry(id: id, timestamp: .now, millilitres: 500)))
+
+        let pending = try await store.pending()
+
+        XCTAssertEqual(pending.count, 1)
+        guard case let .upsertWaterEntry(entry) = pending[0].operation else {
+            return XCTFail("Expected the latest water upsert.")
+        }
+        XCTAssertEqual(entry.millilitres, 500)
+    }
+
+    func testProfileIntentCompactionKeepsTheOriginalCloudBaseline() async throws {
+        let fileURL = FileManager.default.temporaryDirectory
+            .appending(path: UUID().uuidString)
+            .appending(path: "sync-intents.json")
+        let store = SyncIntentStore(fileURL: fileURL)
+        let original = Profile(name: "Original")
+        var renamed = original
+        renamed.name = "Renamed"
+        var retargeted = renamed
+        retargeted.waterTargetMillilitres = 3_000
+        try await store.enqueue(.updateProfile(before: original, after: renamed))
+        try await store.enqueue(.updateProfile(before: renamed, after: retargeted))
+
+        let pending = try await store.pending()
+
+        XCTAssertEqual(pending.count, 1)
+        XCTAssertEqual(pending.first?.operation, .updateProfile(before: original, after: retargeted))
+    }
+
     private static let cloudExport = #"""
     {
       "schema": "calorie-journal-backup",
@@ -251,7 +303,9 @@ final class CalorieCoreTests: XCTestCase {
         "fibreG": 7,
         "favourite": true,
         "lastUsedAt": 1700000000000,
-        "archivedAt": null
+        "archivedAt": null,
+        "isPackaged": true,
+        "labels": ["breakfast", "high-protein"]
       }],
       "entries": [{
         "id": "22222222-2222-4222-8222-222222222222",
@@ -263,7 +317,9 @@ final class CalorieCoreTests: XCTestCase {
         "carbsG": 48,
         "proteinG": 29,
         "fibreG": 7,
-        "eatenAt": 1700000000000
+        "eatenAt": 1700000000000,
+        "isPackaged": true,
+        "labels": ["breakfast"]
       }],
       "waterEntries": [{"id":"33333333-3333-4333-8333-333333333333","amountMl":750,"drankAt":1700035200000}],
       "medications": [{"id":"44444444-4444-4444-8444-444444444444","name":"Morning routine","schedule":"morning","createdAt":1700000000000,"archivedAt":null}],

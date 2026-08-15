@@ -653,3 +653,10 @@ export function startOfflineRetry() {
   retry();
   return () => window.removeEventListener('online', retry);
 }
+
+export async function refreshCloudState(userId: string): Promise<boolean> {
+  if (isDemo() || isLocalMode() || !navigator.onLine) return false;
+  await flushPendingWrites();
+  await deleteDashboardCache(userId);
+  return true;
+}
