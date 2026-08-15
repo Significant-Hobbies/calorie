@@ -67,11 +67,13 @@ export function computeMacroCompletion(input: {
   const suggestions: MacroCompletionSuggestion[] = [];
   if (!complete && leading) {
     const deficit = tracked.find((item) => item.macro === leading.macro)?.remaining ?? 0;
+    const leadingValue = (item: { proteinG: number; fibreG: number }) =>
+      leading.macro === 'protein' ? item.proteinG : item.fibreG;
     suggestions.push(
       ...input.foods
         .map((food) => {
           const serving = scaleNutrients(food, food.servingMode, food.defaultAmount);
-          const servingLeading = leading.macro === 'protein' ? serving.proteinG : serving.fibreG;
+          const servingLeading = leadingValue(serving);
           return {
             food,
             calories: serving.calories,
@@ -80,15 +82,8 @@ export function computeMacroCompletion(input: {
             covers: deficit > 0 ? round(servingLeading / deficit, 2) : 0,
           };
         })
-        .filter((item) => {
-          const servingLeading = leading.macro === 'protein' ? item.proteinG : item.fibreG;
-          return servingLeading > 0;
-        })
-        .sort((a, b) => {
-          const aLeading = leading.macro === 'protein' ? a.proteinG : a.fibreG;
-          const bLeading = leading.macro === 'protein' ? b.proteinG : b.fibreG;
-          return bLeading - aLeading;
-        })
+        .filter((item) => leadingValue(item) > 0)
+        .sort((a, b) => leadingValue(b) - leadingValue(a))
         .slice(0, MAX_SUGGESTIONS)
     );
   }

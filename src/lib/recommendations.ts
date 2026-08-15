@@ -62,15 +62,15 @@ export function round(value: number, precision = 0): number {
   return Math.round(value * multiplier) / multiplier;
 }
 
+function signedValue(value: number): string {
+  if (value > 0) return `+${value.toLocaleString()}`;
+  if (value < 0) return `−${Math.abs(value).toLocaleString()}`;
+  return '0';
+}
+
 export function formatCalorieAdjustmentRange(range: [number, number] | null): string {
   if (!range) return 'no goal adjustment';
-  const signed = (value: number) =>
-    value > 0
-      ? `+${value.toLocaleString()}`
-      : value < 0
-        ? `−${Math.abs(value).toLocaleString()}`
-        : '0';
-  return `${signed(range[0])} to ${signed(range[1])}`;
+  return `${signedValue(range[0])} to ${signedValue(range[1])}`;
 }
 
 export function scaleNutrients(
@@ -188,11 +188,19 @@ export function calculateNutritionTarget(input: {
   };
 }
 
+function resolveWeightDirection(
+  distanceKg: number,
+  signedDifferenceKg: number
+): 'reached' | 'lose' | 'gain' {
+  if (distanceKg < 0.05) return 'reached';
+  if (signedDifferenceKg < 0) return 'lose';
+  return 'gain';
+}
+
 export function calculateTargetWeightProgress(currentWeightKg: number, targetWeightKg: number) {
   const signedDifferenceKg = round(targetWeightKg - currentWeightKg, 1);
   const distanceKg = Math.abs(signedDifferenceKg);
-  const direction =
-    distanceKg < 0.05 ? 'reached' : signedDifferenceKg < 0 ? 'lose' : ('gain' as const);
+  const direction = resolveWeightDirection(distanceKg, signedDifferenceKg);
 
   return {
     direction,
@@ -260,10 +268,10 @@ export function calculateGymGuidance(entries: FoodEntry[], now = Date.now()): Gy
 
   for (const entry of entries) {
     if (entry.carbsG < 10 || entry.eatenAt > now) continue;
-    const endMinutes = entry.carbsG <= 20 ? 90 : entry.carbsG <= 50 ? 150 : 240;
+    const endMinutes = gymWindowEndMinutes(entry.carbsG);
     const endAt = entry.eatenAt + endMinutes * 60 * 1000;
     if (endAt < now || (recentEntry && recentEntry.eatenAt >= entry.eatenAt)) continue;
-    const startMinutes = entry.carbsG <= 20 ? 30 : entry.carbsG <= 50 ? 60 : 90;
+    const startMinutes = gymWindowStartMinutes(entry.carbsG);
     recentEntry = entry;
     recentStartAt = entry.eatenAt + startMinutes * 60 * 1000;
     recentEndAt = endAt;
@@ -324,7 +332,7 @@ export function calculateSleepGuidance(input: {
     };
   }
 
-  const settleGap = input.lastEntryCalories < 150 ? 60 : input.lastEntryCalories < 400 ? 120 : 180;
+  const settleGap = settleGapForCalories(input.lastEntryCalories);
   let settleMinutes = input.lastEntryLocalMinutes + settleGap;
   let comparableRoutine = routineMinutes;
   if (comparableRoutine < input.lastEntryLocalMinutes - 12 * 60) comparableRoutine += 1440;
@@ -340,4 +348,22 @@ export function calculateSleepGuidance(input: {
         ? `Your last entry adds a ${settleGap / 60}-hour settling window.`
         : 'Your normal sleep schedule already leaves enough time after eating.',
   };
+}
+
+function settleGapForCalories(calories: number): number {
+  if (calories < 150) return 60;
+  if (calories < 400) return 120;
+  return 180;
+}
+
+function gymWindowEndMinutes(carbsG: number): number {
+  if (carbsG <= 20) return 90;
+  if (carbsG <= 50) return 150;
+  return 240;
+}
+
+function gymWindowStartMinutes(carbsG: number): number {
+  if (carbsG <= 20) return 30;
+  if (carbsG <= 50) return 60;
+  return 90;
 }
