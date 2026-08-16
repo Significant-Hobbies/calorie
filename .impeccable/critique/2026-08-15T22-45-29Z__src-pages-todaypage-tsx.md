@@ -2,7 +2,7 @@
 target: Tracked quality scores across web and native food journals
 total_score: 35
 max_score: 40
-na_heuristics: 
+na_heuristics:
 p0_count: 0
 p1_count: 0
 timestamp: 2026-08-15T22-45-29Z
