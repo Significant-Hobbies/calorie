@@ -19,7 +19,7 @@ const productionPaths = [
 const sourceExtensions = new Set(['.js', '.jsx', '.mjs', '.mts', '.swift', '.ts', '.tsx']);
 const baselines = {
   complexity: { violations: 30, maxCcn: 98, maxLength: 616, maxParams: 19 },
-  duplication: { clones: 18, duplicatedLines: 234 },
+  duplication: { clones: 18, duplicatedLines: 217 },
   unused: {
     files: 0,
     exports: 5,

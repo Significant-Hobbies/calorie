@@ -1,16 +1,19 @@
-import { readFileSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 
-const worker = readFileSync(new URL('./worker.ts', import.meta.url), 'utf8');
+const worker = [
+  readFileSync(new URL('./worker.ts', import.meta.url), 'utf8'),
+  ...readdirSync(new URL('./worker/', import.meta.url))
+    .filter((name) => name.endsWith('.ts'))
+    .sort()
+    .map((name) => readFileSync(new URL(`./worker/${name}`, import.meta.url), 'utf8')),
+].join('\n');
 const migration = readFileSync(
   new URL('../migrations/0006_mcp_read_tokens.sql', import.meta.url),
   'utf8'
 );
 const tokenSource = readFileSync(new URL('./server/read-tokens.ts', import.meta.url), 'utf8');
-const mcpReads = worker.slice(
-  worker.indexOf("app.get('/api/mcp/daily'"),
-  worker.indexOf('app.notFound')
-);
+const mcpReads = readFileSync(new URL('./worker/mcp.ts', import.meta.url), 'utf8');
 
 describe('Calorie MCP source boundary', () => {
   it('stores only a hash and revokes tokens within the signed-in owner', () => {
