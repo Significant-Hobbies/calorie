@@ -3,40 +3,44 @@ import type { WaterEntry } from '../../lib/types';
 import { formatTime } from './today-utils';
 
 export function TodayWaterPanel({
-  waterMl,
-  waterTargetMl,
-  waterPercent,
-  waterBarProgress,
-  waterEntries,
-  pendingId,
-  editingWaterId,
-  waterAmount,
-  waterTime,
-  onQuickWater,
-  onBeginEdit,
-  onAmountChange,
-  onTimeChange,
-  onSaveEdit,
-  onCancelEdit,
-  onRemove,
+  summary,
+  editor,
+  handlers,
 }: {
-  waterMl: number;
-  waterTargetMl: number;
-  waterPercent: number;
-  waterBarProgress: number;
-  waterEntries: WaterEntry[];
-  pendingId: string | null;
-  editingWaterId: string | null;
-  waterAmount: string;
-  waterTime: string;
-  onQuickWater: (amountMl: number) => void;
-  onBeginEdit: (entry: WaterEntry) => void;
-  onAmountChange: (value: string) => void;
-  onTimeChange: (value: string) => void;
-  onSaveEdit: () => void;
-  onCancelEdit: () => void;
-  onRemove: (entry: WaterEntry) => void;
+  summary: {
+    waterMl: number;
+    waterTargetMl: number;
+    waterPercent: number;
+    waterBarProgress: number;
+    waterEntries: WaterEntry[];
+  };
+  editor: {
+    pendingId: string | null;
+    editingWaterId: string | null;
+    waterAmount: string;
+    waterTime: string;
+  };
+  handlers: {
+    onQuickWater: (amountMl: number) => void;
+    onBeginEdit: (entry: WaterEntry) => void;
+    onAmountChange: (value: string) => void;
+    onTimeChange: (value: string) => void;
+    onSaveEdit: () => void;
+    onCancelEdit: () => void;
+    onRemove: (entry: WaterEntry) => void;
+  };
 }) {
+  const { waterMl, waterTargetMl, waterPercent, waterBarProgress, waterEntries } = summary;
+  const { pendingId, editingWaterId, waterAmount, waterTime } = editor;
+  const {
+    onQuickWater,
+    onBeginEdit,
+    onAmountChange,
+    onTimeChange,
+    onSaveEdit,
+    onCancelEdit,
+    onRemove,
+  } = handlers;
   return (
     <section className="water-panel" aria-labelledby="water-title">
       <div className="water-main">

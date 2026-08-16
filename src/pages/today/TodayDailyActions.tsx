@@ -4,32 +4,47 @@ import type { DailyActionKey, getDailyActionState } from '../../lib/daily-action
 import type { Units } from '../../lib/types';
 
 export function TodayDailyActions({
-  incompleteActions,
-  dailyActionState,
-  pendingId,
-  weightEditorOpen,
-  weightValue,
-  units,
-  dailyActionsRef,
-  weightInputRef,
+  actions,
+  weight,
   onAction,
-  onWeightValueChange,
-  onCancelWeight,
-  onSaveWeight,
+  onWeight,
 }: {
-  incompleteActions: DailyActionKey[];
-  dailyActionState: ReturnType<typeof getDailyActionState> | null;
-  pendingId: string | null;
-  weightEditorOpen: boolean;
-  weightValue: string;
-  units: Units;
-  dailyActionsRef: RefObject<HTMLElement | null>;
-  weightInputRef: RefObject<HTMLInputElement | null>;
+  actions: {
+    incomplete: DailyActionKey[];
+    state: ReturnType<typeof getDailyActionState> | null;
+    pendingId: string | null;
+    sectionRef: RefObject<HTMLElement | null>;
+  };
+  weight: {
+    editorOpen: boolean;
+    value: string;
+    units: Units;
+    inputRef: RefObject<HTMLInputElement | null>;
+  };
   onAction: (action: DailyActionKey) => void;
-  onWeightValueChange: (value: string) => void;
-  onCancelWeight: () => void;
-  onSaveWeight: () => void;
+  onWeight: {
+    onValueChange: (value: string) => void;
+    onCancel: () => void;
+    onSave: () => void;
+  };
 }) {
+  const {
+    incomplete: incompleteActions,
+    state: dailyActionState,
+    pendingId,
+    sectionRef: dailyActionsRef,
+  } = actions;
+  const {
+    editorOpen: weightEditorOpen,
+    value: weightValue,
+    units,
+    inputRef: weightInputRef,
+  } = weight;
+  const {
+    onValueChange: onWeightValueChange,
+    onCancel: onCancelWeight,
+    onSave: onSaveWeight,
+  } = onWeight;
   if (!incompleteActions.length) return null;
 
   return (

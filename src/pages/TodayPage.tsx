@@ -195,18 +195,24 @@ export function TodayPage({
       />
 
       <TodayDailyActions
-        incompleteActions={incompleteActions}
-        dailyActionState={dailyActionState}
-        pendingId={pendingId}
-        weightEditorOpen={weightEditorOpen}
-        weightValue={weightValue}
-        units={dashboard.profile.units}
-        dailyActionsRef={dailyActionsRef}
-        weightInputRef={weightInputRef}
+        actions={{
+          incomplete: incompleteActions,
+          state: dailyActionState,
+          pendingId,
+          sectionRef: dailyActionsRef,
+        }}
+        weight={{
+          editorOpen: weightEditorOpen,
+          value: weightValue,
+          units: dashboard.profile.units,
+          inputRef: weightInputRef,
+        }}
         onAction={handleDailyAction}
-        onWeightValueChange={setWeightValue}
-        onCancelWeight={() => setWeightEditorOpen(false)}
-        onSaveWeight={() => void saveWeightCheckIn()}
+        onWeight={{
+          onValueChange: setWeightValue,
+          onCancel: () => setWeightEditorOpen(false),
+          onSave: () => void saveWeightCheckIn(),
+        }}
       />
 
       <p className="sr-only" aria-live="polite">
@@ -228,22 +234,28 @@ export function TodayPage({
       />
 
       <TodayWaterPanel
-        waterMl={dashboard.totals.waterMl}
-        waterTargetMl={dashboard.profile.waterTargetMl}
-        waterPercent={waterPercent}
-        waterBarProgress={waterBarProgress}
-        waterEntries={dashboard.waterEntries}
-        pendingId={pendingId}
-        editingWaterId={editingWaterId}
-        waterAmount={waterAmount}
-        waterTime={waterTime}
-        onQuickWater={(amount) => void quickWater(amount)}
-        onBeginEdit={beginWaterEdit}
-        onAmountChange={setWaterAmount}
-        onTimeChange={setWaterTime}
-        onSaveEdit={() => void saveWaterEdit()}
-        onCancelEdit={() => setEditingWaterId(null)}
-        onRemove={(entry) => void removeWater(entry)}
+        summary={{
+          waterMl: dashboard.totals.waterMl,
+          waterTargetMl: dashboard.profile.waterTargetMl,
+          waterPercent,
+          waterBarProgress,
+          waterEntries: dashboard.waterEntries,
+        }}
+        editor={{
+          pendingId,
+          editingWaterId,
+          waterAmount,
+          waterTime,
+        }}
+        handlers={{
+          onQuickWater: (amount) => void quickWater(amount),
+          onBeginEdit: beginWaterEdit,
+          onAmountChange: setWaterAmount,
+          onTimeChange: setWaterTime,
+          onSaveEdit: () => void saveWaterEdit(),
+          onCancelEdit: () => setEditingWaterId(null),
+          onRemove: (entry) => void removeWater(entry),
+        }}
       />
 
       <TodayMedicationPanel
