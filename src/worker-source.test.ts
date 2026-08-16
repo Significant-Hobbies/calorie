@@ -1,7 +1,13 @@
-import { readFileSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 
-const source = readFileSync(new URL('./worker.ts', import.meta.url), 'utf8');
+const source = [
+  readFileSync(new URL('./worker.ts', import.meta.url), 'utf8'),
+  ...readdirSync(new URL('./worker/', import.meta.url))
+    .filter((name) => name.endsWith('.ts'))
+    .sort()
+    .map((name) => readFileSync(new URL(`./worker/${name}`, import.meta.url), 'utf8')),
+].join('\n');
 
 describe('private Worker data controls', () => {
   it('scopes correction mutations to the signed-in owner', () => {
