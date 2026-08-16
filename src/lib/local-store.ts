@@ -10,6 +10,7 @@ import {
 } from './food-library';
 import { entriesWithinRange } from './history';
 import { createJournalExport } from './journal-export';
+import { sumNutrients } from './nutrients';
 import { activeMedications, upsertMedicationCheckIn } from './medications';
 import {
   calculateCompletedFasts,
@@ -321,15 +322,7 @@ export function localDashboard(): Dashboard {
     .filter((entry) => entry.drankAt >= range.start && entry.drankAt < range.end)
     .sort((a, b) => b.drankAt - a.drankAt);
   const latestWeight = [...state.weights].sort((a, b) => b.recordedAt - a.recordedAt)[0] ?? null;
-  const nutrients = entries.reduce(
-    (total, entry) => ({
-      calories: total.calories + entry.calories,
-      carbsG: total.carbsG + entry.carbsG,
-      proteinG: total.proteinG + entry.proteinG,
-      fibreG: total.fibreG + entry.fibreG,
-    }),
-    { calories: 0, carbsG: 0, proteinG: 0, fibreG: 0 }
-  );
+  const nutrients = sumNutrients(entries);
   return {
     profile: state.profile,
     foods: foodsByLifecycle(state.foods, 'active').sort(

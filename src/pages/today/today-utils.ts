@@ -1,4 +1,5 @@
 import { waterTotal } from '../../lib/log-corrections';
+import { sumNutrients } from '../../lib/nutrients';
 import type { Dashboard, FoodEntry, WaterEntry } from '../../lib/types';
 
 export function formatTime(timestamp: number) {
@@ -34,15 +35,7 @@ export function withEntries(
   entries: FoodEntry[],
   waterEntries: WaterEntry[]
 ): Dashboard {
-  const nutrients = entries.reduce(
-    (total, entry) => ({
-      calories: total.calories + entry.calories,
-      carbsG: total.carbsG + entry.carbsG,
-      proteinG: total.proteinG + entry.proteinG,
-      fibreG: total.fibreG + entry.fibreG,
-    }),
-    { calories: 0, carbsG: 0, proteinG: 0, fibreG: 0 }
-  );
+  const nutrients = sumNutrients(entries);
   return {
     ...dashboard,
     entries: [...entries].sort((a, b) => b.eatenAt - a.eatenAt),
