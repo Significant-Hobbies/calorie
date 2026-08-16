@@ -61,6 +61,12 @@ The native adapter downloads the versioned cloud export and maps it into the nat
 
 After connection, supported local mutations save first, append a durable sync intent, then attempt the existing owner-scoped REST contract. Successful writes remove their intent; offline, authentication, and server failures retain it and set a visible pending/failed state. Sign out removes the Keychain session but preserves the local journal and pending work. Account deletion requires confirmation and routes through Better Auth so the auth user and D1-owned rows cascade together.
 
+### Query-style native server-state cache
+
+The versioned local journal is the UI's immediate, persisted view of server state; D1 remains authoritative whenever an account is connected. A small Swift actor provides React Query-like coordination without adding a runtime dependency: it timestamps the latest decoded cloud snapshot, returns it while fresh, deduplicates concurrent reads, and revalidates stale data on launch, foreground activation, explicit sync, and reconciliation. It does not duplicate the durable journal into a second on-disk cache.
+
+Local mutations optimistically update and persist the journal before network work, then enqueue durable intents and invalidate the cloud snapshot. After all pending intents succeed, the client performs one authoritative export read, reconciles it into the local journal, and marks the cache fresh. A failed mutation keeps the local change and intent pending rather than rolling back user-entered data. Sign out and account deletion clear in-memory private server state; switching accounts therefore cannot reuse another owner's snapshot.
+
 ### Preserve-mode visual adaptation
 
 The native app inherits `DESIGN.md`: a bright botanical pocket journal, moss primary actions, leaf ink, cherry calorie moments, amber carbohydrate/timing cues, rounded system typography, and Today/Progress/Foods/You navigation. SwiftUI semantic colors provide Light, Dark, and System palettes; native controls, Dynamic Type, VoiceOver, and Reduce Motion remain authoritative.
@@ -76,6 +82,7 @@ Bundle identifier is `com.significanthobbies.calorie`; version starts at `1.0.0`
 - [Apple email can be hidden, changed, or absent after first authorization] → Key identity to the verified Apple subject and require explicit proof before linking an existing Google journal.
 - [A browser callback can leak a reusable credential] → Return only a short-lived one-use handoff code and store the resulting bearer session in Keychain.
 - [Native and web journal shapes are not identical] → Preserve exact source records, map only supported fields, disclose local-only fields, and cover fixtures in both TypeScript and Swift tests.
+- [Repeated foreground and mutation refreshes can waste requests or apply stale snapshots] → Give one actor ownership of freshness, in-flight read deduplication, invalidation, and account-boundary clearing.
 - [Dense trend views can become inaccessible] → Pair every chart with a textual summary and test accessibility categories.
 - [Simulator cannot validate camera-free real-device ergonomics, notifications, or Keychain/account callbacks fully] → Record them as device-only release checks.
 

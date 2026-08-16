@@ -49,6 +49,8 @@ public struct Food: Codable, Equatable, Identifiable, Sendable {
     public var isCustom: Bool
     public var isPackaged: Bool? = nil
     public var labels: [String]? = nil
+    public var defaultAmount: Double? = nil
+    public var lastUsedAt: Date? = nil
 
     public init(
         id: UUID = UUID(),
@@ -58,7 +60,9 @@ public struct Food: Codable, Equatable, Identifiable, Sendable {
         nutrients: Nutrients,
         isFavorite: Bool = false,
         isArchived: Bool = false,
-        isCustom: Bool = false
+        isCustom: Bool = false,
+        defaultAmount: Double? = nil,
+        lastUsedAt: Date? = nil
     ) {
         self.id = id
         self.name = name
@@ -68,6 +72,8 @@ public struct Food: Codable, Equatable, Identifiable, Sendable {
         self.isFavorite = isFavorite
         self.isArchived = isArchived
         self.isCustom = isCustom
+        self.defaultAmount = defaultAmount
+        self.lastUsedAt = lastUsedAt
     }
 }
 
@@ -210,6 +216,8 @@ public enum EquationProfile: String, Codable, CaseIterable, Sendable {
 
 public struct Profile: Codable, Equatable, Sendable {
     public var name: String
+    public var units: String? = nil
+    public var genderIdentity: String? = nil
     public var age: Int?
     public var heightCentimetres: Double?
     public var weightKilograms: Double?
@@ -217,7 +225,15 @@ public struct Profile: Codable, Equatable, Sendable {
     public var activity: ActivityLevel
     public var equationProfile: EquationProfile?
     public var manualCalorieTarget: Double?
+    public var manualCalorieRange: [Double]? = nil
     public var manualMacroTargets: Nutrients?
+    public var targetWeightKilograms: Double? = nil
+    public var wakeTime: String? = nil
+    public var sleepHours: Double? = nil
+    public var fastingThresholdHours: Int? = nil
+    public var dailyActionOrder: [String]? = nil
+    public var dailyActionHidden: [String]? = nil
+    public var onboardingComplete: Bool? = nil
     public var waterTargetMillilitres: Int
 
     public init(
@@ -245,6 +261,46 @@ public struct Profile: Codable, Equatable, Sendable {
     }
 }
 
+public enum GoalCycleKind: String, Codable, Sendable {
+    case cut
+    case gain
+    case recomposition
+}
+
+public struct GoalCycleSession: Codable, Equatable, Identifiable, Sendable {
+    public var id: UUID
+    public var kind: GoalCycleKind
+    public var goal: String
+    public var startOn: String
+    public var endOn: String?
+    public var calorieRange: [Double]?
+    public var proteinRange: [Double]?
+    public var createdAt: Date
+    public var updatedAt: Date
+
+    public init(
+        id: UUID,
+        kind: GoalCycleKind,
+        goal: String,
+        startOn: String,
+        endOn: String?,
+        calorieRange: [Double]?,
+        proteinRange: [Double]?,
+        createdAt: Date,
+        updatedAt: Date
+    ) {
+        self.id = id
+        self.kind = kind
+        self.goal = goal
+        self.startOn = startOn
+        self.endOn = endOn
+        self.calorieRange = calorieRange
+        self.proteinRange = proteinRange
+        self.createdAt = createdAt
+        self.updatedAt = updatedAt
+    }
+}
+
 public enum AppTheme: String, Codable, CaseIterable, Sendable {
     case system = "System"
     case light = "Light"
@@ -268,6 +324,7 @@ public struct CalorieDocument: Codable, Equatable, Sendable {
     public var weightEntries: [WeightEntry]
     public var routines: [MedicationRoutine]
     public var routineCheckIns: [RoutineCheckIn]
+    public var goalCycleSessions: [GoalCycleSession]? = nil
     public var cycle: CycleContext
     public var dailyNotes: [String: String]
     public var theme: AppTheme
@@ -283,6 +340,7 @@ public struct CalorieDocument: Codable, Equatable, Sendable {
         weightEntries: [WeightEntry] = [],
         routines: [MedicationRoutine] = [],
         routineCheckIns: [RoutineCheckIn] = [],
+        goalCycleSessions: [GoalCycleSession]? = nil,
         cycle: CycleContext = CycleContext(),
         dailyNotes: [String: String] = [:],
         theme: AppTheme = .system,
@@ -297,6 +355,7 @@ public struct CalorieDocument: Codable, Equatable, Sendable {
         self.weightEntries = weightEntries
         self.routines = routines
         self.routineCheckIns = routineCheckIns
+        self.goalCycleSessions = goalCycleSessions
         self.cycle = cycle
         self.dailyNotes = dailyNotes
         self.theme = theme
@@ -366,6 +425,9 @@ public extension CalorieDocument {
             servings: servings,
             nutrients: food.nutrients.scaled(by: servings)
         ))
+        if let index = foods.firstIndex(where: { $0.id == food.id }) {
+            foods[index].lastUsedAt = date
+        }
     }
 
     mutating func duplicateEntry(_ id: UUID, at date: Date = .now) throws {

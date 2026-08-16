@@ -2,6 +2,146 @@ import XCTest
 @testable import CalorieCore
 
 final class CalorieCoreTests: XCTestCase {
+    func testTrackedQualityMatchesTheSharedScoreBoundaries() {
+        let fixtures: [(Nutrients, Int)] = [
+            (Nutrients(calories: 100, protein: 8, fibre: 0), 70),
+            (Nutrients(calories: 100, protein: 0, fibre: 3), 70),
+            (Nutrients(calories: 100, protein: 8, fibre: 3), 100),
+            (Nutrients(calories: 100, protein: 4, fibre: 1.5), 50),
+            (Nutrients(calories: 100, protein: 8, fibre: 1.5), 85),
+            (Nutrients(calories: 100, protein: 16, fibre: 6), 100),
+        ]
+
+        for (nutrients, expected) in fixtures {
+            XCTAssertEqual(TrackedQualityEvaluator.evaluate(nutrients).score, expected)
+        }
+        XCTAssertNil(TrackedQualityEvaluator.evaluate(Nutrients(calories: 0, protein: 20, fibre: 5)).score)
+    }
+
+    func testTrackedQualityMenuUsesCombinedNutrientsAndRecalculates() {
+        let rice = Nutrients(calories: 200, protein: 4, fibre: 1)
+        let dal = Nutrients(calories: 150, protein: 12, fibre: 6)
+
+        XCTAssertEqual(TrackedQualityEvaluator.evaluateMenu([rice]).score, 23)
+        XCTAssertEqual(TrackedQualityEvaluator.evaluateMenu([rice, dal]).score, 64)
+        XCTAssertNotEqual(
+            TrackedQualityEvaluator.evaluateMenu([rice, dal]).score,
+            Int(((Double(TrackedQualityEvaluator.evaluate(rice).score ?? 0) + Double(TrackedQualityEvaluator.evaluate(dal).score ?? 0)) / 2).rounded())
+        )
+    }
+
+    func testTrackedQualityIgnoresCarbohydratesAndPackagingContext() {
+        let base = Nutrients(calories: 250, protein: 20, carbohydrates: 0, fibre: 0)
+        let withCarbs = Nutrients(calories: 250, protein: 20, carbohydrates: 180, fibre: 0)
+
+        XCTAssertEqual(TrackedQualityEvaluator.evaluate(base), TrackedQualityEvaluator.evaluate(withCarbs))
+        XCTAssertEqual(TrackedQualityEvaluator.evaluate(base).score, 70)
+    }
+
+    func testTrackedQualityUsesTheLatestActiveFoodWithoutMutatingTheLoggedEntry() throws {
+        var document = CalorieDocument.sample
+        let loggedFood = try XCTUnwrap(document.foods.first)
+        document.foodEntries = []
+        document.log(food: loggedFood, servings: 1, meal: .lunch, at: .now)
+
+        let entryBeforeEdit = try XCTUnwrap(document.foodEntries.first)
+        let scoreBeforeEdit = TrackedQualityEvaluator.evaluate(entryBeforeEdit.nutrients).score
+        let foodIndex = try XCTUnwrap(document.foods.firstIndex(where: { $0.id == loggedFood.id }))
+        document.foods[foodIndex].nutrients = Nutrients(calories: 100, protein: 0, fibre: 3)
+
+        let entryAfterEdit = try XCTUnwrap(document.foodEntries.first)
+        let basis = EntryScoreBasisResolver.resolve(entryAfterEdit, foods: document.foods)
+        XCTAssertEqual(entryAfterEdit.nutrients, entryBeforeEdit.nutrients)
+        XCTAssertEqual(basis.source, .currentFood)
+        XCTAssertEqual(TrackedQualityEvaluator.evaluate(basis.nutrients).score, 70)
+        XCTAssertNotEqual(TrackedQualityEvaluator.evaluate(basis.nutrients).score, scoreBeforeEdit)
+    }
+
+    func testTrackedQualityFallsBackForMissingAndArchivedFoods() throws {
+        var document = CalorieDocument.sample
+        let food = try XCTUnwrap(document.foods.first)
+        document.foodEntries = []
+        document.log(food: food, servings: 1, meal: .lunch, at: .now)
+        let entry = try XCTUnwrap(document.foodEntries.first)
+
+        let missing = EntryScoreBasisResolver.resolve(entry, foods: [])
+        document.foods[0].isArchived = true
+        let archived = EntryScoreBasisResolver.resolve(entry, foods: document.foods)
+
+        XCTAssertEqual(missing, EntryScoreBasis(nutrients: entry.nutrients, source: .loggedFallback, fallbackReason: .missingFood))
+        XCTAssertEqual(archived, EntryScoreBasis(nutrients: entry.nutrients, source: .loggedFallback, fallbackReason: .archivedFood))
+    }
+
+    func testDailyScoreMatchesTargetsAndCaloriePenaltyBoundaries() {
+        let targets = DailyScoreTargets(
+            calorieRange: [1_800, 2_200],
+            calorieTarget: 2_000,
+            proteinTarget: 100,
+            fibreTarget: 25
+        )
+        let complete = FoodEntry(
+            foodID: UUID(),
+            foodName: "Complete day",
+            meal: .dinner,
+            timestamp: .now,
+            servings: 1,
+            nutrients: Nutrients(calories: 2_000, protein: 100, fibre: 25)
+        )
+        let over = FoodEntry(
+            foodID: UUID(),
+            foodName: "Over target",
+            meal: .dinner,
+            timestamp: .now,
+            servings: 1,
+            nutrients: Nutrients(calories: 3_300, protein: 100, fibre: 25)
+        )
+
+        let final = DailyScoreEvaluator.evaluate(entries: [complete], foods: [], targets: targets, isCurrentDay: false)
+        let current = DailyScoreEvaluator.evaluate(entries: [over], foods: [], targets: targets, isCurrentDay: true)
+
+        XCTAssertEqual(final.score, 100)
+        XCTAssertEqual(final.label, "Final score")
+        XCTAssertEqual(final.fallbackCount, 1)
+        XCTAssertEqual(current.score, 50)
+        XCTAssertEqual(current.calorieFactor, 0)
+        XCTAssertEqual(current.label, "Score so far")
+    }
+
+    func testDailyScoreNormalizesMissingTargetsAndCapsProtein() {
+        let entry = FoodEntry(
+            foodID: UUID(),
+            foodName: "Protein day",
+            meal: .dinner,
+            timestamp: .now,
+            servings: 1,
+            nutrients: Nutrients(calories: 2_000, protein: 160, fibre: 25)
+        )
+        let caloriesOnly = DailyScoreEvaluator.evaluate(
+            entries: [entry],
+            foods: [],
+            targets: DailyScoreTargets(calorieRange: [1_800, 2_200]),
+            isCurrentDay: false
+        )
+        let complete = DailyScoreEvaluator.evaluate(
+            entries: [entry],
+            foods: [],
+            targets: DailyScoreTargets(calorieRange: [1_800, 2_200], proteinTarget: 100, fibreTarget: 25),
+            isCurrentDay: false
+        )
+        let unavailable = DailyScoreEvaluator.evaluate(
+            entries: [entry],
+            foods: [],
+            targets: DailyScoreTargets(),
+            isCurrentDay: false
+        )
+
+        XCTAssertEqual(caloriesOnly.score, 100)
+        XCTAssertTrue(caloriesOnly.explanation.contains("Omitted unavailable protein and fibre targets"))
+        XCTAssertEqual(complete.score, 100)
+        XCTAssertEqual(complete.proteinFactor, 1)
+        XCTAssertNil(unavailable.score)
+    }
+
     func testFreshJournalHasFoodsButNoPretendPersonalHistory() {
         XCTAssertFalse(CalorieDocument.starter.foods.isEmpty)
         XCTAssertTrue(CalorieDocument.starter.foodEntries.isEmpty)
@@ -105,6 +245,16 @@ final class CalorieCoreTests: XCTestCase {
         XCTAssertTrue(items[1].explanation.contains("not a medical rule"))
     }
 
+    func testGuidanceUsesTheCloudBackedFastingPreference() {
+        let items = GuidanceEngine.items(
+            entries: [],
+            now: Date(timeIntervalSince1970: 1_700_000_000),
+            fastingThresholdHours: 14
+        )
+
+        XCTAssertEqual(items.first(where: { $0.id == "fast" })?.timing, "Your reporting threshold is 14 hours")
+    }
+
     func testWeightCycleAndNoteRemainVersionedLocalState() throws {
         let date = Date(timeIntervalSince1970: 200_000)
         var document = CalorieDocument.sample
@@ -135,11 +285,19 @@ final class CalorieCoreTests: XCTestCase {
         XCTAssertEqual(snapshot.document.foodEntries.first?.nutrients.fat, 0)
         XCTAssertEqual(snapshot.document.foods.first?.isPackaged, true)
         XCTAssertEqual(snapshot.document.foods.first?.labels, ["breakfast", "high-protein"])
+        XCTAssertEqual(snapshot.document.foods.first?.defaultAmount, 2)
+        XCTAssertEqual(snapshot.document.foods.first?.lastUsedAt, Date(timeIntervalSince1970: 1_700_000_000))
         XCTAssertEqual(snapshot.document.foodEntries.first?.isPackaged, true)
         XCTAssertEqual(snapshot.document.foodEntries.first?.labels, ["breakfast"])
         XCTAssertEqual(snapshot.document.weightEntries.first?.kilograms, 72.4)
         XCTAssertEqual(snapshot.document.profile.weightKilograms, 72.4)
         XCTAssertEqual(snapshot.document.weightEntries.count, 2)
+        XCTAssertEqual(snapshot.document.profile.units, "metric")
+        XCTAssertEqual(snapshot.document.profile.manualCalorieRange, [2_000, 2_200])
+        XCTAssertEqual(snapshot.document.profile.wakeTime, "07:00")
+        XCTAssertEqual(snapshot.document.profile.fastingThresholdHours, 12)
+        XCTAssertEqual(snapshot.document.goalCycleSessions?.first?.kind, .cut)
+        XCTAssertEqual(snapshot.document.goalCycleSessions?.first?.startOn, "2026-08-01")
         XCTAssertEqual(snapshot.document.syncState, .synced)
     }
 
@@ -228,6 +386,22 @@ final class CalorieCoreTests: XCTestCase {
         XCTAssertEqual(CloudJournalDiff.operations(from: cloud, to: local), [.upsertWaterEntry(water)])
     }
 
+    func testLoggingUpdatesRecencyWithoutRewritingTheFoodDefinition() throws {
+        var document = CalorieDocument.starter
+        let before = document
+        let food = try XCTUnwrap(document.foods.first)
+        let loggedAt = Date(timeIntervalSince1970: 1_800_000_000)
+
+        document.log(food: food, servings: 1, meal: .breakfast, at: loggedAt)
+        let operations = CloudJournalDiff.operations(from: before, to: document)
+
+        XCTAssertEqual(document.foods.first?.lastUsedAt, loggedAt)
+        XCTAssertEqual(operations.count, 1)
+        guard case .upsertFoodEntry = operations[0] else {
+            return XCTFail("Logging should queue only the new entry.")
+        }
+    }
+
     func testGranularSyncIntentsCompactByRecord() async throws {
         let fileURL = FileManager.default.temporaryDirectory
             .appending(path: UUID().uuidString)
@@ -296,7 +470,7 @@ final class CalorieCoreTests: XCTestCase {
         "name": "Greek yoghurt",
         "servingMode": "per_unit",
         "unitLabel": "bowl",
-        "defaultAmount": 1,
+        "defaultAmount": 2,
         "calories": 410,
         "carbsG": 48,
         "proteinG": 29,
@@ -328,7 +502,18 @@ final class CalorieCoreTests: XCTestCase {
         {"id":"66666666-6666-4666-8666-666666666666","weightKg":72.4,"recordedAt":1700035200000},
         {"id":"77777777-7777-4777-8777-777777777777","weightKg":73.1,"recordedAt":1699948800000}
       ],
-      "cycleSessions": []
+      "cycleSessions": [{
+        "id": "88888888-8888-4888-8888-888888888888",
+        "userId": "user-1",
+        "cycle": "cut",
+        "goal": "lose_gentle",
+        "startOn": "2026-08-01",
+        "endOn": null,
+        "calorieRange": [2000, 2200],
+        "proteinRangeG": [120, 150],
+        "createdAt": 1699920000000,
+        "updatedAt": 1700000000000
+      }]
     }
     """#
 }

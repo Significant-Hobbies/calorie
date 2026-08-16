@@ -2,7 +2,7 @@
   "$schema": "fleet.design-review.v1",
   "version": 1,
   "project": "calorie",
-  "target": "Calorie mobile logging and actionable Progress insights",
+  "target": "Tracked quality scores across web and native food journals",
   "mode": "preserve",
   "register": "product",
   "context": {
@@ -20,27 +20,31 @@
     "screenshots": [
       {
         "width": 390,
-        "path": "artifacts/design/mobile-insights/after-390.png"
+      "path": "artifacts/design/tracked-quality/after-390.png"
       },
       {
         "width": 768,
-        "path": "artifacts/design/mobile-insights/after-768.png"
+      "path": "artifacts/design/tracked-quality/after-768.png"
       },
       {
         "width": 1440,
-        "path": "artifacts/design/mobile-insights/after-1440.png"
+      "path": "artifacts/design/tracked-quality/after-1440.png"
+      },
+      {
+        "width": 402,
+        "path": "artifacts/design/tracked-quality/native-after.png"
       }
     ],
     "projectCheck": {
-      "command": "pnpm check",
+      "command": "pnpm quality",
       "status": "pass"
     },
     "critique": {
-      "score": 32,
+      "score": 35,
       "maximum": 40
     },
     "audit": {
-      "score": 20,
+      "score": 19,
       "maximum": 20
     },
     "unresolved": {
@@ -53,7 +57,7 @@
     }
   },
   "ownerFeedback": {
-    "decision": "delegated",
-    "note": "Owner delegated sequential issue completion and preserve-mode closeout; current four-destination product truth was verified from the later shipped commit and PROJECT_STATUS.md."
+    "decision": "pending",
+    "note": "Awaiting the owner's keep, close, or wrong-lane decision after reviewing the target-based daily score and dynamic historical-entry presentation."
   }
 }

@@ -7,7 +7,7 @@ Calorie's core job is fast, one-handed daily logging, yet the maintained experie
 - Add a first-party SwiftUI iPhone application using Apple frameworks and no new production dependencies.
 - Match the current Calorie surface: onboarding, daily energy and macro targets, food search and custom foods, meal logging, editing, timing, medication and cycle context, progress and trends, archive, preferences, Sign in with Apple, synchronization, export, and deletion controls.
 - Let an existing Google-authenticated owner prove control of that account once, explicitly link their Apple identity, and load the same private D1 journal without matching accounts by email alone.
-- Preserve offline-first logging and deterministic, previewed reconciliation when an account is connected; never silently replace either the iPhone journal or the existing cloud journal.
+- Preserve offline-first logging and deterministic, previewed reconciliation when an account is connected; use a query-style native server-state cache for fresh reads, background revalidation, deduplicated requests, and mutation invalidation; never silently replace either the iPhone journal or the existing cloud journal.
 - Adapt the existing botanical pocket-journal visual system to native controls and accessibility conventions.
 - Add native tests, privacy metadata, app metadata, icons, simulator verification, and a signed archive workflow that stops before upload.
 - Keep the web application intact and do not add a unified Fleet hub.
@@ -24,4 +24,4 @@ None.
 
 ## Impact
 
-Adds an `ios/` Swift/Xcode surface beside the existing web application. The Worker gains optional Apple provider configuration, bearer-session support for the native client, a short-lived Google handoff contract, and owner-scoped synchronization routes. Existing web behavior and data ownership remain intact. The iOS app uses the personal Apple development team for local signing and produces no App Store Connect records or uploads.
+Adds an `ios/` Swift/Xcode surface beside the existing web application. The Worker gains optional Apple provider configuration, bearer-session support for the native client, a short-lived Google handoff contract, and owner-scoped synchronization routes. Existing web behavior and D1 data ownership remain intact. The iOS app uses a small Apple-native server-state cache rather than a third-party runtime package, uses the personal Apple development team for local signing, and produces no App Store Connect records or uploads.

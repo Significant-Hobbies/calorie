@@ -20,14 +20,15 @@ Audit target: iPhone simulator build of the native SwiftUI application in light 
 - Quick Log keeps frequent food and water actions within one-handed reach while preserving editing depth.
 - Nutrient charts include textual summaries, avoiding chart-only meaning.
 - The journal makes calculated targets and guidance traceable and avoids presenting medical claims.
+- Tracked quality uses the same 0–100 protein-and-fibre contract as the web app, exposes its calculation to VoiceOver, and recomputes the daily menu from combined entry snapshots rather than averaging food scores.
 
 ## Residual findings
 
 - P0: 0
 - P1: 0
-- P2: 2 — physical-device VoiceOver pass; physical iPad window-resizing and keyboard pass.
+- P2: 2 — repeat the Tracked quality disclosure and score labels with VoiceOver on physical hardware; repeat iPad window-resizing and keyboard behavior on a physical iPad.
 - P3: 0
 
 ## Evidence
 
-Screenshots are stored in `artifacts/simulator/`, including Dark and accessibility variants. Automated coverage and the Release simulator build are run by `./scripts/check.sh`; the personal-team archive is created by `./scripts/archive.sh` without upload.
+Screenshots are stored in `artifacts/simulator/`, including Dark and accessibility variants. The current Tracked quality Today screen is also recorded at `artifacts/design/tracked-quality/native-today.png`. Automated coverage and the Release simulator build are run by `./scripts/check.sh`; the personal-team archive is created by `./scripts/archive.sh` without upload.

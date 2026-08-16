@@ -11,12 +11,14 @@
 		114FDFB6F9694B144FBA79C7 /* SecondaryViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3523182BBBDD1E71250C273B /* SecondaryViews.swift */; };
 		25AD6E9E051AFE291FA07616 /* Domain.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8ACE5415BD48E3808BAF96FF /* Domain.swift */; };
 		26F27793A07AC74763642E88 /* Persistence.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA0C6738799B8E33E8896F89 /* Persistence.swift */; };
+		2C781D94DD931ED926A3BBB9 /* ServerStateQueryCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = E878C846052A2B4C029151AC /* ServerStateQueryCache.swift */; };
 		38F5C42E9B74740668D007AD /* TodayView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E37CD42D2D735AEC0AD67FA /* TodayView.swift */; };
 		46F7A58C2594B5E28EC62189 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 0784046F52F660D200F04976 /* PrivacyInfo.xcprivacy */; };
 		54C2F07D0E083738B1A1151E /* RootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2536F3912B308A351D1EC58A /* RootView.swift */; };
 		55C2A062AE890CBD5C2EEED3 /* CalorieCore.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = DC17149D5C06CBF45F708679 /* CalorieCore.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		5B4D5AACE4A17C920925FD2F /* CalorieCore.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = DC17149D5C06CBF45F708679 /* CalorieCore.framework */; };
 		613E9FD8E9375AA8861FA275 /* Design.swift in Sources */ = {isa = PBXBuildFile; fileRef = EBB24B8FF2959E506077CF87 /* Design.swift */; };
+		6BCD77BF59CC00D5FADF23B0 /* TrackedQuality.swift in Sources */ = {isa = PBXBuildFile; fileRef = FC23CF128665E724C9079F98 /* TrackedQuality.swift */; };
 		6C77923823355D303B5FF0AA /* CloudJournal.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9F7F06E256D2C0050248110B /* CloudJournal.swift */; };
 		6F65D34632FD28BAE0BAB1C2 /* CalorieApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 06FC3F1464E7826DACD45FA1 /* CalorieApp.swift */; };
 		73AE9BE3FE74B8429BF45B63 /* NativeAccountTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C8E00A30DB2E0CE9C479117E /* NativeAccountTests.swift */; };
@@ -111,7 +113,9 @@
 		C8E00A30DB2E0CE9C479117E /* NativeAccountTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeAccountTests.swift; sourceTree = "<group>"; };
 		DA0C6738799B8E33E8896F89 /* Persistence.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Persistence.swift; sourceTree = "<group>"; };
 		DC17149D5C06CBF45F708679 /* CalorieCore.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = CalorieCore.framework; sourceTree = BUILT_PRODUCTS_DIR; };
+		E878C846052A2B4C029151AC /* ServerStateQueryCache.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ServerStateQueryCache.swift; sourceTree = "<group>"; };
 		EBB24B8FF2959E506077CF87 /* Design.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Design.swift; sourceTree = "<group>"; };
+		FC23CF128665E724C9079F98 /* TrackedQuality.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrackedQuality.swift; sourceTree = "<group>"; };
 		FF1E3D43289FA952AA9D5BAD /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -156,6 +160,7 @@
 				82843A6E095B0D695BE975A9 /* QuickLogView.swift */,
 				2536F3912B308A351D1EC58A /* RootView.swift */,
 				3523182BBBDD1E71250C273B /* SecondaryViews.swift */,
+				E878C846052A2B4C029151AC /* ServerStateQueryCache.swift */,
 				7E37CD42D2D735AEC0AD67FA /* TodayView.swift */,
 				3DEDB33CA9B685F43814CFB6 /* Resources */,
 			);
@@ -222,6 +227,7 @@
 				8ACE5415BD48E3808BAF96FF /* Domain.swift */,
 				DA0C6738799B8E33E8896F89 /* Persistence.swift */,
 				565270E679B8100810227F67 /* SyncQueue.swift */,
+				FC23CF128665E724C9079F98 /* TrackedQuality.swift */,
 			);
 			name = CalorieCore;
 			path = Sources/CalorieCore;
@@ -425,6 +431,7 @@
 				25AD6E9E051AFE291FA07616 /* Domain.swift in Sources */,
 				26F27793A07AC74763642E88 /* Persistence.swift in Sources */,
 				04B3A88603FCF16E068383CA /* SyncQueue.swift in Sources */,
+				6BCD77BF59CC00D5FADF23B0 /* TrackedQuality.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -439,6 +446,7 @@
 				8A4FF16B70883E3694F2D8F0 /* QuickLogView.swift in Sources */,
 				54C2F07D0E083738B1A1151E /* RootView.swift in Sources */,
 				114FDFB6F9694B144FBA79C7 /* SecondaryViews.swift in Sources */,
+				2C781D94DD931ED926A3BBB9 /* ServerStateQueryCache.swift in Sources */,
 				38F5C42E9B74740668D007AD /* TodayView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -615,7 +623,7 @@
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				CODE_SIGN_STYLE = Automatic;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 3;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				DEVELOPMENT_TEAM = 8F7LXHTJZR;
 				ENABLE_NS_ASSERTIONS = NO;
@@ -717,7 +725,7 @@
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				CODE_SIGN_STYLE = Automatic;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 3;
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				DEVELOPMENT_TEAM = 8F7LXHTJZR;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;

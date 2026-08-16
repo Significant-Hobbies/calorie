@@ -679,7 +679,7 @@ export function ProgressPage({ userId, cloudRevision }: { userId: string; cloudR
                 filter={calendarFilter}
                 history={calendarHistory}
                 selectedDate={selectedDate}
-                target={dashboard.target}
+                scoring={{ foods: dashboard.foods, target: dashboard.target }}
                 units={dashboard.profile.units}
                 onModeChange={changeCalendarMode}
                 onFilterChange={setCalendarFilter}

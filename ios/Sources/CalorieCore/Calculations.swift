@@ -75,7 +75,12 @@ public struct GuidanceItem: Identifiable, Equatable, Sendable {
 }
 
 public enum GuidanceEngine {
-    public static func items(entries: [FoodEntry], now: Date, bedtimeHour: Int = 23) -> [GuidanceItem] {
+    public static func items(
+        entries: [FoodEntry],
+        now: Date,
+        bedtimeHour: Int = 23,
+        fastingThresholdHours: Int? = nil
+    ) -> [GuidanceItem] {
         let lastMeal = entries.max(by: { $0.timestamp < $1.timestamp })
         let mealCopy: String
         if let lastMeal {
@@ -87,7 +92,12 @@ public enum GuidanceEngine {
         return [
             GuidanceItem(id: "training", title: "Training window", timing: "About 1–3 hours after a meal", explanation: "\(mealCopy) This broad range is a practical estimate; comfort varies by meal size and person."),
             GuidanceItem(id: "sleep", title: "Wind-down meal", timing: "Finish a larger meal 2–3 hours before sleep", explanation: "Using your \(bedtimeHour):00 bedtime preference. This is a comfort estimate, not a medical rule."),
-            GuidanceItem(id: "fast", title: "Overnight pause", timing: "Count from your last recorded food", explanation: "Calorie reports the recorded interval only. It does not prescribe a fasting target or judge shorter intervals."),
+            GuidanceItem(
+                id: "fast",
+                title: "Overnight pause",
+                timing: fastingThresholdHours.map { "Your reporting threshold is \($0) hours" } ?? "Count from your last recorded food",
+                explanation: "Calorie reports the recorded interval from your last food. The threshold is your display preference, not a prescription, and shorter intervals are not judged."
+            ),
         ]
     }
 }

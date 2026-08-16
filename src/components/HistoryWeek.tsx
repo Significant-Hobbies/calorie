@@ -16,8 +16,9 @@ import {
   type WeeklyJournalEvent,
   type WeeklyJournalFilter,
 } from '../lib/weekly-journal';
-import type { HistoryDay, HistoryResponse } from '../lib/types';
-import { NutrientDensityBadge } from './NutrientDensityBadge';
+import { calculateEntryTrackedQuality } from '../lib/nutrient-density';
+import type { Food, HistoryDay, HistoryResponse } from '../lib/types';
+import { EntryTrackedQualityBadge } from './EntryTrackedQualityBadge';
 
 const HOUR_LABELS = calendarHourLabels();
 const DAY_FORMATTER = new Intl.DateTimeFormat(undefined, { day: 'numeric' });
@@ -41,10 +42,15 @@ function emptyDay(date: string): HistoryDay {
   return { date, calories: 0, carbsG: 0, proteinG: 0, fibreG: 0, waterMl: 0, fastCount: 0 };
 }
 
-function eventLabel(event: WeeklyJournalEvent, units: 'metric' | 'imperial') {
+function eventLabel(event: WeeklyJournalEvent, units: 'metric' | 'imperial', foods: Food[]) {
   const time = format24HourTime(event.at);
   if (event.type === 'food') {
-    return `${time}, ${event.entry.foodName}, ${Math.round(event.entry.calories)} calories`;
+    const tracked = calculateEntryTrackedQuality(event.entry, foods);
+    const score =
+      tracked.quality.score === null
+        ? 'tracked score unavailable'
+        : `${tracked.quality.score} of 100 tracked`;
+    return `${time}, ${event.entry.foodName}, ${Math.round(event.entry.calories)} calories, ${score}, ${tracked.basisLabel}`;
   }
   if (event.type === 'weight') {
     return `${time}, weight check-in, ${displayWeight(event.weight.weightKg, units)}`;
@@ -65,11 +71,13 @@ function eventKey(event: WeeklyJournalEvent) {
 export function HistoryWeek({
   weekStart,
   history,
+  foods,
   filter,
   units,
 }: {
   weekStart: Date;
   history: HistoryResponse;
+  foods: Food[];
   filter: WeeklyJournalFilter;
   units: 'metric' | 'imperial';
 }) {
@@ -225,8 +233,8 @@ export function HistoryWeek({
                         aria-expanded={
                           selectedEvent?.type === event.type && selectedEvent.id === event.id
                         }
-                        aria-label={`${eventLabel(event, units)}; show details`}
-                        title={eventLabel(event, units)}
+                        aria-label={`${eventLabel(event, units, foods)}; show details`}
+                        title={eventLabel(event, units, foods)}
                         onClick={() => setSelectedEvent(event)}
                       >
                         <div className="weekly-calendar-event-heading">
@@ -239,7 +247,7 @@ export function HistoryWeek({
                           <>
                             <strong>{event.entry.foodName}</strong>
                             <span>{Math.round(event.entry.calories)} kcal</span>
-                            <NutrientDensityBadge nutrients={event.entry} />
+                            <EntryTrackedQualityBadge entry={event.entry} foods={foods} />
                           </>
                         ) : event.type === 'weight' ? (
                           <>
@@ -286,7 +294,7 @@ export function HistoryWeek({
                   {Math.round(selectedEvent.entry.proteinG)}g protein ·{' '}
                   {Math.round(selectedEvent.entry.fibreG)}g fibre
                 </p>
-                <NutrientDensityBadge nutrients={selectedEvent.entry} showBasis />
+                <EntryTrackedQualityBadge entry={selectedEvent.entry} foods={foods} showBasis />
               </>
             ) : selectedEvent.type === 'weight' ? (
               <>

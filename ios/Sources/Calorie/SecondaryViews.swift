@@ -6,20 +6,41 @@ import UniformTypeIdentifiers
 
 struct ProgressViewScreen: View {
     @Environment(AppModel.self) private var model
+    @State private var rangeDays = 7
+    @State private var historyDate = Date.now
 
     private var days: [DaySummary] {
-        (0..<7).reversed().compactMap { offset in
+        (0..<rangeDays).reversed().compactMap { offset in
             guard let date = Calendar.current.date(byAdding: .day, value: -offset, to: .now) else { return nil }
             return DaySummary(date: date, nutrients: model.document.totals(on: date))
         }
+    }
+
+    private var historyEntries: [FoodEntry] {
+        model.document.entries(on: historyDate)
+    }
+
+    private var activeGoalCycle: GoalCycleSession? {
+        model.document.goalCycleSessions?
+            .filter { $0.endOn == nil }
+            .max { $0.updatedAt < $1.updatedAt }
     }
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 26) {
                 botanicalHeader("Progress", subtitle: "Patterns without punishment.")
+                Picker("History range", selection: $rangeDays) {
+                    Text("7 days").tag(7)
+                    Text("30 days").tag(30)
+                }
+                .pickerStyle(.segmented)
+                .accessibilityHint("Changes the period used by the energy summary")
+                if let activeGoalCycle {
+                    goalCycleSummary(activeGoalCycle)
+                }
                 VStack(alignment: .leading, spacing: 14) {
-                    Text("Seven-day energy").font(.title2.weight(.bold))
+                    Text("\(rangeDays)-day energy").font(.title2.weight(.bold))
                     Chart(days) { day in
                         BarMark(
                             x: .value("Day", day.date, unit: .day),
@@ -38,33 +59,52 @@ struct ProgressViewScreen: View {
                 .background(CaloriePalette.surface)
                 .clipShape(RoundedRectangle(cornerRadius: 16))
                 VStack(alignment: .leading, spacing: 14) {
+                    Text("Review a day").font(.title2.weight(.bold))
+                    DatePicker(
+                        "Journal date",
+                        selection: $historyDate,
+                        in: ...Date.now,
+                        displayedComponents: .date
+                    )
+                    .datePickerStyle(.graphical)
+                    selectedDaySummary
+                }
+                VStack(alignment: .leading, spacing: 14) {
                     Text("Meal timing").font(.title2.weight(.bold))
-                    ForEach(model.document.foodEntries.sorted { $0.timestamp < $1.timestamp }.suffix(8)) { entry in
-                        HStack {
-                            Text(entry.timestamp.formatted(.dateTime.weekday(.abbreviated)))
-                                .font(.caption.weight(.bold)).frame(width: 36)
-                            GeometryReader { geometry in
-                                let hour = Calendar.current.component(.hour, from: entry.timestamp)
-                                Circle().fill(CaloriePalette.amber)
-                                    .frame(width: 12, height: 12)
-                                    .offset(x: geometry.size.width * CGFloat(hour) / 24)
+                    if model.document.foodEntries.isEmpty {
+                        ContentUnavailableView(
+                            "No meal times yet",
+                            systemImage: "clock",
+                            description: Text("Timing patterns appear after you log food.")
+                        )
+                    } else {
+                        ForEach(model.document.foodEntries.sorted { $0.timestamp < $1.timestamp }.suffix(8)) { entry in
+                            HStack {
+                                Text(entry.timestamp.formatted(.dateTime.weekday(.abbreviated)))
+                                    .font(.caption.weight(.bold)).frame(width: 36)
+                                GeometryReader { geometry in
+                                    let hour = Calendar.current.component(.hour, from: entry.timestamp)
+                                    Circle().fill(CaloriePalette.amber)
+                                        .frame(width: 12, height: 12)
+                                        .offset(x: geometry.size.width * CGFloat(hour) / 24)
+                                }
+                                .frame(height: 14)
+                                Text(entry.timestamp.formatted(.dateTime.hour().minute()))
+                                    .font(.caption.monospacedDigit()).frame(width: 64)
                             }
-                            .frame(height: 14)
-                            Text(entry.timestamp.formatted(.dateTime.hour().minute()))
-                                .font(.caption.monospacedDigit()).frame(width: 64)
                         }
+                        HStack {
+                            Text("00"); Spacer(); Text("06"); Spacer(); Text("12"); Spacer(); Text("18"); Spacer(); Text("24")
+                        }
+                        .font(.caption2.monospacedDigit()).foregroundStyle(.secondary)
                     }
-                    HStack {
-                        Text("00"); Spacer(); Text("06"); Spacer(); Text("12"); Spacer(); Text("18"); Spacer(); Text("24")
-                    }
-                    .font(.caption2.monospacedDigit()).foregroundStyle(.secondary)
                 }
                 VStack(alignment: .leading, spacing: 14) {
                     Text("Weight check-ins").font(.title2.weight(.bold))
                     if let latest = model.document.weightEntries.sorted(by: { $0.date > $1.date }).first {
                         HStack(alignment: .lastTextBaseline) {
                             Text(latest.kilograms.formatted(.number.precision(.fractionLength(1))))
-                                .font(.system(size: 42, weight: .bold, design: .rounded).monospacedDigit())
+                                .font(.system(.largeTitle, design: .rounded, weight: .bold).monospacedDigit())
                             Text("kg recorded").font(.subheadline).foregroundStyle(.secondary)
                         }
                         Text("A check-in is a measurement, not a grade.").font(.subheadline).foregroundStyle(.secondary)
@@ -82,9 +122,68 @@ struct ProgressViewScreen: View {
 
     private var accessibleWeekSummary: String {
         let recorded = days.filter { $0.nutrients.calories > 0 }
-        guard !recorded.isEmpty else { return "No energy entries were recorded in the last seven days." }
+        guard !recorded.isEmpty else { return "No energy entries were recorded in the last \(rangeDays) days." }
         let average = recorded.map(\.nutrients.calories).reduce(0, +) / Double(recorded.count)
         return "\(recorded.count) days include entries, averaging \(average.formatted(.number.precision(.fractionLength(0)))) recorded calories. Missing days are not treated as zero intake."
+    }
+
+    private func goalCycleSummary(_ cycle: GoalCycleSession) -> some View {
+        VStack(alignment: .leading, spacing: 7) {
+            BotanicalSectionLabel(text: "Current goal period")
+            Text("\(cycle.kind.rawValue.capitalized) · since \(cycle.startOn)")
+                .font(.headline)
+            if let calories = cycle.calorieRange, calories.count == 2 {
+                Text("Recorded target range \(calories[0].formatted(.number.precision(.fractionLength(0))))–\(calories[1].formatted(.number.precision(.fractionLength(0)))) kcal")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .accessibilityElement(children: .combine)
+    }
+
+    @ViewBuilder
+    private var selectedDaySummary: some View {
+        let totals = model.document.totals(on: historyDate)
+        let water = model.document.waterTotal(on: historyDate)
+        if historyEntries.isEmpty && water == 0 {
+            ContentUnavailableView(
+                "No entries on this date",
+                systemImage: "calendar",
+                description: Text("Missing days stay neutral and are never treated as zero intake.")
+            )
+        } else {
+            Text("\(totals.calories.formatted(.number.precision(.fractionLength(0)))) kcal · P \(totals.protein.formatted(.number.precision(.fractionLength(0))))g · C \(totals.carbohydrates.formatted(.number.precision(.fractionLength(0))))g · fibre \(totals.fibre.formatted(.number.precision(.fractionLength(0))))g · \(water) ml water")
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+            DailyScoreView(
+                result: DailyScoreEvaluator.evaluate(
+                    entries: historyEntries,
+                    foods: model.document.foods,
+                    targets: model.dailyScoreTargets,
+                    isCurrentDay: Calendar.current.isDateInToday(historyDate)
+                )
+            )
+            ForEach(historyEntries) { entry in
+                let scoreBasis = EntryScoreBasisResolver.resolve(entry, foods: model.document.foods)
+                HStack(alignment: .top, spacing: 12) {
+                    Text(entry.timestamp.formatted(.dateTime.hour().minute()))
+                        .font(.caption.monospacedDigit())
+                        .foregroundStyle(.secondary)
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(entry.foodName).font(.body.weight(.semibold))
+                        TrackedQualityScoreView(
+                            quality: TrackedQualityEvaluator.evaluate(scoreBasis.nutrients),
+                            contextLabel: "Entry score",
+                            basisLabel: scoreBasis.source == .currentFood ? "Latest active food" : "Logged values fallback"
+                        )
+                    }
+                    Spacer()
+                    Text("\(entry.nutrients.calories.formatted(.number.precision(.fractionLength(0)))) kcal")
+                        .font(.subheadline.monospacedDigit())
+                }
+                .accessibilityElement(children: .combine)
+            }
+        }
     }
 }
 
@@ -94,20 +193,44 @@ private struct DaySummary: Identifiable {
     var id: Date { date }
 }
 
+private enum NativeFoodOrder: String, CaseIterable {
+    case recent = "Recent"
+    case name = "Name"
+    case protein = "Protein"
+    case fibre = "Fibre"
+}
+
 struct FoodsView: View {
     @Environment(AppModel.self) private var model
     @State private var search = ""
     @State private var isAddPresented = false
     @State private var editingFood: Food?
     @State private var showArchived = false
+    @State private var order: NativeFoodOrder = .recent
 
     private var foods: [Food] {
-        model.document.foods
-            .filter { $0.isArchived == showArchived && (search.isEmpty || $0.name.localizedCaseInsensitiveContains(search)) }
-            .sorted { lhs, rhs in
-                if lhs.isFavorite != rhs.isFavorite { return lhs.isFavorite }
-                return lhs.name < rhs.name
+        let visible = model.document.foods.filter {
+            $0.isArchived == showArchived && (search.isEmpty || $0.name.localizedCaseInsensitiveContains(search))
+        }
+        return visible.sorted { lhs, rhs in
+            switch order {
+            case .recent:
+                if lhs.lastUsedAt != rhs.lastUsedAt {
+                    return (lhs.lastUsedAt ?? .distantPast) > (rhs.lastUsedAt ?? .distantPast)
+                }
+            case .name:
+                break
+            case .protein:
+                if lhs.nutrients.protein != rhs.nutrients.protein {
+                    return lhs.nutrients.protein > rhs.nutrients.protein
+                }
+            case .fibre:
+                if lhs.nutrients.fibre != rhs.nutrients.fibre {
+                    return lhs.nutrients.fibre > rhs.nutrients.fibre
+                }
             }
+            return lhs.name.localizedCaseInsensitiveCompare(rhs.name) == .orderedAscending
+        }
     }
 
     var body: some View {
@@ -134,34 +257,56 @@ struct FoodsView: View {
                     Text("Archived").tag(true)
                 }
                 .pickerStyle(.segmented)
-                ForEach(foods) { food in
-                    HStack(spacing: 12) {
-                        Button { Task { await model.toggleFavorite(food) } } label: {
-                            Image(systemName: food.isFavorite ? "heart.fill" : "heart")
-                                .foregroundStyle(food.isFavorite ? CaloriePalette.cherry : .secondary)
-                                .frame(width: 44, height: 44)
-                        }
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text(food.name).font(.headline)
-                            Text("\(food.servingName) · P \(food.nutrients.protein.formatted(.number.precision(.fractionLength(0)))) · C \(food.nutrients.carbohydrates.formatted(.number.precision(.fractionLength(0)))) · F \(food.nutrients.fat.formatted(.number.precision(.fractionLength(0))))")
-                                .font(.caption).foregroundStyle(.secondary)
-                        }
-                        Spacer()
-                        Text(food.nutrients.calories.formatted(.number.precision(.fractionLength(0))))
-                            .font(.headline.monospacedDigit().weight(.bold))
-                        Menu {
-                            Button("Edit") { editingFood = food }
-                            Button(showArchived ? "Restore" : "Archive") {
-                                Task { await model.toggleArchive(food) }
-                            }
-                        } label: {
-                            Image(systemName: "ellipsis.circle")
-                                .frame(width: 44, height: 44)
-                        }
-                        .accessibilityLabel("Actions for \(food.name)")
+                Picker("Sort foods", selection: $order) {
+                    ForEach(NativeFoodOrder.allCases, id: \.self) { order in
+                        Text(order.rawValue).tag(order)
                     }
-                    .padding(.vertical, 8)
-                    Divider()
+                }
+                .pickerStyle(.menu)
+                if foods.isEmpty {
+                    ContentUnavailableView(
+                        search.isEmpty ? (showArchived ? "No archived foods" : "No foods yet") : "No matching foods",
+                        systemImage: search.isEmpty ? "fork.knife" : "magnifyingglass",
+                        description: Text(search.isEmpty ? "Your food library will appear here." : "Try another search or clear the current one.")
+                    )
+                } else {
+                    LazyVStack(alignment: .leading, spacing: 0) {
+                        ForEach(foods) { food in
+                            HStack(spacing: 12) {
+                                Button { Task { await model.toggleFavorite(food) } } label: {
+                                    Image(systemName: food.isFavorite ? "heart.fill" : "heart")
+                                        .foregroundStyle(food.isFavorite ? CaloriePalette.cherry : .secondary)
+                                        .frame(width: 44, height: 44)
+                                }
+                                .accessibilityLabel("\(food.isFavorite ? "Remove" : "Add") \(food.name) \(food.isFavorite ? "from" : "to") favorites")
+                                .accessibilityValue(food.isFavorite ? "Favorite" : "Not favorite")
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text(food.name).font(.headline)
+                                    Text("\(food.servingName) · protein \(food.nutrients.protein.formatted(.number.precision(.fractionLength(0))))g · carbs \(food.nutrients.carbohydrates.formatted(.number.precision(.fractionLength(0))))g · fibre \(food.nutrients.fibre.formatted(.number.precision(.fractionLength(0))))g")
+                                        .font(.caption).foregroundStyle(.secondary)
+                                    TrackedQualityScoreView(
+                                        quality: TrackedQualityEvaluator.evaluate(food.nutrients),
+                                        contextLabel: "Food score"
+                                    )
+                                }
+                                Spacer()
+                                Text("\(food.nutrients.calories.formatted(.number.precision(.fractionLength(0)))) kcal")
+                                    .font(.headline.monospacedDigit().weight(.bold))
+                                Menu {
+                                    Button("Edit") { editingFood = food }
+                                    Button(showArchived ? "Restore" : "Archive") {
+                                        Task { await model.toggleArchive(food) }
+                                    }
+                                } label: {
+                                    Image(systemName: "ellipsis.circle")
+                                        .frame(width: 44, height: 44)
+                                }
+                                .accessibilityLabel("Actions for \(food.name)")
+                            }
+                            .padding(.vertical, 8)
+                            Divider()
+                        }
+                    }
                 }
             }
             .padding(18)

@@ -10,14 +10,14 @@ struct QuickLogView: View {
     @State private var meal: Meal = .snack
 
     private var visibleFoods: [Food] {
-        let active = model.document.foods.filter { !$0.isArchived }
-        if search.isEmpty {
-            return active.sorted { lhs, rhs in
-                if lhs.isFavorite != rhs.isFavorite { return lhs.isFavorite }
-                return lhs.name < rhs.name
+        model.document.foods
+            .filter { !$0.isArchived && (search.isEmpty || $0.name.localizedCaseInsensitiveContains(search)) }
+            .sorted { lhs, rhs in
+                if lhs.lastUsedAt != rhs.lastUsedAt {
+                    return (lhs.lastUsedAt ?? .distantPast) > (rhs.lastUsedAt ?? .distantPast)
+                }
+                return lhs.name.localizedCaseInsensitiveCompare(rhs.name) == .orderedAscending
             }
-        }
-        return active.filter { $0.name.localizedCaseInsensitiveContains(search) }
     }
 
     var body: some View {
@@ -25,10 +25,17 @@ struct QuickLogView: View {
             VStack(spacing: 0) {
                 if let selectedFood {
                     selection(selectedFood)
+                } else if visibleFoods.isEmpty {
+                    ContentUnavailableView(
+                        search.isEmpty ? "No foods available" : "No matching foods",
+                        systemImage: search.isEmpty ? "fork.knife" : "magnifyingglass",
+                        description: Text(search.isEmpty ? "Add a food from the Foods tab before logging." : "Try another search or clear the current one.")
+                    )
                 } else {
                     List(visibleFoods) { food in
                         Button {
                             selectedFood = food
+                            servings = max(0.25, food.defaultAmount ?? 1)
                             meal = suggestedMeal
                         } label: {
                             HStack(spacing: 12) {
@@ -80,13 +87,16 @@ struct QuickLogView: View {
                         Button { servings = max(0.25, servings - 0.25) } label: {
                             Image(systemName: "minus").frame(width: 48, height: 48)
                         }
+                        .accessibilityLabel("Decrease amount")
                         Spacer()
                         Text("\(servings.formatted()) ×")
-                            .font(.system(size: 34, weight: .bold, design: .rounded).monospacedDigit())
+                            .font(.system(.largeTitle, design: .rounded, weight: .bold).monospacedDigit())
+                            .accessibilityLabel("\(servings.formatted()) servings")
                         Spacer()
                         Button { servings += 0.25 } label: {
                             Image(systemName: "plus").frame(width: 48, height: 48)
                         }
+                        .accessibilityLabel("Increase amount")
                     }
                     .background(CaloriePalette.surface)
                     .clipShape(RoundedRectangle(cornerRadius: 13))
@@ -102,6 +112,11 @@ struct QuickLogView: View {
                     quickMetric("CARBS", scaled.carbohydrates)
                     quickMetric("FAT", scaled.fat)
                 }
+                TrackedQualityScoreView(
+                    quality: TrackedQualityEvaluator.evaluate(scaled),
+                    contextLabel: "This amount",
+                    showsExplanation: true
+                )
                 Button("Add to \(meal.rawValue.lowercased())") {
                     let time = Calendar.current.date(
                         bySettingHour: Calendar.current.component(.hour, from: .now),
@@ -121,7 +136,7 @@ struct QuickLogView: View {
         VStack(spacing: 4) {
             Text(value.formatted(.number.precision(.fractionLength(0))))
                 .font(.headline.monospacedDigit().weight(.bold))
-            Text(label).font(.system(size: 9, weight: .bold)).foregroundStyle(.secondary)
+            Text(label).font(.caption2.weight(.bold)).foregroundStyle(.secondary)
         }
         .frame(maxWidth: .infinity)
     }

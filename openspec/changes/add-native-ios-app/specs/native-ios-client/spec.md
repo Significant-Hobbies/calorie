@@ -58,9 +58,17 @@ The iOS client SHALL be fully usable without an account. It SHALL support native
 - **WHEN** an authenticated owner records supported journal data without connectivity
 - **THEN** the local save completes immediately, a durable owner-scoped intent remains pending, and the client retries it after connectivity returns
 
+#### Scenario: Fresh cloud state is requested repeatedly
+- **WHEN** launch, foreground activation, or another caller requests the same connected journal while its cloud snapshot is fresh or already loading
+- **THEN** the client reuses the fresh snapshot or awaits the in-flight request instead of issuing a duplicate export request
+
+#### Scenario: A local mutation invalidates cloud state
+- **WHEN** an authenticated owner changes supported journal data
+- **THEN** the local journal updates immediately, the cloud snapshot becomes stale, pending intents are sent before one authoritative revalidation, and a failed request leaves the local change available for retry
+
 #### Scenario: User signs out
 - **WHEN** an authenticated user signs out
-- **THEN** the client explains which local journal remains active and does not claim unsynchronized cloud data is present locally
+- **THEN** the client clears private cached server state, explains which local journal remains active, and does not claim unsynchronized cloud data is present locally
 
 ### Requirement: Theme and accessibility preferences are native
 The iOS client SHALL support Light, Dark, and System appearance, Dynamic Type, VoiceOver labels and values, Reduce Motion, sufficient contrast, 44-point targets, and non-color status cues.

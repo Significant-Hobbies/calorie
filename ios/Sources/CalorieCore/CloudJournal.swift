@@ -77,6 +77,19 @@ public enum CloudJournalMapper {
                     date: date($0.takenAt)
                 )
             },
+            goalCycleSessions: export.cycleSessions.map {
+                GoalCycleSession(
+                    id: stableUUID($0.id),
+                    kind: mapGoalCycleKind($0.cycle),
+                    goal: $0.goal,
+                    startOn: $0.startOn,
+                    endOn: $0.endOn,
+                    calorieRange: $0.calorieRange,
+                    proteinRange: $0.proteinRangeG,
+                    createdAt: date($0.createdAt),
+                    updatedAt: date($0.updatedAt)
+                )
+            },
             theme: .system,
             syncState: .synced,
             lastSyncedAt: generatedAt
@@ -172,7 +185,7 @@ public enum CloudJournalMapper {
         case "male": .mifflinMaleConstant
         default: nil
         }
-        return Profile(
+        var result = Profile(
             name: profile.displayName,
             age: profile.ageYears,
             heightCentimetres: profile.heightCm,
@@ -184,6 +197,17 @@ public enum CloudJournalMapper {
             manualMacroTargets: nil,
             waterTargetMillilitres: profile.waterTargetMl
         )
+        result.units = profile.units
+        result.genderIdentity = profile.genderIdentity
+        result.manualCalorieRange = profile.manualCalorieRange
+        result.targetWeightKilograms = profile.targetWeightKg
+        result.wakeTime = profile.wakeTime
+        result.sleepHours = profile.sleepHours
+        result.fastingThresholdHours = profile.fastingThresholdHours
+        result.dailyActionOrder = profile.dailyActionOrder
+        result.dailyActionHidden = profile.dailyActionHidden
+        result.onboardingComplete = profile.onboardingComplete
+        return result
     }
 
     private static func mapFood(_ food: CloudFood) -> Food {
@@ -202,7 +226,9 @@ public enum CloudJournalMapper {
             ),
             isFavorite: food.favourite,
             isArchived: food.archivedAt != nil,
-            isCustom: true
+            isCustom: true,
+            defaultAmount: food.servingMode == "per_100g" ? 1 : food.defaultAmount,
+            lastUsedAt: food.lastUsedAt.map(date)
         )
         result.isPackaged = food.isPackaged
         result.labels = food.labels
@@ -258,6 +284,14 @@ public enum CloudJournalMapper {
         }
     }
 
+    private static func mapGoalCycleKind(_ value: String) -> GoalCycleKind {
+        switch value {
+        case "cut": .cut
+        case "gain": .gain
+        default: .recomposition
+        }
+    }
+
     private static func date(_ milliseconds: Double) -> Date {
         Date(timeIntervalSince1970: milliseconds / 1_000)
     }
@@ -285,17 +319,28 @@ private struct CloudExport: Decodable {
     let medications: [CloudMedication]
     let medicationCheckIns: [CloudMedicationCheckIn]
     let weights: [CloudWeight]
+    let cycleSessions: [CloudGoalCycle]
 }
 
 private struct CloudProfile: Decodable {
     let displayName: String
+    let units: String?
     let ageYears: Int?
+    let genderIdentity: String?
     let equationProfile: String?
     let heightCm: Double?
     let activityLevel: String
     let goal: String
+    let targetWeightKg: Double?
     let manualCalorieTarget: Double?
+    let manualCalorieRange: [Double]?
+    let wakeTime: String?
+    let sleepHours: Double?
+    let fastingThresholdHours: Int?
     let waterTargetMl: Int
+    let dailyActionOrder: [String]?
+    let dailyActionHidden: [String]?
+    let onboardingComplete: Bool?
 }
 
 private struct CloudFood: Decodable {
@@ -309,6 +354,7 @@ private struct CloudFood: Decodable {
     let proteinG: Double
     let fibreG: Double
     let favourite: Bool
+    let lastUsedAt: Double?
     let archivedAt: Double?
     let isPackaged: Bool?
     let labels: [String]?
@@ -340,4 +386,15 @@ private struct CloudMedicationCheckIn: Decodable {
     let id: String
     let medicationId: String
     let takenAt: Double
+}
+private struct CloudGoalCycle: Decodable {
+    let id: String
+    let cycle: String
+    let goal: String
+    let startOn: String
+    let endOn: String?
+    let calorieRange: [Double]?
+    let proteinRangeG: [Double]?
+    let createdAt: Double
+    let updatedAt: Double
 }

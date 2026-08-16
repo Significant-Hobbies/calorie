@@ -147,6 +147,15 @@ struct TodayView: View {
                     nutrient("FIBRE", totals.fibre, targets.fibre, CaloriePalette.mossStrong)
                 }
             }
+            Divider()
+            DailyScoreView(
+                result: DailyScoreEvaluator.evaluate(
+                    entries: model.selectedEntries,
+                    foods: model.document.foods,
+                    targets: model.dailyScoreTargets,
+                    isCurrentDay: Calendar.current.isDateInToday(model.selectedDate)
+                )
+            )
         }
         .padding(18)
         .background(CaloriePalette.surface)
@@ -187,7 +196,7 @@ struct TodayView: View {
                 Text("\(model.selectedEntries.count) entries").font(.caption.weight(.bold)).foregroundStyle(.secondary)
             }
             if model.selectedEntries.isEmpty {
-                Text("Nothing recorded yet. Add what you ate; there is no score to protect.")
+                Text("Nothing recorded yet. Add what you ate; the daily score will use the complete menu.")
                     .foregroundStyle(.secondary)
                     .padding(.vertical, 16)
             } else {
@@ -313,6 +322,10 @@ private struct FoodEntryRow: View {
     let entry: FoodEntry
     let onEdit: () -> Void
 
+    private var scoreBasis: EntryScoreBasis {
+        EntryScoreBasisResolver.resolve(entry, foods: model.document.foods)
+    }
+
     var body: some View {
         HStack(spacing: 12) {
             Text(entry.timestamp.formatted(.dateTime.hour().minute()))
@@ -322,8 +335,13 @@ private struct FoodEntryRow: View {
                 .frame(width: 62, alignment: .leading)
             VStack(alignment: .leading, spacing: 3) {
                 Text(entry.foodName).font(.headline)
-                Text("\(entry.servings.formatted()) serving · P \(entry.nutrients.protein.formatted(.number.precision(.fractionLength(0)))) · C \(entry.nutrients.carbohydrates.formatted(.number.precision(.fractionLength(0)))) · F \(entry.nutrients.fat.formatted(.number.precision(.fractionLength(0))))")
+                Text("\(entry.servings.formatted()) serving · protein \(entry.nutrients.protein.formatted(.number.precision(.fractionLength(0))))g · carbs \(entry.nutrients.carbohydrates.formatted(.number.precision(.fractionLength(0))))g · fibre \(entry.nutrients.fibre.formatted(.number.precision(.fractionLength(0))))g")
                     .font(.caption).foregroundStyle(.secondary)
+                TrackedQualityScoreView(
+                    quality: TrackedQualityEvaluator.evaluate(scoreBasis.nutrients),
+                    contextLabel: "Entry score",
+                    basisLabel: scoreBasis.source == .currentFood ? "Latest active food" : "Logged values fallback"
+                )
             }
             Spacer()
             Text(entry.nutrients.calories.formatted(.number.precision(.fractionLength(0))))
@@ -350,6 +368,10 @@ private struct EntryEditorView: View {
     @State private var meal: Meal
     @State private var timestamp: Date
 
+    private var scoreBasis: EntryScoreBasis {
+        EntryScoreBasisResolver.resolve(entry, foods: model.document.foods)
+    }
+
     init(entry: FoodEntry) {
         self.entry = entry
         _servings = State(initialValue: entry.servings)
@@ -371,6 +393,14 @@ private struct EntryEditorView: View {
                         ForEach(Meal.allCases, id: \.self) { Text($0.rawValue).tag($0) }
                     }
                     DatePicker("Time", selection: $timestamp)
+                }
+                Section("Tracked quality") {
+                    TrackedQualityScoreView(
+                        quality: TrackedQualityEvaluator.evaluate(scoreBasis.nutrients.scaled(by: servings / max(entry.servings, 0.0001))),
+                        contextLabel: "Entry score",
+                        basisLabel: scoreBasis.source == .currentFood ? "Latest active food" : "Logged values fallback",
+                        showsExplanation: true
+                    )
                 }
             }
             .navigationTitle("Edit food entry")

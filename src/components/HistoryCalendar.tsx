@@ -11,10 +11,12 @@ import {
 import { memo, type KeyboardEvent } from 'react';
 import { dateFromKey, isSameMonth, isSameWeek, localDateKey, weekDateKeys } from '../lib/calendar';
 import { entriesForLocalDate } from '../lib/history';
+import { calculateDailyScore } from '../lib/nutrient-density';
 import type { WeeklyJournalFilter } from '../lib/weekly-journal';
-import type { HistoryDay, HistoryResponse, NutritionTarget, WeightEntry } from '../lib/types';
+import type { Food, HistoryDay, HistoryResponse, NutritionTarget, WeightEntry } from '../lib/types';
+import { DailyScoreBadge } from './DailyScoreBadge';
+import { EntryTrackedQualityBadge } from './EntryTrackedQualityBadge';
 import { HistoryWeek } from './HistoryWeek';
-import { NutrientDensityBadge } from './NutrientDensityBadge';
 
 export type HistoryCalendarMode = 'week' | 'month';
 
@@ -25,7 +27,7 @@ type HistoryCalendarProps = {
   filter: WeeklyJournalFilter;
   history: HistoryResponse;
   selectedDate: string;
-  target: NutritionTarget;
+  scoring: { target: NutritionTarget; foods: Food[] };
   units: 'metric' | 'imperial';
   onModeChange: (mode: HistoryCalendarMode) => void;
   onFilterChange: (filter: WeeklyJournalFilter) => void;
@@ -112,22 +114,24 @@ function cellLabel(day: HistoryDay, weights: WeightEntry[], hasFoodEntry: boolea
   return parts.join(', ');
 }
 
-export const HistoryCalendar = memo(function HistoryCalendar({
-  mode,
-  month,
-  weekStart,
-  filter,
-  history,
-  selectedDate,
-  target,
-  units,
-  onModeChange,
-  onFilterChange,
-  onPrevious,
-  onNext,
-  onSelectDate,
-  onToday,
-}: HistoryCalendarProps) {
+export const HistoryCalendar = memo(function HistoryCalendar(props: HistoryCalendarProps) {
+  const {
+    mode,
+    month,
+    weekStart,
+    filter,
+    history,
+    selectedDate,
+    scoring,
+    units,
+    onModeChange,
+    onFilterChange,
+    onPrevious,
+    onNext,
+    onSelectDate,
+    onToday,
+  } = props;
+  const { foods, target } = scoring;
   const today = new Date();
   const todayKey = localDateKey(today);
   const byDate = new Map(history.days.map((day) => [day.date, day]));
@@ -139,6 +143,12 @@ export const HistoryCalendar = memo(function HistoryCalendar({
     (entry) => localDateKey(new Date(entry.recordedAt)) === selectedDate
   );
   const selectedEntries = entriesForLocalDate(history.entries ?? [], selectedDate);
+  const selectedDailyScore = calculateDailyScore({
+    entries: selectedEntries,
+    foods,
+    target,
+    isCurrentDay: selectedDate === todayKey,
+  });
   const selectedHasData = selectedDay
     ? hasDayData(selectedDay, history.weights, selectedEntries.length > 0)
     : false;
@@ -329,10 +339,16 @@ export const HistoryCalendar = memo(function HistoryCalendar({
               ))}
             </fieldset>
             <p className="calendar-density-note">
-              Food labels compare tracked protein and fibre per 100 kcal—not overall food quality.
+              Tracked scores compare protein and fibre per 100 kcal—not overall health quality.
             </p>
           </div>
-          <HistoryWeek weekStart={weekStart} history={history} filter={filter} units={units} />
+          <HistoryWeek
+            weekStart={weekStart}
+            history={history}
+            foods={foods}
+            filter={filter}
+            units={units}
+          />
         </>
       ) : (
         <>
@@ -416,6 +432,15 @@ export const HistoryCalendar = memo(function HistoryCalendar({
                     <strong>{selectedDay.fastCount}</strong>
                   </div>
                 </div>
+                {selectedEntries.length > 0 ? (
+                  <div className="calendar-menu-quality daily-score-summary">
+                    <div>
+                      <strong>{selectedDailyScore.label}</strong>
+                      <span>Based on this day’s logged food entries</span>
+                    </div>
+                    <DailyScoreBadge result={selectedDailyScore} />
+                  </div>
+                ) : null}
                 <section
                   className="calendar-foods"
                   aria-labelledby={`calendar-foods-${selectedDate}`}
@@ -444,7 +469,7 @@ export const HistoryCalendar = memo(function HistoryCalendar({
                               {Math.round(entry.carbsG)}C · {Math.round(entry.proteinG)}P ·{' '}
                               {Math.round(entry.fibreG)}F
                             </span>
-                            <NutrientDensityBadge nutrients={entry} />
+                            <EntryTrackedQualityBadge entry={entry} foods={foods} />
                           </div>
                         </li>
                       ))}
@@ -456,8 +481,8 @@ export const HistoryCalendar = memo(function HistoryCalendar({
                 {target.calorieRange ? (
                   <p className="calendar-target-note">
                     Your intake estimate for this goal is {target.calorieRange[0].toLocaleString()}–
-                    {target.calorieRange[1].toLocaleString()} kcal. This day is context, not a
-                    score.
+                    {target.calorieRange[1].toLocaleString()} kcal. It does not change the tracked
+                    daily score.
                   </p>
                 ) : null}
                 {selectedWeights.length > 0 ? (

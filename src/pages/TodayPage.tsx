@@ -21,6 +21,8 @@ import {
   X,
 } from 'lucide-react';
 import { type KeyboardEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { DailyScoreBadge } from '../components/DailyScoreBadge';
+import { EntryTrackedQualityBadge } from '../components/EntryTrackedQualityBadge';
 import { NutrientDensityBadge } from '../components/NutrientDensityBadge';
 import {
   addFoodEntry,
@@ -44,6 +46,7 @@ import { directEntryError, foodFromDirectEntry, mergeDashboardEntry } from '../l
 import { normalizeFoodLabels } from '../lib/food-context';
 import { waterTotal } from '../lib/log-corrections';
 import { computeMacroCompletion } from '../lib/macro-completion';
+import { calculateDailyScore, calculateEntryTrackedQuality } from '../lib/nutrient-density';
 import {
   calculateGymGuidance,
   calculateSleepGuidance,
@@ -966,6 +969,12 @@ export function TodayPage({
   const calorieProgress = target
     ? Math.min(100, Math.max(0, (dashboard.totals.calories / target) * 100))
     : 0;
+  const dailyScore = calculateDailyScore({
+    entries: dashboard.entries,
+    foods: dashboard.foods,
+    target: dashboard.target,
+    isCurrentDay: true,
+  });
   const proteinTarget = dashboard.target.proteinRangeG?.[0] ?? null;
   const fibreTarget = dashboard.target.fibreTargetG;
   const waterPercent = Math.max(
@@ -1641,30 +1650,49 @@ export function TodayPage({
           </button>
         </div>
         {dashboard.entries.length ? (
+          <div className="daily-menu-quality daily-score-summary">
+            <div>
+              <strong>{dailyScore.label}</strong>
+              <span>
+                Based on {dashboard.entries.length} logged food{' '}
+                {dashboard.entries.length === 1 ? 'entry' : 'entries'}
+              </span>
+            </div>
+            <DailyScoreBadge result={dailyScore} />
+          </div>
+        ) : null}
+        {dashboard.entries.length ? (
           <div className="entry-list">
-            {dashboard.entries.map((entry) => (
-              <button
-                className="entry-row"
-                key={entry.id}
-                type="button"
-                aria-label={`Edit ${entry.foodName}, ${formatTime(entry.eatenAt)}`}
-                onClick={() => openEntry(entry)}
-              >
-                <time dateTime={new Date(entry.eatenAt).toISOString()}>
-                  {formatTime(entry.eatenAt)}
-                </time>
-                <span className="entry-dot" />
-                <div>
-                  <strong>{entry.foodName}</strong>
-                  <span>
-                    {entry.amount} {entry.unitLabel} · {Math.round(entry.carbsG)}C ·{' '}
-                    {Math.round(entry.proteinG)}P · {Math.round(entry.fibreG)}F
-                  </span>
-                  <NutrientDensityBadge nutrients={entry} />
-                </div>
-                <b>{Math.round(entry.calories)} kcal</b>
-              </button>
-            ))}
+            {dashboard.entries.map((entry) => {
+              const tracked = calculateEntryTrackedQuality(entry, dashboard.foods);
+              const score =
+                tracked.quality.score === null
+                  ? 'tracked score unavailable'
+                  : `${tracked.quality.score} of 100 tracked`;
+              return (
+                <button
+                  className="entry-row"
+                  key={entry.id}
+                  type="button"
+                  aria-label={`Edit ${entry.foodName}, ${formatTime(entry.eatenAt)}, ${score}, ${tracked.basisLabel}`}
+                  onClick={() => openEntry(entry)}
+                >
+                  <time dateTime={new Date(entry.eatenAt).toISOString()}>
+                    {formatTime(entry.eatenAt)}
+                  </time>
+                  <span className="entry-dot" />
+                  <div>
+                    <strong>{entry.foodName}</strong>
+                    <span>
+                      {entry.amount} {entry.unitLabel} · {Math.round(entry.carbsG)}C ·{' '}
+                      {Math.round(entry.proteinG)}P · {Math.round(entry.fibreG)}F
+                    </span>
+                    <EntryTrackedQualityBadge entry={entry} foods={dashboard.foods} />
+                  </div>
+                  <b>{Math.round(entry.calories)} kcal</b>
+                </button>
+              );
+            })}
           </div>
         ) : (
           <div className="empty-inline">
@@ -1991,7 +2019,8 @@ export function TodayPage({
                   <div className="nutrient-density-preview is-compact">
                     <NutrientDensityBadge nutrients={entryDraft} showBasis />
                     <p>
-                      Based only on tracked protein and fibre per calorie—not overall food quality.
+                      This score uses only tracked protein and fibre per calorie, not overall health
+                      quality.
                     </p>
                   </div>
 

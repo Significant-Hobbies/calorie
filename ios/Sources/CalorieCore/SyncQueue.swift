@@ -47,7 +47,7 @@ public enum CloudJournalDiff {
         operations.append(contentsOf: deleted(before.weightEntries, after.weightEntries).map(SyncOperation.deleteWeightEntry))
         operations.append(contentsOf: deleted(before.routineCheckIns, after.routineCheckIns).map(SyncOperation.deleteRoutineCheckIn))
 
-        operations.append(contentsOf: changed(before.foods, after.foods).map(SyncOperation.upsertFood))
+        operations.append(contentsOf: changedFoods(before.foods, after.foods).map(SyncOperation.upsertFood))
         operations.append(contentsOf: changed(before.routines, after.routines).map(SyncOperation.upsertRoutine))
         operations.append(contentsOf: changed(before.foodEntries, after.foodEntries).map { entry in
             .upsertFoodEntry(entry, food: after.foods.first(where: { $0.id == entry.foodID }))
@@ -64,6 +64,17 @@ public enum CloudJournalDiff {
     ) -> [Value] where Value.ID: Hashable {
         let prior = Dictionary(uniqueKeysWithValues: before.map { ($0.id, $0) })
         return after.filter { prior[$0.id] != $0 }
+    }
+
+    private static func changedFoods(_ before: [Food], _ after: [Food]) -> [Food] {
+        let prior = Dictionary(uniqueKeysWithValues: before.map { ($0.id, $0) })
+        return after.filter { food in
+            guard var previous = prior[food.id] else { return true }
+            var current = food
+            previous.lastUsedAt = nil
+            current.lastUsedAt = nil
+            return previous != current
+        }
     }
 
     private static func deleted<Value: Identifiable>(

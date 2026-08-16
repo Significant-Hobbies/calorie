@@ -776,14 +776,18 @@
       gap: 2px;
       max-width: 100%;
       padding: 1px 4px;
-      font-size: 0.5rem;
+      font-size: 0.6875rem;
       line-height: 1.2;
       white-space: nowrap;
     }
 
     .weekly-calendar-event .nutrient-density svg {
-      width: 8px;
-      height: 8px;
+      width: 10px;
+      height: 10px;
+    }
+
+    .weekly-calendar-event .nutrient-density-wrap > small {
+      display: none;
     }
 
     .weekly-calendar-event.is-compact {

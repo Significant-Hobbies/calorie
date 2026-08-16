@@ -52,6 +52,62 @@ enum NativeAccountError: LocalizedError {
     }
 }
 
+enum NativeProfilePatch {
+    static func apply(from before: Profile, to profile: Profile, body: inout [String: Any]) throws {
+        if before.name != profile.name { body["displayName"] = profile.name.isEmpty ? "You" : profile.name }
+        if before.age != profile.age {
+            guard let age = profile.age else {
+                throw NativeAccountError.server("Age cannot be removed from a connected journal.")
+            }
+            body["ageYears"] = age
+        }
+        if before.heightCentimetres != profile.heightCentimetres {
+            guard let height = profile.heightCentimetres else {
+                throw NativeAccountError.server("Height cannot be removed from a connected journal.")
+            }
+            body["heightCm"] = height
+        }
+        if before.equationProfile != profile.equationProfile {
+            body["equationProfile"] = cloudEquationProfile(profile.equationProfile)
+        }
+        if before.activity != profile.activity { body["activityLevel"] = cloudActivity(profile.activity) }
+        if before.goal != profile.goal { body["goal"] = cloudGoal(profile.goal) }
+        if before.manualCalorieTarget != profile.manualCalorieTarget {
+            body["manualCalorieTarget"] = profile.manualCalorieTarget ?? NSNull()
+            body["manualCalorieRange"] = profile.manualCalorieTarget.map {
+                [max(800, $0 - 100), min(6_000, $0 + 100)]
+            } ?? NSNull()
+        }
+        if before.waterTargetMillilitres != profile.waterTargetMillilitres {
+            body["waterTargetMl"] = profile.waterTargetMillilitres
+        }
+    }
+
+    private static func cloudGoal(_ goal: Goal) -> String {
+        switch goal {
+        case .gradualLoss: "lose_gentle"
+        case .gradualGain: "gain_gentle"
+        case .maintain: "maintain"
+        }
+    }
+
+    private static func cloudActivity(_ activity: ActivityLevel) -> String {
+        switch activity {
+        case .light: "light"
+        case .moderate: "moderate"
+        case .high: "very"
+        }
+    }
+
+    private static func cloudEquationProfile(_ equationProfile: EquationProfile?) -> String {
+        switch equationProfile {
+        case .mifflinFemaleConstant: "female"
+        case .mifflinMaleConstant: "male"
+        case nil: "none"
+        }
+    }
+}
+
 actor KeychainSessionStore {
     private let service: String
     private let account: String
@@ -265,21 +321,11 @@ actor NativeAccountClient: NativeAccountServing {
 
     private func pushProfile(before: Profile, after profile: Profile) async throws {
         guard hasSupportedProfileChange(from: before, to: profile) else { return }
-        guard
-            let age = profile.age,
-            let height = profile.heightCentimetres
-        else { return }
         let response = try await request(path: "/api/app/profile", method: "GET", authenticated: true)
         guard var body = try JSONSerialization.jsonObject(with: response.data) as? [String: Any] else {
             throw NativeAccountError.server("Calorie returned an invalid profile.")
         }
-        applyNativeProfileChanges(
-            from: before,
-            to: profile,
-            age: age,
-            height: height,
-            body: &body
-        )
+        try NativeProfilePatch.apply(from: before, to: profile, body: &body)
         _ = try await request(
             path: "/api/app/profile",
             method: "PUT",
@@ -301,58 +347,6 @@ actor NativeAccountClient: NativeAccountServing {
         ].contains(true)
     }
 
-    private func applyNativeProfileChanges(
-        from before: Profile,
-        to profile: Profile,
-        age: Int,
-        height: Double,
-        body: inout [String: Any]
-    ) {
-        let manualTarget: Any = profile.manualCalorieTarget ?? NSNull()
-        let manualRange: Any = profile.manualCalorieTarget.map {
-            [max(800, $0 - 100), min(6_000, $0 + 100)]
-        } ?? NSNull()
-        if before.name != profile.name { body["displayName"] = profile.name.isEmpty ? "You" : profile.name }
-        if before.age != profile.age { body["ageYears"] = age }
-        if before.heightCentimetres != profile.heightCentimetres { body["heightCm"] = height }
-        if before.equationProfile != profile.equationProfile {
-            body["equationProfile"] = cloudEquationProfile(profile.equationProfile)
-        }
-        if before.activity != profile.activity { body["activityLevel"] = cloudActivity(profile.activity) }
-        if before.goal != profile.goal { body["goal"] = cloudGoal(profile.goal) }
-        if before.manualCalorieTarget != profile.manualCalorieTarget {
-            body["manualCalorieTarget"] = manualTarget
-            body["manualCalorieRange"] = manualRange
-        }
-        if before.waterTargetMillilitres != profile.waterTargetMillilitres {
-            body["waterTargetMl"] = profile.waterTargetMillilitres
-        }
-    }
-
-    private func cloudGoal(_ goal: Goal) -> String {
-        switch goal {
-        case .gradualLoss: "lose_gentle"
-        case .gradualGain: "gain_gentle"
-        case .maintain: "maintain"
-        }
-    }
-
-    private func cloudActivity(_ activity: ActivityLevel) -> String {
-        switch activity {
-        case .light: "light"
-        case .moderate: "moderate"
-        case .high: "very"
-        }
-    }
-
-    private func cloudEquationProfile(_ equationProfile: EquationProfile?) -> String {
-        switch equationProfile {
-        case .mifflinFemaleConstant: "female"
-        case .mifflinMaleConstant: "male"
-        case nil: "none"
-        }
-    }
-
     private func pushFood(_ food: Food) async throws {
         let servingGrams = food.servingGrams ?? 0
         let scale = servingGrams > 0 ? 100 / servingGrams : 1
@@ -361,7 +355,7 @@ actor NativeAccountClient: NativeAccountServing {
             "name": food.name,
             "servingMode": servingGrams > 0 ? "per_100g" : "per_unit",
             "unitLabel": food.servingName,
-            "defaultAmount": servingGrams > 0 ? servingGrams : 1,
+            "defaultAmount": servingGrams > 0 ? servingGrams : (food.defaultAmount ?? 1),
             "calories": food.nutrients.calories * scale,
             "carbsG": food.nutrients.carbohydrates * scale,
             "proteinG": food.nutrients.protein * scale,

@@ -26,16 +26,22 @@ final class AppModel {
     private let store: CalorieStore
     private let accountClient: any NativeAccountServing
     private let syncStore: SyncIntentStore
+    private let cloudQuery: ServerStateQueryCache<CloudJournalSnapshot>
     private let webAuthentication = WebAuthenticationCoordinator()
+    private var activeLocalMutations = 0
+    private var localMutationRevision = 0
+    private var syncRequestedAfterMutation = false
 
     init(
         store: CalorieStore = CalorieStore(),
         accountClient: any NativeAccountServing = NativeAccountClient(),
-        syncStore: SyncIntentStore = SyncIntentStore()
+        syncStore: SyncIntentStore = SyncIntentStore(),
+        cloudQuery: ServerStateQueryCache<CloudJournalSnapshot> = ServerStateQueryCache()
     ) {
         self.store = store
         self.accountClient = accountClient
         self.syncStore = syncStore
+        self.cloudQuery = cloudQuery
         if ProcessInfo.processInfo.arguments.contains("--progress-demo") { selectedTab = 1 }
         if ProcessInfo.processInfo.arguments.contains("--foods-demo") { selectedTab = 2 }
         if ProcessInfo.processInfo.arguments.contains("--you-demo") { selectedTab = 3 }
@@ -52,7 +58,39 @@ final class AppModel {
     var selectedEntries: [FoodEntry] { document.entries(on: selectedDate) }
     var selectedTotals: Nutrients { document.totals(on: selectedDate) }
     var targetExplanation: TargetExplanation? { TargetCalculator.targets(for: document.profile) }
-    var guidance: [GuidanceItem] { GuidanceEngine.items(entries: selectedEntries, now: .now) }
+    var dailyScoreTargets: DailyScoreTargets {
+        let nutrientTargets = targetExplanation?.target
+        let activeCycle = document.goalCycleSessions?
+            .filter { $0.endOn == nil }
+            .max { $0.updatedAt < $1.updatedAt }
+        return DailyScoreTargets(
+            calorieRange: activeCycle?.calorieRange,
+            calorieTarget: nutrientTargets?.calories,
+            proteinTarget: activeCycle?.proteinRange?.first ?? nutrientTargets?.protein,
+            fibreTarget: nutrientTargets?.fibre
+        )
+    }
+    var guidance: [GuidanceItem] {
+        GuidanceEngine.items(
+            entries: selectedEntries,
+            now: .now,
+            bedtimeHour: preferredBedtimeHour,
+            fastingThresholdHours: document.profile.fastingThresholdHours
+        )
+    }
+
+    private var preferredBedtimeHour: Int {
+        guard
+            let wakeTime = document.profile.wakeTime,
+            let sleepHours = document.profile.sleepHours,
+            let separator = wakeTime.firstIndex(of: ":"),
+            let wakeHour = Int(wakeTime[..<separator]),
+            let wakeMinute = Int(wakeTime[wakeTime.index(after: separator)...])
+        else { return 23 }
+        let wakeMinutes = wakeHour * 60 + wakeMinute
+        let bedtimeMinutes = (wakeMinutes - Int((sleepHours * 60).rounded()) + 24 * 60) % (24 * 60)
+        return bedtimeMinutes / 60
+    }
 
     func load() async {
         defer { isLoading = false }
@@ -248,6 +286,7 @@ final class AppModel {
                 let code = components.queryItems?.first(where: { $0.name == "code" })?.value
             else { throw NativeAccountError.invalidCallback }
             account = try await accountClient.exchangeGoogleHandoff(code)
+            await cloudQuery.clear()
             accountNotice = "Cloud journal connected. Apple sign-in is optional."
             await prepareCloudReconciliation()
         } catch {
@@ -262,9 +301,11 @@ final class AppModel {
         do {
             if let account, !account.hasApple {
                 self.account = try await accountClient.linkApple(payload)
+                await cloudQuery.clear()
                 await prepareCloudReconciliation()
             } else {
                 account = try await accountClient.signInWithApple(payload)
+                await cloudQuery.clear()
                 await prepareCloudReconciliation()
             }
         } catch {
@@ -274,8 +315,11 @@ final class AppModel {
 
     func signOut() async {
         isAccountWorking = true
+        await cloudQuery.clear()
         await accountClient.signOut()
         account = nil
+        cloudSnapshot = nil
+        syncRequestedAfterMutation = false
         document.syncState = .localOnly
         try? await store.save(document)
         isAccountWorking = false
@@ -288,8 +332,11 @@ final class AppModel {
         do {
             try await accountClient.deleteAccount()
             try await syncStore.removeAll()
+            await cloudQuery.clear()
             pendingSyncCount = 0
             account = nil
+            cloudSnapshot = nil
+            syncRequestedAfterMutation = false
             document.syncState = .localOnly
             try await store.save(document)
             accountNotice = "Cloud account deleted. This device journal was preserved."
@@ -343,7 +390,7 @@ final class AppModel {
 
     private func prepareCloudReconciliation() async {
         do {
-            cloudSnapshot = try CloudJournalMapper.decode(await accountClient.cloudExport())
+            cloudSnapshot = try await fetchCloud(policy: .always).value
             document.syncState = .conflict
             try await store.save(document)
             isReconciliationPresented = true
@@ -354,33 +401,43 @@ final class AppModel {
         }
     }
 
-    func syncNow() async {
-        guard account != nil, !isSyncing else { return }
+    func syncNow(forceRefresh: Bool = true) async {
+        guard account != nil else { return }
+        guard !isSyncing else {
+            syncRequestedAfterMutation = true
+            return
+        }
+        guard activeLocalMutations == 0 else {
+            syncRequestedAfterMutation = true
+            return
+        }
         if document.syncState == .conflict {
             await resumeReconciliation()
             return
         }
         isSyncing = true
-        defer { isSyncing = false }
         do {
             while true {
-                let pending = try await syncStore.pending()
-                pendingSyncCount = pending.count
-                for intent in pending {
-                    try await accountClient.apply(intent)
-                    try await syncStore.complete(intent.id)
-                    pendingSyncCount -= 1
+                let replayedPending = try await replayPendingSyncIntents()
+                guard try await syncStore.pending().isEmpty else { continue }
+                let revisionBeforeFetch = localMutationRevision
+                let query = try await fetchCloud(
+                    policy: cloudPolicy(forceRefresh: forceRefresh, replayedPending: replayedPending)
+                )
+                guard activeLocalMutations == 0, revisionBeforeFetch == localMutationRevision else {
+                    syncRequestedAfterMutation = true
+                    break
                 }
                 guard try await syncStore.pending().isEmpty else { continue }
-                let cloud = try CloudJournalMapper.decode(await accountClient.cloudExport())
-                guard try await syncStore.pending().isEmpty else { continue }
-                let refreshed = CloudJournalMapper.reconcile(
-                    local: document,
-                    cloud: cloud,
-                    choice: .keepCloud
-                )
-                document = refreshed
-                try await store.save(refreshed)
+                if query.source == .network {
+                    let refreshed = CloudJournalMapper.reconcile(
+                        local: document,
+                        cloud: query.value,
+                        choice: .keepCloud
+                    )
+                    document = refreshed
+                    try await store.save(refreshed)
+                }
                 guard try await syncStore.pending().isEmpty else { continue }
                 break
             }
@@ -390,11 +447,44 @@ final class AppModel {
             try? await store.save(document)
             message = accountErrorMessage(error, recovery: "Your changes are saved on this device and cloud sync can be retried.")
         }
+        isSyncing = false
+        if account != nil, activeLocalMutations == 0, syncRequestedAfterMutation {
+            syncRequestedAfterMutation = false
+            await syncNow()
+        }
+    }
+
+    private func replayPendingSyncIntents() async throws -> Bool {
+        let pending = try await syncStore.pending()
+        pendingSyncCount = pending.count
+        guard !pending.isEmpty else { return false }
+        await cloudQuery.invalidate()
+        for intent in pending {
+            try await accountClient.apply(intent)
+            try await syncStore.complete(intent.id)
+            pendingSyncCount -= 1
+        }
+        return true
+    }
+
+    private func cloudPolicy(
+        forceRefresh: Bool,
+        replayedPending: Bool
+    ) -> ServerStateQueryPolicy {
+        forceRefresh || replayedPending ? .always : .ifStale
     }
 
     func refreshFromCloud() async {
         guard !isLoading, account != nil else { return }
-        await syncNow()
+        await syncNow(forceRefresh: false)
+    }
+
+    private func fetchCloud(
+        policy: ServerStateQueryPolicy
+    ) async throws -> ServerStateQueryResult<CloudJournalSnapshot> {
+        try await cloudQuery.value(policy: policy) { [accountClient] in
+            try CloudJournalMapper.decode(await accountClient.cloudExport())
+        }
     }
 
     private func accountErrorMessage(_ error: Error, recovery: String) -> String {
@@ -403,22 +493,35 @@ final class AppModel {
     }
 
     private func mutate(_ operation: (inout CalorieDocument) throws -> Void) async {
+        activeLocalMutations += 1
+        var shouldRequestSync = false
         do {
             let previous = document
             var next = document
             try operation(&next)
-            if account != nil { next.syncState = .pending }
+            let syncOperations = account == nil ? [] : CloudJournalDiff.operations(from: previous, to: next)
+            if !syncOperations.isEmpty {
+                next.syncState = .pending
+                localMutationRevision += 1
+                await cloudQuery.invalidate()
+                shouldRequestSync = true
+            }
             try await store.save(next)
             document = next
-            if account != nil {
-                for operation in CloudJournalDiff.operations(from: previous, to: next) {
+            if !syncOperations.isEmpty {
+                for operation in syncOperations {
                     try await syncStore.enqueue(operation)
                 }
                 pendingSyncCount = (try await syncStore.pending()).count
-                await syncNow()
             }
         } catch {
             message = error.localizedDescription
+        }
+        if shouldRequestSync { syncRequestedAfterMutation = true }
+        activeLocalMutations -= 1
+        if activeLocalMutations == 0, syncRequestedAfterMutation {
+            syncRequestedAfterMutation = false
+            await syncNow()
         }
     }
 }

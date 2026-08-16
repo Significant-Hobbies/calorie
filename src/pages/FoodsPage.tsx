@@ -525,8 +525,9 @@ export function FoodsPage({ cloudRevision }: { cloudRevision: number }) {
               <div className="nutrient-density-preview">
                 <NutrientDensityBadge nutrients={draft} showBasis />
                 <p>
-                  This compares tracked protein and fibre per calorie. It does not assess vitamins,
-                  minerals, ingredients, or overall health quality.
+                  This score uses tracked protein and fibre per calorie. It does not assess
+                  ingredients, vitamins, minerals, sodium, added sugars, fat quality, dietary
+                  variety, or overall health quality.
                 </p>
               </div>
 

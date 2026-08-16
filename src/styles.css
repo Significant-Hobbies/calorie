@@ -4214,32 +4214,65 @@
     border-radius: 999px;
     font-size: 0.6875rem;
     font-weight: var(--weight-strong);
+    font-variant-numeric: tabular-nums;
     line-height: 1.25;
     white-space: nowrap;
   }
 
-  .nutrient-density-high {
+  .nutrient-density-score {
     background: var(--moss-100);
     color: var(--moss-900);
   }
 
-  .nutrient-density-medium {
-    background: var(--amber-soft);
-    color: var(--amber-ink);
-  }
-
-  .nutrient-density-low,
   .nutrient-density-unavailable {
     border: 1px solid var(--line);
     background: var(--surface);
     color: var(--ink-soft);
   }
 
-  .nutrient-density-wrap > small {
+  .nutrient-density-wrap > small,
+  .nutrient-density-details small {
     color: var(--ink-soft);
     font-size: 0.6875rem;
     line-height: 1.35;
     white-space: normal;
+  }
+
+  .nutrient-density-wrap > small strong,
+  .nutrient-density-details small strong {
+    color: var(--ink);
+  }
+
+  .nutrient-density-with-basis {
+    display: grid;
+    gap: 5px;
+  }
+
+  .nutrient-density-details {
+    max-width: 65ch;
+  }
+
+  .nutrient-density-details summary {
+    min-height: 44px;
+    display: flex;
+    align-items: center;
+    width: fit-content;
+    color: var(--moss-700);
+    cursor: pointer;
+    font-size: 0.6875rem;
+    font-weight: var(--weight-strong);
+  }
+
+  .nutrient-density-details[open] summary {
+    margin-bottom: 5px;
+  }
+
+  .nutrient-density-details small {
+    display: block;
+  }
+
+  .nutrient-density-details small + small {
+    margin-top: 4px;
   }
 
   .nutrient-density-preview {
@@ -4259,6 +4292,103 @@
 
   .nutrient-density-preview.is-compact {
     padding: 10px;
+  }
+
+  .daily-menu-quality,
+  .calendar-menu-quality {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 11px 12px;
+    border-top: 1px solid var(--line);
+    border-bottom: 1px solid var(--line);
+  }
+
+  .daily-menu-quality {
+    margin-bottom: 10px;
+  }
+
+  .calendar-menu-quality {
+    margin-top: 14px;
+  }
+
+  .daily-menu-quality > div,
+  .calendar-menu-quality > div {
+    min-width: 0;
+    display: grid;
+    gap: 2px;
+  }
+
+  .daily-menu-quality > div > span,
+  .calendar-menu-quality > div > span {
+    color: var(--ink-soft);
+    font-size: 0.75rem;
+  }
+
+  .daily-menu-quality > .nutrient-density-wrap,
+  .calendar-menu-quality > .nutrient-density-wrap,
+  .daily-score-summary > .daily-score-badge-wrap {
+    max-width: min(65ch, 70%);
+    justify-content: flex-end;
+    text-align: right;
+  }
+
+  .daily-score-badge-wrap {
+    min-width: 0;
+    display: grid;
+    justify-items: end;
+    gap: 5px;
+  }
+
+  .daily-score-badge {
+    min-height: 25px;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 3px 9px;
+    border-radius: 999px;
+    background: var(--moss-100);
+    color: var(--moss-900);
+    font-size: 0.75rem;
+    font-weight: var(--weight-strong);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+
+  .daily-score-unavailable {
+    border: 1px solid var(--line);
+    background: var(--surface);
+    color: var(--ink-soft);
+  }
+
+  .daily-score-details {
+    max-width: 65ch;
+    color: var(--ink-soft);
+    font-size: 0.75rem;
+    line-height: 1.4;
+    text-align: left;
+  }
+
+  .daily-score-details summary {
+    min-height: 44px;
+    display: flex;
+    align-items: center;
+    color: var(--moss-700);
+    cursor: pointer;
+    font-weight: var(--weight-strong);
+  }
+
+  .daily-score-details[open] summary {
+    margin-bottom: 5px;
+  }
+
+  .daily-score-details small {
+    display: block;
+  }
+
+  .daily-score-details small + small {
+    margin-top: 4px;
   }
 
   .prompt-preference-list,
@@ -4453,6 +4583,21 @@
   }
 
   @media (max-width: 560px) {
+    .daily-menu-quality,
+    .calendar-menu-quality {
+      flex-direction: column;
+    }
+
+    .daily-menu-quality > .nutrient-density-wrap,
+    .calendar-menu-quality > .nutrient-density-wrap,
+    .daily-score-summary > .daily-score-badge-wrap {
+      width: 100%;
+      max-width: 100%;
+      justify-content: stretch;
+      justify-items: start;
+      text-align: left;
+    }
+
     .cycle-overview > header,
     .water-log-heading,
     .weight-history-heading {

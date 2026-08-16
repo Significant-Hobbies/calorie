@@ -26,6 +26,8 @@
 - [x] 4.1e Persist and replay owner-scoped sync intents for supported local writes, with visible pending/conflict/failure states
 - [x] 4.1f Add sign-out and confirmed account-deletion controls that preserve the local journal unless the owner separately resets it
 - [x] 4.1g Cover auth configuration, handoff expiry/single-use behavior, DTO mapping, merge behavior, Keychain boundaries, and offline intent retention in automated tests
+- [x] 4.1h Add a query-style native server-state cache with freshness, in-flight request deduplication, mutation invalidation, and account-boundary clearing
+- [x] 4.1i Cover fresh-cache reuse, stale revalidation, request deduplication, mutation refresh, and private-cache clearing in automated tests
 - [x] 4.2a Complete the existing Light/Dark/System, Dynamic Type, VoiceOver, Reduce Motion, contrast, empty/error/loading states, and native polish review
 - [ ] 4.2b Capture and review the new account/reconciliation states in Light, Dark, accessibility Dynamic Type, and VoiceOver without exposing production credentials
 - [x] 4.3 Add release metadata, privacy/support copy, simulator screenshots, and documented device-only checks

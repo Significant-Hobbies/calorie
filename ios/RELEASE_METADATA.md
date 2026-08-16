@@ -1,13 +1,14 @@
 # Calorie iOS release draft
 
-Preparation only. No App Store Connect record has been created.
+App Store Connect app ID: `6801238805`. Build `1.0.0 (3)` was accepted for
+TestFlight processing on 2026-08-16.
 
 ## Identity
 
 - Name: Calorie
 - Bundle ID: `com.significanthobbies.calorie`
 - Version: `1.0.0`
-- Build: `1`
+- Build: `3`
 - SKU: `calorie-ios-1`
 - Primary language: English (U.S.)
 - Category: Health & Fitness

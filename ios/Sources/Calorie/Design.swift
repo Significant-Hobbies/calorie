@@ -1,3 +1,4 @@
+import CalorieCore
 import SwiftUI
 import UIKit
 
@@ -100,6 +101,106 @@ struct BotanicalSectionLabel: View {
         Text(text)
             .font(.caption.weight(.bold))
             .foregroundStyle(.secondary)
+    }
+}
+
+struct TrackedQualityScoreView: View {
+    let quality: TrackedQuality
+    var contextLabel = "Tracked quality"
+    var basisLabel: String?
+    var showsExplanation = false
+
+    var body: some View {
+        if showsExplanation {
+            DisclosureGroup {
+                VStack(alignment: .leading, spacing: 4) {
+                    if let basisLabel {
+                        Text(basisLabel).font(.caption.weight(.semibold))
+                    }
+                    Text(quality.explanation)
+                }
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .padding(.top, 5)
+            } label: {
+                HStack(spacing: 10) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(contextLabel).font(.subheadline.weight(.semibold))
+                        if let basisLabel {
+                            Text(basisLabel).font(.caption2).foregroundStyle(.secondary)
+                        }
+                    }
+                    Spacer()
+                    scoreChip
+                }
+            }
+            .accessibilityLabel(accessibilityLabel)
+        } else {
+            VStack(alignment: .leading, spacing: 3) {
+                scoreChip
+                if let basisLabel {
+                    Text(basisLabel)
+                        .font(.caption2.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                }
+            }
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(accessibilityLabel)
+        }
+    }
+
+    private var accessibilityLabel: String {
+        [contextLabel, basisLabel, quality.explanation].compactMap { $0 }.joined(separator: ". ")
+    }
+
+    private var scoreChip: some View {
+        Label(
+            quality.score.map { "\($0)/100 tracked" } ?? "Score unavailable",
+            systemImage: "leaf.fill"
+        )
+        .font(.caption.weight(.bold))
+        .foregroundStyle(quality.score == nil ? .secondary : CaloriePalette.mossStrong)
+        .padding(.horizontal, 8)
+        .padding(.vertical, 5)
+        .background(CaloriePalette.surfaceStrong)
+        .clipShape(Capsule())
+    }
+}
+
+struct DailyScoreView: View {
+    let result: DailyScore
+
+    var body: some View {
+        DisclosureGroup {
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Calories \(factor(result.calorieFactor)) · Protein \(factor(result.proteinFactor)) · Fibre \(factor(result.fibreFactor))")
+                    .font(.caption.weight(.semibold))
+                Text(result.explanation)
+                    .font(.caption)
+            }
+            .foregroundStyle(.secondary)
+            .padding(.top, 5)
+        } label: {
+            HStack(spacing: 10) {
+                Text(result.label).font(.subheadline.weight(.semibold))
+                Spacer()
+                Label(
+                    result.score.map { "\($0)/100" } ?? "Score unavailable",
+                    systemImage: "target"
+                )
+                .font(.caption.weight(.bold))
+                .foregroundStyle(result.score == nil ? .secondary : CaloriePalette.mossStrong)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 5)
+                .background(CaloriePalette.surfaceStrong)
+                .clipShape(Capsule())
+            }
+        }
+        .accessibilityLabel("\(result.label). \(result.explanation)")
+    }
+
+    private func factor(_ value: Double?) -> String {
+        value.map { "\(Int(($0 * 100).rounded()))%" } ?? "not scored"
     }
 }
 
