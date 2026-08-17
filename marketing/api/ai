@@ -1,0 +1,78 @@
+{
+  "name": "Calorie",
+  "version": "1",
+  "url": "https://calorie.significanthobbies.com",
+  "llms": "https://calorie.significanthobbies.com/llms.txt",
+  "llmsFull": null,
+  "sitemap": "https://calorie.significanthobbies.com/sitemap.xml",
+  "markdown": {
+    "suffix": ".md",
+    "negotiation": false
+  },
+  "surfaces": [
+    {
+      "id": "home",
+      "url": "/",
+      "md": "/index.md",
+      "kind": "static"
+    },
+    {
+      "id": "privacy",
+      "url": "/privacy/",
+      "kind": "static"
+    },
+    {
+      "id": "support",
+      "url": "/support/",
+      "kind": "static"
+    },
+    {
+      "id": "terms",
+      "url": "/terms/",
+      "kind": "static"
+    },
+    {
+      "id": "accessibility",
+      "url": "/accessibility/",
+      "kind": "static"
+    },
+    {
+      "id": "testflight",
+      "url": "/testflight/",
+      "kind": "static"
+    }
+  ],
+  "auth": {
+    "public": true,
+    "notes": "No product account."
+  },
+  "product": {
+    "name": "Calorie",
+    "tagline": "A little log for feeling good.",
+    "summary": "A private, local-first food, water, and weight journal with transparent timing guidance. Optional Google or Apple sign-in can add private Cloudflare sync.",
+    "status": "Live on the web. iPhone app in preparation.",
+    "platforms": [
+      "Web",
+      "iPhone"
+    ],
+    "capabilities": [
+      "Today: food, water, medicine, and timing for this date",
+      "Foods: reusable items per 100 g or per unit",
+      "Progress: 7- and 30-day trends without streak scoring"
+    ],
+    "boundaries": [
+      "No social feed",
+      "Not medical advice",
+      "Default data is local-first; optional private cloud sync",
+      "No App Store listing yet"
+    ],
+    "links": {
+      "home": "https://calorie.significanthobbies.com/",
+      "privacy": "https://calorie.significanthobbies.com/privacy/",
+      "support": "https://calorie.significanthobbies.com/support/",
+      "terms": "https://calorie.significanthobbies.com/terms/",
+      "accessibility": "https://calorie.significanthobbies.com/accessibility/",
+      "testflight": "https://calorie.significanthobbies.com/testflight/"
+    }
+  }
+}

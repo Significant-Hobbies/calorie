@@ -17,6 +17,7 @@ migrations, or credential changes.
 
 ## Product rules
 
+- The public front door is `/`. The journal lives at `/app/`.
 - Keep food-entry flows mobile-first and fast enough to use immediately after eating.
 - Store nutrient values as calories, carbs, protein, and fibre.
 - Timing suggestions are informational estimates, not medical advice.

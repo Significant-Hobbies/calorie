@@ -19,7 +19,8 @@
     "directory": "./dist",
     "binding": "ASSETS",
     "not_found_handling": "single-page-application",
-    "run_worker_first": ["/api/*"]
+    "html_handling": "auto-trailing-slash",
+    "run_worker_first": ["/api/*", "/app", "/app/*"]
   },
   "d1_databases": [
     {

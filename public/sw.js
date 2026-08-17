@@ -1,7 +1,7 @@
-const SHELL_CACHE = 'calorie-shell-v3';
-const RUNTIME_CACHE = 'calorie-runtime-v3';
+const SHELL_CACHE = 'calorie-shell-v4';
+const RUNTIME_CACHE = 'calorie-runtime-v4';
 const SHELL = [
-  '/',
+  '/app/',
   '/manifest.webmanifest',
   '/icon.svg',
   '/icons/icon-192.png',
@@ -41,14 +41,15 @@ self.addEventListener('fetch', (event) => {
   }
 
   if (request.mode === 'navigate') {
+    const shell = url.pathname.startsWith('/app') ? '/app/' : url.pathname;
     event.respondWith(
       fetch(request)
         .then((response) => {
           const copy = response.clone();
-          caches.open(RUNTIME_CACHE).then((cache) => cache.put('/', copy));
+          caches.open(RUNTIME_CACHE).then((cache) => cache.put(shell, copy));
           return response;
         })
-        .catch(() => caches.match('/'))
+        .catch(() => caches.match(shell))
     );
     return;
   }

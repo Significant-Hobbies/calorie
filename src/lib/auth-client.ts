@@ -71,7 +71,7 @@ export async function signInWithGoogle() {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       provider: 'google',
-      callbackURL: window.location.origin,
+      callbackURL: `${window.location.origin}/app/`,
     }),
   });
   const data = (await response.json().catch(() => null)) as {
@@ -81,7 +81,7 @@ export async function signInWithGoogle() {
   if (!response.ok) {
     throw new Error(data?.message ?? 'Google sign-in could not start.');
   }
-  window.location.href = data?.url ?? '/';
+  window.location.href = data?.url ?? '/app/';
 }
 
 export async function signOut() {

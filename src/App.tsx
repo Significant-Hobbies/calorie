@@ -29,9 +29,14 @@ type AppState =
   | { status: 'error'; message: string };
 
 export default function App() {
+  const appPath = location.pathname.replace(/^\/app(?=\/|$)/, '') || '/';
   const legalKind =
-    location.pathname === '/privacy' ? 'privacy' : location.pathname === '/terms' ? 'terms' : null;
-  const isChangelog = location.pathname === '/changelog';
+    appPath === '/privacy' || appPath === '/privacy/'
+      ? 'privacy'
+      : appPath === '/terms' || appPath === '/terms/'
+        ? 'terms'
+        : null;
+  const isChangelog = appPath === '/changelog' || appPath === '/changelog/';
   const [state, setState] = useState<AppState>({ status: 'loading' });
   const [tab, setTab] = useState<AppTab>(() =>
     new URLSearchParams(location.search).get('quick') === 'food' ? 'foods' : 'today'

@@ -11,7 +11,7 @@
     "dev": "concurrently -k -n api,web -c green,blue \"pnpm dev:api\" \"pnpm dev:web\"",
     "dev:web": "vite",
     "dev:api": "wrangler dev --port 8787",
-    "build": "node scripts/generate-public-entrypoints.mjs && vite build",
+    "build": "node scripts/generate-public-entrypoints.mjs && node scripts/assemble-site.mjs",
     "preview": "vite preview",
     "deploy": "pnpm check && wrangler deploy --tag \"$(git rev-parse HEAD)\"",
     "db:migrate:local": "wrangler d1 migrations apply calorie --local",

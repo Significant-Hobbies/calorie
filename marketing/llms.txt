@@ -1,0 +1,14 @@
+# Calorie
+> A private, local-first food, water, and weight journal with transparent timing guidance. Optional Google or Apple sign-in can add private Cloudflare sync.
+
+## Primary
+- [Product overview](https://calorie.significanthobbies.com/index.md): Canonical Markdown summary of Calorie.
+- [Privacy](https://calorie.significanthobbies.com/privacy/): Current privacy policy.
+- [Support](https://calorie.significanthobbies.com/support/): Support and feedback.
+- [TestFlight](https://calorie.significanthobbies.com/testflight/): Current beta availability.
+
+## Product boundaries
+- No social feed
+- Not medical advice
+- Default data is local-first; optional private cloud sync
+- No App Store listing yet

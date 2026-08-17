@@ -8,9 +8,10 @@ import {
 
 const ORIGIN = 'https://calorie.significanthobbies.com';
 const indexHtml = readFileSync('index.html', 'utf8');
+const landingHtml = readFileSync('marketing/index.html', 'utf8');
 const sitemapXml = readFileSync('public/sitemap.xml', 'utf8');
 
-const CANONICAL_PATTERN = /<link rel="canonical" href="([^"]+)" \/>/;
+const CANONICAL_PATTERN = /<link rel="canonical" href="([^"]+)"\s*\/?>/;
 const LOC_PATTERN = /<loc>([^<]+)<\/loc>/g;
 
 function canonicalFromHtml(html: string): string {
@@ -28,7 +29,10 @@ describe('sitemap/canonical parity', () => {
   // ship an exact self-canonical, and every public entrypoint canonical must be
   // listed in the sitemap. Drift in either direction fails the build.
   it('matches every sitemap URL to an exact self-canonical entrypoint', () => {
-    const canonicalUrls = new Set<string>([canonicalFromHtml(indexHtml)]);
+    const canonicalUrls = new Set<string>([
+      canonicalFromHtml(landingHtml),
+      canonicalFromHtml(indexHtml),
+    ]);
     for (const entry of PUBLIC_ENTRYPOINTS) {
       canonicalUrls.add(canonicalFromHtml(renderPublicEntrypoint(indexHtml, entry)));
     }

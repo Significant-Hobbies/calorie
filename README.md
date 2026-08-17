@@ -21,7 +21,7 @@ pnpm install
 pnpm dev
 ```
 
-Open the printed Vite URL, choose **Start on this device**, and complete the
+Open the printed Vite URL at `/app/`, choose **Start on this device**, and complete the
 three-step onboarding flow. No credentials or local database are required for
 the account-free experience.
 
@@ -59,6 +59,8 @@ intentionally contains no credentials.
 
 Production uses a dedicated Google web client with
 `https://calorie.significanthobbies.com` as its JavaScript origin and
+The public site is the shared landing at `/`. The journal is `/app/`.
+Google callback stays at
 `https://calorie.significanthobbies.com/api/auth/callback/google` as its
 callback. Only the standard OpenID Connect identity scopes are requested.
 Native Apple ID tokens are verified for `com.significanthobbies.calorie`.

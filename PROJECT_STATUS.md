@@ -1,6 +1,6 @@
 # Calorie — PROJECT STATUS
 
-Last updated: 2026-08-12
+Last updated: 2026-08-17
 
 ## Why / What
 
@@ -34,6 +34,8 @@ full sets/reps workout-programming system.
 
 ## Timeline
 
+- 2026-08-17 — public `/` is the shared landing snapshot; the journal
+  builds to `/app/`. Not deployed yet.
 - 2026-08-12 — adopted the Fleet code-health contract as the single CI gate:
   whole-source web and native coverage, unused code, cross-language complexity,
   exact duplication, import/target cycles, severe advisories, suppression
@@ -106,6 +108,7 @@ full sets/reps workout-programming system.
 
 ## Features (shipped)
 
+- Public `/` landing snapshot from ios-landings; journal at `/app/`
 - CI-enforced mixed web/native Fleet code-health ratchets across whole-source
   coverage, dead code, complexity, duplication, cycles, dependency advisories,
   suppression markers, builds, and repository hygiene
