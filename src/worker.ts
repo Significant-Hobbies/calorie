@@ -18,15 +18,6 @@ app.use('*', async (c, next) => {
 
 app.get('/app', (c) => c.redirect('/app/', 302));
 
-app.get('/app/*', async (c) => {
-  const url = new URL(c.req.url);
-  const file = url.pathname.split('/').pop() ?? '';
-  if (file.includes('.') && !file.endsWith('.html')) {
-    return c.env.ASSETS.fetch(c.req.raw);
-  }
-  return c.env.ASSETS.fetch(new Request(new URL('/app/index.html', url.origin), c.req.raw));
-});
-
 app.use('/api/*', async (c, next) => {
   await next();
   for (const [name, value] of Object.entries(SECURITY_HEADERS)) c.header(name, value);
