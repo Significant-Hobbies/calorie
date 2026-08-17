@@ -19,6 +19,7 @@
       "!.artifacts",
       "!index.html",
       "!public",
+      "!marketing",
       "!**/*.css",
       "!worker-configuration.d.ts"
     ]
