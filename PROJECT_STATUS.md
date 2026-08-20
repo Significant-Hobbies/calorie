@@ -36,9 +36,9 @@ full sets/reps workout-programming system.
 
 - 2026-08-17 — public `/` is the shared landing snapshot; the journal
   builds to `/app/`. Not deployed yet.
-- 2026-08-16 — App Store Connect accepted native build `1.0.0 (3)` for
-  TestFlight processing under personal Apple team `8F7LXHTJZR` and app ID
-  `6801238805`; tester availability has not been re-verified from the portal
+- 2026-08-16 — Apple confirmed native build `1.0.0 (3)` is available to
+  internal TestFlight testers under personal Apple team `8F7LXHTJZR` and app
+  ID `6801238805`; this is not a public App Store release
 - 2026-08-12 — adopted the Fleet code-health contract as the single CI gate:
   whole-source web and native coverage, unused code, cross-language complexity,
   exact duplication, import/target cycles, severe advisories, suppression
@@ -105,8 +105,7 @@ full sets/reps workout-programming system.
 ## Products
 
 - Universal native SwiftUI iPhone and iPad beta under `ios/`; build `1.0.0 (3)`
-  was accepted for TestFlight processing on the personal Apple team, but is not
-  currently claimed ready for testers
+  is available to internal TestFlight testers on the personal Apple team
 - Installable local-first web app
 - Production Worker — `https://calorie.significanthobbies.com`
 
