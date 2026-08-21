@@ -6,8 +6,7 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/Significant-Hobbies/personal-platform.git",
       "state" : {
-        "branch" : "main",
-        "revision" : "455a0368ed810e9cf87abd6a8414cfb60d04056e"
+        "revision" : "a254f77f883e0ff3a85841ea9620754875a21666"
       }
     }
   ],
