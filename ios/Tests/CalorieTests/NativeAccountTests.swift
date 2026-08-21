@@ -1,6 +1,7 @@
 import XCTest
 @testable import Calorie
 import CalorieCore
+import PersonalSyncKit
 
 final class NativeAccountTests: XCTestCase {
     func testNonceIsRandomAndUsesASHA256Digest() {
@@ -15,7 +16,7 @@ final class NativeAccountTests: XCTestCase {
 
     func testSessionRoundTripsOnlyThroughAnIsolatedKeychainItem() async throws {
         let service = "com.significanthobbies.calorie.tests.\(UUID().uuidString)"
-        let store = KeychainSessionStore(service: service, account: "test-bearer")
+        let store = KeychainBearerTokenStore(service: service, account: "test-bearer")
 
         let initial = try await store.load()
         XCTAssertNil(initial)

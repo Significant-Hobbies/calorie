@@ -12,7 +12,9 @@
 		25AD6E9E051AFE291FA07616 /* Domain.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8ACE5415BD48E3808BAF96FF /* Domain.swift */; };
 		26F27793A07AC74763642E88 /* Persistence.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA0C6738799B8E33E8896F89 /* Persistence.swift */; };
 		2C781D94DD931ED926A3BBB9 /* ServerStateQueryCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = E878C846052A2B4C029151AC /* ServerStateQueryCache.swift */; };
+		360534E54A81CB14648D8765 /* PersonalSyncKit in Frameworks */ = {isa = PBXBuildFile; productRef = 9D21FAD91915CF0C25A76959 /* PersonalSyncKit */; };
 		38F5C42E9B74740668D007AD /* TodayView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E37CD42D2D735AEC0AD67FA /* TodayView.swift */; };
+		464855F6AC15A91E41201874 /* PersonalSyncKit in Frameworks */ = {isa = PBXBuildFile; productRef = 002ECA2451C6B565726001E3 /* PersonalSyncKit */; };
 		46F7A58C2594B5E28EC62189 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 0784046F52F660D200F04976 /* PrivacyInfo.xcprivacy */; };
 		54C2F07D0E083738B1A1151E /* RootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2536F3912B308A351D1EC58A /* RootView.swift */; };
 		55C2A062AE890CBD5C2EEED3 /* CalorieCore.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = DC17149D5C06CBF45F708679 /* CalorieCore.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
@@ -120,11 +122,20 @@
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
+		A0530F8BB84084313B225DD3 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				360534E54A81CB14648D8765 /* PersonalSyncKit in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		DA0C6B4651B5B221F6ABB43C /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
 				9A3D45CEDC31C27CC3147C08 /* CalorieCore.framework in Frameworks */,
+				464855F6AC15A91E41201874 /* PersonalSyncKit in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -252,6 +263,7 @@
 			);
 			name = Calorie;
 			packageProductDependencies = (
+				002ECA2451C6B565726001E3 /* PersonalSyncKit */,
 			);
 			productName = Calorie;
 			productReference = BB8AC23F88B95C56898E9611 /* Calorie.app */;
@@ -317,6 +329,7 @@
 			buildConfigurationList = A0DE31C37FB04EF36159B3AC /* Build configuration list for PBXNativeTarget "CalorieTests" */;
 			buildPhases = (
 				64714EE0F4C1A53D049CA425 /* Sources */,
+				A0530F8BB84084313B225DD3 /* Frameworks */,
 			);
 			buildRules = (
 			);
@@ -325,6 +338,7 @@
 			);
 			name = CalorieTests;
 			packageProductDependencies = (
+				9D21FAD91915CF0C25A76959 /* PersonalSyncKit */,
 			);
 			productName = CalorieTests;
 			productReference = 999A9A642DBE09F3AF3DFEC7 /* CalorieTests.xctest */;
@@ -371,6 +385,9 @@
 			);
 			mainGroup = EB53E7125FD69A486B182788;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				6D7E9B77EA0A31AAA3029070 /* XCRemoteSwiftPackageReference "personal-platform" */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 6A0CF6897D28F1D82B728A85 /* Products */;
 			projectDirPath = "";
@@ -850,6 +867,30 @@
 			defaultConfigurationName = Debug;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		6D7E9B77EA0A31AAA3029070 /* XCRemoteSwiftPackageReference "personal-platform" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/Significant-Hobbies/personal-platform.git";
+			requirement = {
+				branch = main;
+				kind = branch;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		002ECA2451C6B565726001E3 /* PersonalSyncKit */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 6D7E9B77EA0A31AAA3029070 /* XCRemoteSwiftPackageReference "personal-platform" */;
+			productName = PersonalSyncKit;
+		};
+		9D21FAD91915CF0C25A76959 /* PersonalSyncKit */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 6D7E9B77EA0A31AAA3029070 /* XCRemoteSwiftPackageReference "personal-platform" */;
+			productName = PersonalSyncKit;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = E87F57FAB848DA4A75734312 /* Project object */;
 }
