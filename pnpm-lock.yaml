@@ -18,8 +18,8 @@ importers:
         specifier: 0.45.2
         version: 0.45.2(@cloudflare/workers-types@5.20260812.1)(kysely@0.29.4)
       hono:
-        specifier: 4.12.32
-        version: 4.12.32
+        specifier: 4.13.3
+        version: 4.13.3
     devDependencies:
       '@biomejs/biome':
         specifier: 2.5.5
@@ -1298,8 +1298,8 @@ packages:
     resolution: {integrity: sha512-EykJT/Q1KjTWctppgIAgfSO0tKVuZUjhgMr17kqTumMl6Afv3EISleU7qZUzoXDFTAHTDC4NOoG/ZxU3EvlMPQ==}
     engines: {node: '>=8'}
 
-  hono@4.12.32:
-    resolution: {integrity: sha512-XcuyW9qE2kJn07PkecMOBd5Vq/hMy7mmGw+idz1yblbg9N17ijJODrvPkn7/dwL3Kulj8LcRJ69DLOWf91dRUg==}
+  hono@4.13.3:
+    resolution: {integrity: sha512-r8AO2mYHoLxSHkgafNeC/BXyb2vWRxD3jem4Ts+ptav8oTG5FIRifAjuJEmZI4bSvvc2ns0GxmIYiZnHqN3mMw==}
     engines: {node: '>=16.9.0'}
 
   html-escaper@2.0.2:
@@ -2590,7 +2590,7 @@ snapshots:
 
   has-flag@4.0.0: {}
 
-  hono@4.12.32: {}
+  hono@4.13.3: {}
 
   html-escaper@2.0.2: {}
 
