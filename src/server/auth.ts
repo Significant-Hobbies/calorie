@@ -16,6 +16,7 @@ export type AuthBindings = {
   APPLE_CLIENT_ID?: string;
   APPLE_CLIENT_SECRET?: string;
   APPLE_APP_BUNDLE_IDENTIFIER?: string;
+  APPLE_NATIVE_AUDIENCES?: string;
 };
 
 const LOCAL_ORIGINS = [
@@ -45,6 +46,16 @@ export function isAppleWebConfigured(env: AuthBindings) {
   );
 }
 
+function nativeAppleAudiences(env: AuthBindings, bundleIdentifier: string) {
+  return [
+    bundleIdentifier,
+    'com.significanthobbies.kith',
+    ...(env.APPLE_NATIVE_AUDIENCES?.split(',') ?? []),
+  ]
+    .map((audience) => audience.trim())
+    .filter((audience, index, values) => audience.length > 0 && values.indexOf(audience) === index);
+}
+
 export function createAuth(env: AuthBindings, requestUrl: string) {
   const origin = new URL(requestUrl).origin;
   const baseURL = isLocalUrl(origin) ? 'http://localhost:8787' : origin;
@@ -72,6 +83,7 @@ export function createAuth(env: AuthBindings, requestUrl: string) {
               clientId: env.APPLE_CLIENT_ID?.trim() || appleBundleIdentifier,
               clientSecret: env.APPLE_CLIENT_SECRET?.trim() ?? '',
               appBundleIdentifier: appleBundleIdentifier,
+              audience: nativeAppleAudiences(env, appleBundleIdentifier),
             },
           }
         : {}),

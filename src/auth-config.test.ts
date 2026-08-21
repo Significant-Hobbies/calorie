@@ -39,6 +39,8 @@ describe('native Apple authentication configuration', () => {
     expect(source).toContain('plugins: [bearer()]');
     expect(source).toContain('disableImplicitLinking: true');
     expect(source).toContain("trustedProviders: ['google', 'apple']");
+    expect(source).toContain("'com.significanthobbies.kith'");
+    expect(source).toContain('audience: nativeAppleAudiences(env, appleBundleIdentifier)');
     expect(source).toContain("'calorie://auth'");
   });
 });

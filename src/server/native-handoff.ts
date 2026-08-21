@@ -1,8 +1,9 @@
 export const NATIVE_AUTH_CALLBACK = 'calorie://auth';
+export const PACE_AUTH_CALLBACK = 'pace://calorie-auth';
 export const NATIVE_HANDOFF_TTL_MS = 5 * 60 * 1000;
 
 export function isAllowedNativeCallback(value: string) {
-  return value === NATIVE_AUTH_CALLBACK;
+  return value === NATIVE_AUTH_CALLBACK || value === PACE_AUTH_CALLBACK;
 }
 
 export function createNativeHandoffCode() {

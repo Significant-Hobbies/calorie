@@ -6,6 +6,7 @@ import {
   isAllowedNativeCallback,
   NATIVE_AUTH_CALLBACK,
   NATIVE_HANDOFF_TTL_MS,
+  PACE_AUTH_CALLBACK,
   saveNativeHandoff,
 } from './native-handoff';
 
@@ -46,9 +47,11 @@ function handoffDatabase() {
 }
 
 describe('native authentication handoff', () => {
-  it('allows only the exact app callback', () => {
+  it('allows only the exact Calorie and Pace app callbacks', () => {
     expect(isAllowedNativeCallback(NATIVE_AUTH_CALLBACK)).toBe(true);
+    expect(isAllowedNativeCallback(PACE_AUTH_CALLBACK)).toBe(true);
     expect(isAllowedNativeCallback('calorie://auth.evil.example')).toBe(false);
+    expect(isAllowedNativeCallback('pace://calorie-auth.evil.example')).toBe(false);
     expect(isAllowedNativeCallback('https://calorie.example/auth')).toBe(false);
   });
 
