@@ -24,7 +24,7 @@ function mcpOffset(value: string | undefined) {
   return Number.isInteger(parsed) && parsed >= 0 ? Math.min(parsed, 10_000) : 0;
 }
 
-function addUtcDays(date: string, amount: number) {
+export function addUtcDays(date: string, amount: number) {
   const [year, month, day] = date.split('-').map(Number);
   return new Date(Date.UTC(year, month - 1, day + amount)).toISOString().slice(0, 10);
 }
@@ -54,7 +54,7 @@ function timezoneOffset(timestamp: number, timezone: string) {
   );
 }
 
-function localMidnight(date: string, timezone: string): number | null {
+export function localMidnight(date: string, timezone: string): number | null {
   if (!validDateKey(date)) return null;
   const [year, month, day] = date.split('-').map(Number);
   const approximate = Date.UTC(year, month - 1, day);
@@ -82,7 +82,7 @@ type McpTargetRow = {
   fasting_threshold_hours: 12 | 14 | 16;
 };
 
-async function readMcpTargets(db: D1Database, userId: string) {
+export async function readMcpTargets(db: D1Database, userId: string) {
   const row = await db
     .prepare(
       `SELECT manual_calorie_target, manual_calorie_min, manual_calorie_max,
