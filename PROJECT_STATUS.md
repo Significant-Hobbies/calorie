@@ -33,6 +33,9 @@ full sets/reps workout-programming system.
 
 ## Timeline
 
+- 2026-08-22 — Apple completed processing Calorie 1.0.0 (4) and confirmed it
+  available to internal TestFlight testers on personal team `8F7LXHTJZR`.
+
 - 2026-08-21 — applied additive D1 migration
   `0008_shared_family_identity.sql`, deployed exact SHA
   `040474d9f41c6e5884beb0761d13d275d1e8e70a` at 100% Worker traffic, and
