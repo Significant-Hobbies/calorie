@@ -34,6 +34,9 @@ full sets/reps workout-programming system.
 
 ## Timeline
 
+- 2026-08-21 — expanded the native Apple identity verifier to accept the Kith
+  bundle alongside Calorie and deployed the exact merged SHA at 100% Worker
+  traffic; exact native callback allowlisting remains enforced
 - 2026-08-17 — public `/` is the shared landing snapshot; the journal
   builds to `/app/`. Not deployed yet.
 - 2026-08-16 — Apple confirmed native build `1.0.0 (3)` is available to
@@ -122,6 +125,8 @@ full sets/reps workout-programming system.
 - Native Sign in with Apple using bundle-audience token verification, explicit
   existing-account linking without email matching, Keychain bearer sessions,
   iPhone/cloud reconciliation, and durable offline sync intents
+- Shared native Apple audience verification for Calorie and Kith with exact
+  callback allowlisting
 - Shared Ultracite lint baseline with a clean 87-file check
 - Three-step answer-aware onboarding with reload-safe drafts and visible goal math
 - Fully account-free local journal with versioned browser storage
