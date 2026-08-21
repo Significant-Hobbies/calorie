@@ -1,15 +1,35 @@
 import { type FoodEntryRow, mapFoodEntry } from './db';
 import { dateKey, jsonError, validDateKey } from './http';
 import { createEntry } from './journal';
-import { addUtcDays, localMidnight, nutritionTotals, readMcpTargets } from './mcp';
-import { applyCalorieUser, authenticateSharedIdentity } from './shared-identity';
+import { addUtcDays, localMidnight, nutritionTotals, readMcpHistory, readMcpTargets } from './mcp';
+import {
+  applyCalorieUser,
+  authenticateSharedIdentity,
+  findCalorieUserByPersonalId,
+} from './shared-identity';
 import type { App, AppContext } from './types';
 
 async function authenticatePersonalRequest(c: AppContext): Promise<Response | null> {
+  const forwardedUserId = c.req.header('X-Personal-User-Id')?.trim();
+  if (new URL(c.req.url).hostname === 'calorie.internal' && forwardedUserId) {
+    const user = await findCalorieUserByPersonalId(c.env.DB, forwardedUserId);
+    if (!user) {
+      return c.json(
+        { code: 'CALORIE_ACCOUNT_NOT_FOUND', message: 'Connect Calorie to the personal account.' },
+        403
+      );
+    }
+    applyCalorieUser(c, user);
+    return null;
+  }
   const result = await authenticateSharedIdentity(c);
   if (result.status === 'error') return result.response;
   applyCalorieUser(c, result.user);
   return null;
+}
+
+async function history(c: AppContext) {
+  return readMcpHistory(c, c.get('userId'));
 }
 
 async function summary(c: AppContext) {
@@ -71,5 +91,6 @@ export function registerPersonalPlatformRoutes(app: App) {
     await next();
   });
   app.get('/v1/personal/summary', summary);
+  app.get('/v1/personal/history', history);
   app.post('/v1/personal/actions/log_food', logFood);
 }

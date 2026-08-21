@@ -58,6 +58,30 @@ describe('Personal Platform connector', () => {
     expect(response.status).toBe(401);
   });
 
+  it('accepts a mapped owner only across the internal service binding', async () => {
+    const response = await app.request(
+      'https://calorie.internal/v1/personal/history?start=2026-08-20&end=2026-08-21&timezone=UTC',
+      { headers: { 'X-Personal-User-Id': 'shared-user' } },
+      environment(Response.json({}), { id: 'calorie-user' }, true)
+    );
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      schemaVersion: '1',
+      items: [{ date: '2026-08-20' }, { date: '2026-08-21' }],
+      entries: [],
+      page: { total: 2 },
+    });
+  });
+
+  it('does not accept the internal user header on the public host', async () => {
+    const response = await app.request(
+      'https://calorie.example/v1/personal/summary',
+      { headers: { 'X-Personal-User-Id': 'shared-user' } },
+      environment(Response.json({}), { id: 'calorie-user' }, true)
+    );
+    expect(response.status).toBe(401);
+  });
+
   it('links the stable family user ID through the existing Apple account', async () => {
     const response = await app.request(
       'https://calorie.example/v1/personal/summary?date=2026-08-21&timezone=Asia%2FKolkata',

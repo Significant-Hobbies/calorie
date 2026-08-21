@@ -10,7 +10,7 @@ import {
   type WaterRow,
 } from './db';
 import { dateKey, jsonError, validDateKey } from './http';
-import type { App } from './types';
+import type { App, AppContext } from './types';
 
 const MCP_DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -173,6 +173,67 @@ function aggregateMcpHistoryDays(
   return days;
 }
 
+export async function readMcpHistory(c: AppContext, userId: string) {
+  const startDate = validDateKey(c.req.query('start'));
+  const endDate = validDateKey(c.req.query('end'));
+  const timezone = c.req.query('timezone')?.slice(0, 80) || 'UTC';
+  if (!startDate || !endDate || startDate > endDate) {
+    return c.json(jsonError('Choose a valid inclusive date range.'), 400);
+  }
+  const totalDays =
+    Math.round(
+      (Date.parse(`${endDate}T00:00:00Z`) - Date.parse(`${startDate}T00:00:00Z`)) / MCP_DAY_MS
+    ) + 1;
+  if (totalDays < 1 || totalDays > 366) {
+    return c.json(jsonError('Choose a history range of one year or less.'), 400);
+  }
+  const { limit, offset } = mcpPage(c);
+  const pageStartDate = addUtcDays(startDate, Math.min(offset, totalDays));
+  const pageDays = Math.max(0, Math.min(limit, totalDays - offset));
+  const pageEndDate = addUtcDays(pageStartDate, pageDays);
+  const start = localMidnight(pageStartDate, timezone);
+  const end = localMidnight(pageEndDate, timezone);
+  if (start === null || end === null) {
+    return c.json(jsonError('Choose a valid IANA timezone.'), 400);
+  }
+  const [entriesResult, waterResult] = await Promise.all([
+    c.env.DB.prepare(
+      `SELECT * FROM food_entries WHERE user_id = ? AND eaten_at >= ? AND eaten_at < ?
+       ORDER BY eaten_at ASC LIMIT 1001`
+    )
+      .bind(userId, start, end)
+      .all<FoodEntryRow>(),
+    c.env.DB.prepare(
+      `SELECT id, amount_ml, drank_at FROM water_entries
+       WHERE user_id = ? AND drank_at >= ? AND drank_at < ? ORDER BY drank_at ASC LIMIT 1001`
+    )
+      .bind(userId, start, end)
+      .all<WaterRow>(),
+  ]);
+  const entries = entriesResult.results.slice(0, 1000).map(mapFoodEntry);
+  const waterEntries = waterResult.results.slice(0, 1000).map(mapWater);
+  const days = aggregateMcpHistoryDays(pageStartDate, pageDays, entries, waterEntries, timezone);
+  return c.json({
+    schemaVersion: '1',
+    items: days.map((day) => ({
+      ...day,
+      calories: round(day.calories),
+      carbsG: round(day.carbsG, 1),
+      proteinG: round(day.proteinG, 1),
+      fibreG: round(day.fibreG, 1),
+      provenance: day.recorded ? 'calculated-from-recorded-entries' : 'missing-day',
+    })),
+    entries,
+    page: {
+      limit,
+      offset,
+      total: totalDays,
+      nextOffset: offset + pageDays < totalDays ? offset + pageDays : null,
+    },
+    truncated: entriesResult.results.length > 1000 || waterResult.results.length > 1000,
+  });
+}
+
 export function registerMcpRoutes(app: App) {
   app.get('/api/mcp/daily', async (c) => {
     const date = validDateKey(c.req.query('date'));
@@ -249,67 +310,7 @@ export function registerMcpRoutes(app: App) {
     });
   });
 
-  app.get('/api/mcp/history', async (c) => {
-    const startDate = validDateKey(c.req.query('start'));
-    const endDate = validDateKey(c.req.query('end'));
-    const timezone = c.req.query('timezone')?.slice(0, 80) || 'UTC';
-    if (!startDate || !endDate || startDate > endDate) {
-      return c.json(jsonError('Choose a valid inclusive date range.'), 400);
-    }
-    const totalDays =
-      Math.round(
-        (Date.parse(`${endDate}T00:00:00Z`) - Date.parse(`${startDate}T00:00:00Z`)) / MCP_DAY_MS
-      ) + 1;
-    if (totalDays < 1 || totalDays > 366) {
-      return c.json(jsonError('Choose a history range of one year or less.'), 400);
-    }
-    const { limit, offset } = mcpPage(c);
-    const pageStartDate = addUtcDays(startDate, Math.min(offset, totalDays));
-    const pageDays = Math.max(0, Math.min(limit, totalDays - offset));
-    const pageEndDate = addUtcDays(pageStartDate, pageDays);
-    const start = localMidnight(pageStartDate, timezone);
-    const end = localMidnight(pageEndDate, timezone);
-    if (start === null || end === null) {
-      return c.json(jsonError('Choose a valid IANA timezone.'), 400);
-    }
-    const userId = c.get('mcpUserId');
-    const [entriesResult, waterResult] = await Promise.all([
-      c.env.DB.prepare(
-        `SELECT * FROM food_entries WHERE user_id = ? AND eaten_at >= ? AND eaten_at < ?
-         ORDER BY eaten_at ASC LIMIT 1001`
-      )
-        .bind(userId, start, end)
-        .all<FoodEntryRow>(),
-      c.env.DB.prepare(
-        `SELECT id, amount_ml, drank_at FROM water_entries
-         WHERE user_id = ? AND drank_at >= ? AND drank_at < ? ORDER BY drank_at ASC LIMIT 1001`
-      )
-        .bind(userId, start, end)
-        .all<WaterRow>(),
-    ]);
-    const entries = entriesResult.results.slice(0, 1000).map(mapFoodEntry);
-    const waterEntries = waterResult.results.slice(0, 1000).map(mapWater);
-    const days = aggregateMcpHistoryDays(pageStartDate, pageDays, entries, waterEntries, timezone);
-    return c.json({
-      schemaVersion: '1',
-      items: days.map((day) => ({
-        ...day,
-        calories: round(day.calories),
-        carbsG: round(day.carbsG, 1),
-        proteinG: round(day.proteinG, 1),
-        fibreG: round(day.fibreG, 1),
-        provenance: day.recorded ? 'calculated-from-recorded-entries' : 'missing-day',
-      })),
-      entries,
-      page: {
-        limit,
-        offset,
-        total: totalDays,
-        nextOffset: offset + pageDays < totalDays ? offset + pageDays : null,
-      },
-      truncated: entriesResult.results.length > 1000 || waterResult.results.length > 1000,
-    });
-  });
+  app.get('/api/mcp/history', (c) => readMcpHistory(c, c.get('mcpUserId')));
 
   app.get('/api/mcp/foods', async (c) => {
     const { limit, offset } = mcpPage(c);
