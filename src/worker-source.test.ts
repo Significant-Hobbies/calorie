@@ -10,6 +10,11 @@ const source = [
 ].join('\n');
 
 describe('private Worker data controls', () => {
+  it('keeps the retired browser journal out of the public product surface', () => {
+    expect(source).toContain("app.get(retiredPath, (c) => c.redirect('/', 308))");
+    expect(source).not.toContain("c.redirect('/app/'");
+  });
+
   it('scopes correction mutations to the signed-in owner', () => {
     expect(source).toContain(
       'UPDATE water_entries SET amount_ml = ?, drank_at = ? WHERE id = ? AND user_id = ?'

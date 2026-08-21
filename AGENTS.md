@@ -9,7 +9,8 @@ migrations, or credential changes.
 ## Project
 
 - **Product:** Calorie
-- **Stack:** Vite + React + TypeScript, Cloudflare Worker, D1, Better Auth with Google
+- **Stack:** static native-product landing, TypeScript Cloudflare Worker, D1,
+  Better Auth with Google and Apple
 - **Package manager:** pnpm
 - **Local dev:** `pnpm dev`
 - **Checks:** `pnpm quality` (alias: `pnpm check`); `pnpm quality:native` on macOS
@@ -17,7 +18,8 @@ migrations, or credential changes.
 
 ## Product rules
 
-- The public front door is `/`. The journal lives at `/app/`.
+- The public front door is `/`. The journal is native-only; retired `/app`
+  routes permanently redirect to the landing.
 - Keep food-entry flows mobile-first and fast enough to use immediately after eating.
 - Store nutrient values as calories, carbs, protein, and fibre.
 - Timing suggestions are informational estimates, not medical advice.

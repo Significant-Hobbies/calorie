@@ -17,7 +17,9 @@ app.use('*', async (c, next) => {
   await next();
 });
 
-app.get('/app', (c) => c.redirect('/app/', 302));
+for (const retiredPath of ['/app', '/app/', '/app/*']) {
+  app.get(retiredPath, (c) => c.redirect('/', 308));
+}
 
 app.use('*', async (c, next) => {
   await next();

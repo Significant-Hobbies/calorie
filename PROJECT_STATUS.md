@@ -4,10 +4,10 @@ Last updated: 2026-08-21
 
 ## Why / What
 
-Calorie is a private, mobile-first food, water, and weight journal that turns
+Calorie is a private, native food, water, and weight journal that turns
 lightweight macro tracking into practical daily timing guidance. It works
-account-free with local browser or iOS-device storage; optional Google or native
-Apple sign-in can add private Cloudflare D1 sync.
+account-free with local iPhone or iPad storage; optional native Apple sign-in
+can add private Cloudflare D1 sync.
 
 In scope: timestamped food entries, reusable foods measured per 100 g or per
 unit, calories/carbs/protein/fibre, water, medication routines and daily
@@ -22,9 +22,8 @@ full sets/reps workout-programming system.
 
 ### External
 
-- React and Vite
-- Optional Google OAuth and native Apple ID-token verification through Better
-  Auth
+- Better Auth for native Apple identity and retained authenticated service
+  access
 - SwiftUI, AuthenticationServices, and Keychain for the native iOS client
 - Cloudflare Workers, static assets, and D1 for optional cloud sync
 
@@ -34,11 +33,16 @@ full sets/reps workout-programming system.
 
 ## Timeline
 
+- 2026-08-21 — retired the browser journal and its React/Vite/PWA code, leaving
+  the native iPhone/iPad product, static landing and legal pages, authenticated
+  semantic APIs, D1 data, and Cloudflare synchronization intact; old `/app`
+  bookmarks now redirect permanently to the product page
 - 2026-08-21 — expanded the native Apple identity verifier to accept the Kith
   bundle alongside Calorie and deployed the exact merged SHA at 100% Worker
   traffic; exact native callback allowlisting remains enforced
-- 2026-08-17 — public `/` is the shared landing snapshot; the journal
-  builds to `/app/`. Not deployed yet.
+- 2026-08-17 — public `/` became the shared landing snapshot and the browser
+  journal moved to `/app/`; this arrangement was superseded by the native-only
+  release on 21 August.
 - 2026-08-16 — Apple confirmed native build `1.0.0 (3)` is available to
   internal TestFlight testers under personal Apple team `8F7LXHTJZR` and app
   ID `6801238805`; this is not a public App Store release
@@ -109,12 +113,13 @@ full sets/reps workout-programming system.
 
 - Universal native SwiftUI iPhone and iPad beta under `ios/`; build `1.0.0 (3)`
   is available to internal TestFlight testers on the personal Apple team
-- Installable local-first web app
+- Static native-product landing and legal/support pages
 - Production Worker — `https://calorie.significanthobbies.com`
 
 ## Features (shipped)
 
-- Public `/` landing snapshot from ios-landings; journal at `/app/`
+- Public `/` native-product landing snapshot from ios-landings; retired `/app`
+  routes redirect permanently to `/`
 - CI-enforced mixed web/native Fleet code-health ratchets across whole-source
   coverage, dead code, complexity, duplication, cycles, dependency advisories,
   suppression markers, builds, and repository hygiene
@@ -127,10 +132,7 @@ full sets/reps workout-programming system.
   iPhone/cloud reconciliation, and durable offline sync intents
 - Shared native Apple audience verification for Calorie and Kith with exact
   callback allowlisting
-- Shared Ultracite lint baseline with a clean 87-file check
-- Three-step answer-aware onboarding with reload-safe drafts and visible goal math
-- Fully account-free local journal with versioned browser storage
-- Working optional Google sign-in with a dedicated production OAuth client and per-user D1 sync
+- Shared Ultracite lint baseline for the retained TypeScript service
 - Public privacy and terms pages for cloud-account users
 - Reusable foods per unit or per 100 g
 - Complete active saved-food selection without a fixed item-count cap
@@ -163,9 +165,7 @@ full sets/reps workout-programming system.
 - Food-first Today hierarchy with reusable quick picks before lower-frequency
   daily prompts and a keyboard-contained entry sheet
 - Last-used quick picks on Today replacing the favourite pin
-- Installable PWA shell, recent cloud-state cache, and queued offline writes
-- System, Light, and composed botanical Dark appearance modes
-- Responsive mobile, tablet, and desktop UI with accessible touch targets
+- Native system appearance and accessibility support
 
 ## Work queue
 

@@ -4,11 +4,9 @@ Calorie is a cute, mobile-first food, water, medication-routine, and weight
 journal. It tracks calories, carbs, protein, and fibre, then gives deterministic
 sleep, exercise-timing, fasting-window, and goal guidance without using AI.
 
-The app is local-first: **Start on this device** works without an account and
-keeps the journal in versioned browser or iPhone storage. Google sign-in is
-optional on the web. The native client can connect that same Google-backed
-journal directly for private Cloudflare D1 sync and optionally link Sign in
-with Apple as another way to reopen it.
+The native app is local-first: it works without an account and keeps the
+journal on the iPhone or iPad. Optional Sign in with Apple adds private
+Cloudflare D1 synchronization.
 
 Production target: `https://calorie.significanthobbies.com`
 
@@ -21,9 +19,9 @@ pnpm install
 pnpm dev
 ```
 
-Open the printed Vite URL at `/app/`, choose **Start on this device**, and complete the
-three-step onboarding flow. No credentials or local database are required for
-the account-free experience.
+`pnpm dev` builds and serves the static native-product landing together with
+the authenticated Worker APIs. The SwiftUI app lives under `ios/` and remains
+usable without the Worker.
 
 Useful checks:
 
@@ -57,10 +55,8 @@ deployment step. `0002_personalized_daily_care.sql` adds private medication
 routines/check-offs and manual calorie-range columns. The repository
 intentionally contains no credentials.
 
-Production uses a dedicated Google web client with
-`https://calorie.significanthobbies.com` as its JavaScript origin and
-The public site is the shared landing at `/`. The journal is `/app/`.
-Google callback stays at
+The public site is the shared native-product landing at `/`; there is no web
+journal. The retained Google callback stays at
 `https://calorie.significanthobbies.com/api/auth/callback/google` as its
 callback. Only the standard OpenID Connect identity scopes are requested.
 Native Apple ID tokens are verified for `com.significanthobbies.calorie`.
@@ -81,9 +77,9 @@ is not medical advice.
 
 ## Current source scope
 
-Calorie v1 includes onboarding, reusable foods, one-tap and custom food logging,
-water beyond the target, private daily medication check-offs, weight, 7/30-day
-history, light/dark themes, offline support, and an installable PWA. Production
+Calorie v1 includes native onboarding, reusable foods, one-tap and custom food
+logging, water beyond the target, private daily medication check-offs, weight,
+7/30-day history, appearance support, and offline operation. Production
 includes the numbered D1 migrations for medication and profile-range data. Workout
 programming, sets/reps, progressive overload, and wearable sync are separate
 product ideas rather than unfinished Calorie features.

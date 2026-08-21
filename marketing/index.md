@@ -4,7 +4,7 @@
 
 A private, local-first food, water, and weight journal with transparent timing guidance. Optional Google or Apple sign-in can add private Cloudflare sync.
 
-Status: Live on the web. iPhone app in preparation..
+Status: Internal TestFlight beta. Not publicly distributed..
 
 ## Product areas
 
@@ -28,4 +28,4 @@ Status: Live on the web. iPhone app in preparation..
 - accessibility: https://calorie.significanthobbies.com/accessibility/
 - testflight: https://calorie.significanthobbies.com/testflight/
 
-Last updated: 2026-08-17
+Last updated: 2026-08-21

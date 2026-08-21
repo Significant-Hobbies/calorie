@@ -6,16 +6,15 @@ product
 
 ## Platform
 
-web
+iPhone and iPad
 
 ## Users
 
 The primary user is someone logging food with one hand, often immediately
 after eating, and checking progress in short bursts throughout the day. The
-first user is the owner. The default journal stays on the device with no
-account; a Google-authenticated D1 journal is an optional cloud-backed mode,
-and the native client can explicitly link Sign in with Apple to that same
-journal without relying on email matching.
+first user is the owner. The default journal stays on the Apple device with no
+account; optional Sign in with Apple adds a private D1-backed sync copy without
+making the network part of the launch path.
 
 ## Product Purpose
 
@@ -57,7 +56,6 @@ glassmorphism. The interface must not imply medical certainty.
 
 ## Accessibility & Inclusion
 
-The mobile web app targets WCAG 2.2 AA, supports 200% zoom, 44px touch targets,
-visible keyboard focus, reduced motion, and status cues that do not rely on
-color alone. Gender identity is optional. The energy estimate separately asks
+The native app supports Dynamic Type, VoiceOver, comfortable touch targets,
+reduced motion, and status cues that do not rely on color alone. Gender identity is optional. The energy estimate separately asks
 which published equation profile to use and offers a no-estimate path.
