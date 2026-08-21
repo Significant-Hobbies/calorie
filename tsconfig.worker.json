@@ -18,6 +18,11 @@
     "src/worker/**/*.ts",
     "src/server/**/*.ts",
     "src/lib/types.ts",
-    "src/lib/recommendations.ts"
+    "src/lib/recommendations.ts",
+    "src/lib/daily-action-preferences.ts",
+    "src/lib/entries.ts",
+    "src/lib/food-context.ts",
+    "src/lib/goal-cycles.ts",
+    "src/lib/journal-export.ts"
   ]
 }

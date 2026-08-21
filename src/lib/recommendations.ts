@@ -16,7 +16,7 @@ const ACTIVITY_FACTORS: Record<ActivityLevel, number> = {
   very: 1.725,
 };
 
-export const GOAL_DETAILS: Record<
+const GOAL_DETAILS: Record<
   Goal,
   { label: string; shortLabel: string; maintenanceFactors: [number, number]; explanation: string }
 > = {
@@ -45,17 +45,6 @@ export const GOAL_DETAILS: Record<
     explanation: '105–110% of estimated maintenance',
   },
 };
-
-export const METHODOLOGY_LINKS = {
-  energy: 'https://pubmed.ncbi.nlm.nih.gov/2305711/',
-  'loss targets':
-    'https://www.niddk.nih.gov/health-information/diabetes/overview/preventing-type-2-diabetes/game-plan',
-  protein: 'https://pubmed.ncbi.nlm.nih.gov/28642676/',
-  fibre:
-    'https://nap.nationalacademies.org/catalog/10490/dietary-reference-intakes-for-energy-carbohydrate-fiber-fat-fatty-acids-cholesterol-protein-and-amino-acids',
-  exercise: 'https://pmc.ncbi.nlm.nih.gov/articles/PMC6566225/',
-  sleep: 'https://medlineplus.gov/ency/patientinstructions/000853.htm',
-} as const;
 
 export function round(value: number, precision = 0): number {
   const multiplier = 10 ** precision;
@@ -307,13 +296,6 @@ export function calculateGymGuidance(entries: FoodEntry[], now = Date.now()): Gy
 function timeToMinutes(time: string): number {
   const [hours, minutes] = time.split(':').map(Number);
   return hours * 60 + minutes;
-}
-
-export function minutesToTime(minutes: number): string {
-  const normalized = ((minutes % 1440) + 1440) % 1440;
-  const hours = Math.floor(normalized / 60);
-  const mins = normalized % 60;
-  return `${String(hours).padStart(2, '0')}:${String(mins).padStart(2, '0')}`;
 }
 
 export function calculateSleepGuidance(input: {

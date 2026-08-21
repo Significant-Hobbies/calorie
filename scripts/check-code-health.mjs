@@ -9,27 +9,21 @@ import { fileURLToPath } from 'node:url';
 
 const currentFile = fileURLToPath(import.meta.url);
 const projectRoot = resolve(dirname(currentFile), '..');
-const productionPaths = [
-  'src',
-  'ios/Sources',
-  'public/sw.js',
-  'vite.config.ts',
-  'vitest.config.ts',
-];
+const productionPaths = ['src', 'ios/Sources', 'vitest.config.ts'];
 const sourceExtensions = new Set(['.js', '.jsx', '.mjs', '.mts', '.swift', '.ts', '.tsx']);
 const baselines = {
-  complexity: { violations: 30, maxCcn: 98, maxLength: 616, maxParams: 19 },
-  duplication: { clones: 18, duplicatedLines: 217 },
+  complexity: { violations: 10, maxCcn: 60, maxLength: 231, maxParams: 14 },
+  duplication: { clones: 3, duplicatedLines: 36 },
   unused: {
     files: 0,
-    exports: 5,
-    types: 1,
+    exports: 0,
+    types: 0,
     dependencies: 0,
     devDependencies: 0,
     unlisted: 0,
     unresolved: 0,
   },
-  suppressions: 1,
+  suppressions: 0,
 };
 
 function run(command, args, options = {}) {
@@ -157,7 +151,7 @@ function checkDuplication() {
     .statistics.total;
   console.log(
     `Duplication: ${observed.clones} groups, ${observed.duplicatedLines}/${observed.lines} lines ` +
-      `(${observed.percentage.toFixed(4)}%) across ${observed.sources} web/native files.`
+      `(${observed.percentage.toFixed(4)}%) across ${observed.sources} server/native files.`
   );
   failRegressions('Duplication', observed, baselines.duplication);
 }
@@ -207,7 +201,7 @@ function sourceFiles(root) {
 }
 
 function checkSuppressions() {
-  const files = ['src', 'ios/Sources', 'ios/Tests', 'public'].flatMap((root) =>
+  const files = ['src', 'ios/Sources', 'ios/Tests'].flatMap((root) =>
     sourceFiles(resolve(projectRoot, root))
   );
   const matches = files
@@ -217,7 +211,7 @@ function checkSuppressions() {
         .split('\n')
         .filter((line) => suppressionPattern.test(line))
     );
-  console.log(`Suppressions: ${matches.length} justified web/native source or test markers.`);
+  console.log(`Suppressions: ${matches.length} justified server/native source or test markers.`);
   if (matches.length > baselines.suppressions) {
     throw new Error(`Suppressions regressed: ${matches.length} > ${baselines.suppressions}.`);
   }

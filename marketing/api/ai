@@ -50,10 +50,10 @@
     "name": "Calorie",
     "tagline": "A little log for feeling good.",
     "summary": "A private, local-first food, water, and weight journal with transparent timing guidance. Optional Google or Apple sign-in can add private Cloudflare sync.",
-    "status": "Live on the web. iPhone app in preparation.",
+    "status": "Internal TestFlight beta. Not publicly distributed.",
     "platforms": [
-      "Web",
-      "iPhone"
+      "iPhone",
+      "iPad"
     ],
     "capabilities": [
       "Today: food, water, medicine, and timing for this date",

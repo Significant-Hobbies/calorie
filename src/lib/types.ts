@@ -1,14 +1,13 @@
-export type Units = 'metric' | 'imperial';
+type Units = 'metric' | 'imperial';
 export type EquationProfile = 'female' | 'male' | 'none';
 export type ActivityLevel = 'sedentary' | 'light' | 'moderate' | 'very';
 export type Goal = 'lose_gentle' | 'lose_steady' | 'maintain' | 'gain_gentle';
 export type ServingMode = 'per_100g' | 'per_unit';
 export type MedicationSchedule = 'morning' | 'evening' | 'either';
-export type ThemePreference = 'system' | 'light' | 'dark';
 export type DailyActionKey = 'weight' | 'creatine' | 'food' | 'water';
 export type GoalCycle = 'cut' | 'gain' | 'recomposition';
 
-export type Nutrients = {
+type Nutrients = {
   calories: number;
   carbsG: number;
   proteinG: number;
@@ -61,10 +60,6 @@ export type FoodEntry = Nutrients & {
   labels?: string[];
 };
 
-export type FoodEntryWrite = FoodEntry & {
-  optimistic: FoodEntry;
-};
-
 export type WaterEntry = {
   id: string;
   amountMl: number;
@@ -86,7 +81,7 @@ export type MedicationCheckIn = {
   takenAt: number;
 };
 
-export type MedicationHistoryEvent = {
+type MedicationHistoryEvent = {
   id: string;
   medicationId: string;
   medicationName: string;
@@ -175,19 +170,6 @@ export type GoalCycleSession = {
   updatedAt: number;
 };
 
-export type CyclePeriodData = {
-  session: GoalCycleSession;
-  days: HistoryDay[];
-  weights: WeightEntry[];
-};
-
-export type CycleHistoryResponse = {
-  active: CyclePeriodData;
-  previous: CyclePeriodData | null;
-  today: string;
-  timezone: string;
-};
-
 export type JournalExport = {
   schema: 'calorie-journal-backup';
   version: 2;
@@ -200,40 +182,4 @@ export type JournalExport = {
   medicationCheckIns: MedicationCheckIn[];
   weights: WeightEntry[];
   cycleSessions: GoalCycleSession[];
-};
-
-export type MealTimingBandKey = 'before_noon' | 'midday' | 'after_five';
-
-export type MealTimingBand = {
-  key: MealTimingBandKey;
-  calories: number;
-  proteinG: number;
-  calorieShare: number;
-  proteinShare: number;
-};
-
-export type MealTimingAnalysis = {
-  loggedDays: number;
-  entryCount: number;
-  typicalFirstMinutes: number | null;
-  typicalLastMinutes: number | null;
-  averageEatingWindowMinutes: number | null;
-  eatingWindowDays: number;
-  sleepRoutineMinutes: number;
-  nearSleepDays: number;
-  bands: MealTimingBand[];
-  leadingProteinBand: MealTimingBandKey | null;
-  mostLoggedFood: {
-    name: string;
-    entryCount: number;
-    typicalMinutes: number;
-  } | null;
-};
-
-export type PendingWrite = {
-  id: string;
-  path: string;
-  method: 'POST' | 'PATCH' | 'DELETE';
-  body?: unknown;
-  createdAt: number;
 };
