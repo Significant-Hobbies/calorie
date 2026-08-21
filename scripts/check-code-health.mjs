@@ -12,7 +12,7 @@ const projectRoot = resolve(dirname(currentFile), '..');
 const productionPaths = ['src', 'ios/Sources', 'vitest.config.ts'];
 const sourceExtensions = new Set(['.js', '.jsx', '.mjs', '.mts', '.swift', '.ts', '.tsx']);
 const baselines = {
-  complexity: { violations: 10, maxCcn: 60, maxLength: 231, maxParams: 14 },
+  complexity: { violations: 4, maxCcn: 14, maxLength: 92, maxParams: 14 },
   duplication: { clones: 3, duplicatedLines: 36 },
   unused: {
     files: 0,

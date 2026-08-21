@@ -29,11 +29,7 @@ import {
 import { conditionalJson, dateKey, jsonError, parseRange } from './http';
 import type { App, AppContext } from './types';
 
-async function readDashboard(c: AppContext) {
-  const range = parseRange(c);
-  if (!range || range.end - range.start > 48 * 60 * 60 * 1000) {
-    return c.json(jsonError('Choose a valid local-day range.'), 400);
-  }
+async function fetchDashboardData(c: AppContext, range: { start: number; end: number }) {
   const userId = c.get('userId');
   const [
     profile,
@@ -89,6 +85,33 @@ async function readDashboard(c: AppContext) {
       .bind(userId, range.start - 31 * 24 * 60 * 60 * 1000)
       .all<FoodEntryRow>(),
   ]);
+  return {
+    profile,
+    foodsResult,
+    entriesResult,
+    waterResult,
+    medicationResult,
+    medicationCheckInResult,
+    latestWeightRow,
+    fastingRows,
+  };
+}
+
+async function readDashboard(c: AppContext) {
+  const range = parseRange(c);
+  if (!range || range.end - range.start > 48 * 60 * 60 * 1000) {
+    return c.json(jsonError('Choose a valid local-day range.'), 400);
+  }
+  const {
+    profile,
+    foodsResult,
+    entriesResult,
+    waterResult,
+    medicationResult,
+    medicationCheckInResult,
+    latestWeightRow,
+    fastingRows,
+  } = await fetchDashboardData(c, range);
 
   const foods: Food[] = foodsResult.results.map(mapFood);
   const entries: FoodEntry[] = entriesResult.results.map(mapFoodEntry);
@@ -148,6 +171,67 @@ async function readDashboard(c: AppContext) {
   return conditionalJson(c, dashboard);
 }
 
+function buildHistoryDays(
+  entries: FoodEntry[],
+  water: WaterEntry[],
+  range: { start: number; end: number },
+  rangeDays: number | undefined,
+  timezone: string,
+  fastingEntries: FoodEntry[],
+  fastingThreshold: number
+): HistoryDay[] {
+  const dayMap = new Map<string, HistoryDay>();
+  const ensureDay = (key: string) => {
+    const existing = dayMap.get(key);
+    if (existing) return existing;
+    const created: HistoryDay = {
+      date: key,
+      calories: 0,
+      carbsG: 0,
+      proteinG: 0,
+      fibreG: 0,
+      waterMl: 0,
+      fastCount: 0,
+    };
+    dayMap.set(key, created);
+    return created;
+  };
+
+  if (rangeDays) {
+    for (let index = 0; index < rangeDays; index += 1) {
+      ensureDay(dateKey(range.start + index * 24 * 60 * 60 * 1000, timezone));
+    }
+  }
+  for (const entry of entries) {
+    const day = ensureDay(dateKey(entry.eatenAt, timezone));
+    day.calories += entry.calories;
+    day.carbsG += entry.carbsG;
+    day.proteinG += entry.proteinG;
+    day.fibreG += entry.fibreG;
+  }
+  for (const entry of water) {
+    ensureDay(dateKey(entry.drankAt, timezone)).waterMl += entry.amountMl;
+  }
+  for (const fast of calculateCompletedFasts(fastingEntries, timezone)) {
+    if (
+      fast.endAt >= range.start &&
+      fast.endAt < range.end &&
+      fast.durationHours >= fastingThreshold
+    ) {
+      ensureDay(dateKey(fast.endAt, timezone)).fastCount += 1;
+    }
+  }
+  return [...dayMap.values()]
+    .sort((a, b) => a.date.localeCompare(b.date))
+    .map((day) => ({
+      ...day,
+      calories: round(day.calories),
+      carbsG: round(day.carbsG, 1),
+      proteinG: round(day.proteinG, 1),
+      fibreG: round(day.fibreG, 1),
+    }));
+}
+
 async function readHistory(c: AppContext) {
   const range = parseRange(c);
   const requestedDays = Number(c.req.query('days'));
@@ -195,58 +279,16 @@ async function readHistory(c: AppContext) {
     ]);
   const entries = entriesResult.results.map(mapFoodEntry);
   const water = waterResult.results.map(mapWater);
-  const dayMap = new Map<string, HistoryDay>();
-  const ensureDay = (key: string) => {
-    const existing = dayMap.get(key);
-    if (existing) return existing;
-    const created: HistoryDay = {
-      date: key,
-      calories: 0,
-      carbsG: 0,
-      proteinG: 0,
-      fibreG: 0,
-      waterMl: 0,
-      fastCount: 0,
-    };
-    dayMap.set(key, created);
-    return created;
-  };
-
-  if (rangeDays) {
-    for (let index = 0; index < rangeDays; index += 1) {
-      ensureDay(dateKey(range.start + index * 24 * 60 * 60 * 1000, timezone));
-    }
-  }
-  for (const entry of entries) {
-    const day = ensureDay(dateKey(entry.eatenAt, timezone));
-    day.calories += entry.calories;
-    day.carbsG += entry.carbsG;
-    day.proteinG += entry.proteinG;
-    day.fibreG += entry.fibreG;
-  }
-  for (const entry of water) {
-    ensureDay(dateKey(entry.drankAt, timezone)).waterMl += entry.amountMl;
-  }
   const fastingEntries = priorEntry ? [mapFoodEntry(priorEntry), ...entries] : entries;
-  const fastingThreshold = profile.fastingThresholdHours;
-  for (const fast of calculateCompletedFasts(fastingEntries, timezone)) {
-    if (
-      fast.endAt >= range.start &&
-      fast.endAt < range.end &&
-      fast.durationHours >= fastingThreshold
-    ) {
-      ensureDay(dateKey(fast.endAt, timezone)).fastCount += 1;
-    }
-  }
-  const days = [...dayMap.values()]
-    .sort((a, b) => a.date.localeCompare(b.date))
-    .map((day) => ({
-      ...day,
-      calories: round(day.calories),
-      carbsG: round(day.carbsG, 1),
-      proteinG: round(day.proteinG, 1),
-      fibreG: round(day.fibreG, 1),
-    }));
+  const days = buildHistoryDays(
+    entries,
+    water,
+    range,
+    rangeDays,
+    timezone,
+    fastingEntries,
+    profile.fastingThresholdHours
+  );
 
   const response: HistoryResponse = {
     days,

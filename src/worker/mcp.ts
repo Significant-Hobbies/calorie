@@ -127,6 +127,52 @@ export async function readMcpTargets(db: D1Database, userId: string) {
   };
 }
 
+type McpHistoryDay = {
+  date: string;
+  calories: number;
+  carbsG: number;
+  proteinG: number;
+  fibreG: number;
+  waterMl: number;
+  recorded: boolean;
+};
+
+function aggregateMcpHistoryDays(
+  pageStartDate: string,
+  pageDays: number,
+  entries: Array<ReturnType<typeof mapFoodEntry>>,
+  waterEntries: Array<ReturnType<typeof mapWater>>,
+  timezone: string
+): McpHistoryDay[] {
+  const days: McpHistoryDay[] = Array.from({ length: pageDays }, (_, index) => ({
+    date: addUtcDays(pageStartDate, index),
+    calories: 0,
+    carbsG: 0,
+    proteinG: 0,
+    fibreG: 0,
+    waterMl: 0,
+    recorded: false,
+  }));
+  const byDate = new Map(days.map((day) => [day.date, day]));
+  for (const entry of entries) {
+    const day = byDate.get(dateKey(entry.eatenAt, timezone));
+    if (!day) continue;
+    day.recorded = true;
+    day.calories += entry.calories;
+    day.carbsG += entry.carbsG;
+    day.proteinG += entry.proteinG;
+    day.fibreG += entry.fibreG;
+  }
+  for (const entry of waterEntries) {
+    const day = byDate.get(dateKey(entry.drankAt, timezone));
+    if (day) {
+      day.recorded = true;
+      day.waterMl += entry.amountMl;
+    }
+  }
+  return days;
+}
+
 export function registerMcpRoutes(app: App) {
   app.get('/api/mcp/daily', async (c) => {
     const date = validDateKey(c.req.query('date'));
@@ -243,32 +289,7 @@ export function registerMcpRoutes(app: App) {
     ]);
     const entries = entriesResult.results.slice(0, 1000).map(mapFoodEntry);
     const waterEntries = waterResult.results.slice(0, 1000).map(mapWater);
-    const days = Array.from({ length: pageDays }, (_, index) => ({
-      date: addUtcDays(pageStartDate, index),
-      calories: 0,
-      carbsG: 0,
-      proteinG: 0,
-      fibreG: 0,
-      waterMl: 0,
-      recorded: false,
-    }));
-    const byDate = new Map(days.map((day) => [day.date, day]));
-    for (const entry of entries) {
-      const day = byDate.get(dateKey(entry.eatenAt, timezone));
-      if (!day) continue;
-      day.recorded = true;
-      day.calories += entry.calories;
-      day.carbsG += entry.carbsG;
-      day.proteinG += entry.proteinG;
-      day.fibreG += entry.fibreG;
-    }
-    for (const entry of waterEntries) {
-      const day = byDate.get(dateKey(entry.drankAt, timezone));
-      if (day) {
-        day.recorded = true;
-        day.waterMl += entry.amountMl;
-      }
-    }
+    const days = aggregateMcpHistoryDays(pageStartDate, pageDays, entries, waterEntries, timezone);
     return c.json({
       schemaVersion: '1',
       items: days.map((day) => ({

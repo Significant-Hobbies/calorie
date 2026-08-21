@@ -5,7 +5,14 @@ import {
 import { cycleFromGoal } from '../lib/goal-cycles';
 import { createJournalExport } from '../lib/journal-export';
 import { calculateNutritionTarget } from '../lib/recommendations';
-import type { ActivityLevel, EquationProfile, Goal, UserProfile } from '../lib/types';
+import type {
+  ActivityLevel,
+  DailyActionKey,
+  EquationProfile,
+  Goal,
+  NutritionTarget,
+  UserProfile,
+} from '../lib/types';
 import { createReadToken, hashReadToken } from '../server/read-tokens';
 import {
   cycleInsertStatement,
@@ -112,14 +119,32 @@ async function getBootstrap(c: AppContext) {
   });
 }
 
-async function putProfile(c: AppContext) {
-  const body = await c.req.json<Record<string, unknown>>().catch(() => null);
-  if (!body) return c.json(jsonError('Profile details are required.'), 400);
+type ParsedProfileFields = {
+  displayName: string;
+  units: 'imperial' | 'metric';
+  ageYears: number;
+  heightCm: number;
+  equationProfile: EquationProfile;
+  activityLevel: ActivityLevel;
+  goal: Goal;
+  targetWeightKg: number | null;
+  initialWeightKg: number | null;
+  initialWeightId: string | null;
+  manualTarget: number | null;
+  manualRange: readonly [number, number] | null;
+  sleepHours: number;
+  waterTargetMl: number;
+  fastingThreshold: number;
+  wakeTime: string;
+  dailyActionOrder: DailyActionKey[];
+  dailyActionHidden: DailyActionKey[];
+  cycleDate: string;
+  genderIdentity: string | null;
+  onboardingComplete: 0 | 1;
+};
 
-  const displayName = requiredText(body.displayName, 60);
+function validateProfileSettings(body: Record<string, unknown>) {
   const units = body.units === 'imperial' ? 'imperial' : body.units === 'metric' ? 'metric' : null;
-  const ageYears = finiteNumber(body.ageYears, 18, 120);
-  const heightCm = finiteNumber(body.heightCm, 100, 250);
   const equationProfile = ['female', 'male', 'none'].includes(String(body.equationProfile))
     ? (body.equationProfile as EquationProfile)
     : null;
@@ -131,10 +156,25 @@ async function putProfile(c: AppContext) {
   const goal = ['lose_gentle', 'lose_steady', 'maintain', 'gain_gentle'].includes(String(body.goal))
     ? (body.goal as Goal)
     : null;
+  const fastingThreshold = [12, 14, 16].includes(Number(body.fastingThresholdHours))
+    ? Number(body.fastingThresholdHours)
+    : null;
+  return { units, equationProfile, activityLevel, goal, fastingThreshold };
+}
+
+function validateProfileMeasurements(body: Record<string, unknown>) {
+  const ageYears = finiteNumber(body.ageYears, 18, 120);
+  const heightCm = finiteNumber(body.heightCm, 100, 250);
   const targetWeightKg =
     body.targetWeightKg === null ? null : finiteNumber(body.targetWeightKg, 30, 400);
   const initialWeightKg =
     body.initialWeightKg === undefined ? null : finiteNumber(body.initialWeightKg, 30, 400);
+  const sleepHours = finiteNumber(body.sleepHours, 5, 12);
+  const waterTargetMl = finiteNumber(body.waterTargetMl, 250, 10000);
+  return { ageYears, heightCm, targetWeightKg, initialWeightKg, sleepHours, waterTargetMl };
+}
+
+function validateManualCalorieRange(body: Record<string, unknown>) {
   const manualTarget =
     body.manualCalorieTarget === null || body.manualCalorieTarget === undefined
       ? null
@@ -145,11 +185,14 @@ async function putProfile(c: AppContext) {
   const hasInvalidManualRange =
     manualRangeInput !== null &&
     (manualRangeMin === null || manualRangeMax === null || manualRangeMin > manualRangeMax);
-  const sleepHours = finiteNumber(body.sleepHours, 5, 12);
-  const waterTargetMl = finiteNumber(body.waterTargetMl, 250, 10000);
-  const fastingThreshold = [12, 14, 16].includes(Number(body.fastingThresholdHours))
-    ? Number(body.fastingThresholdHours)
-    : null;
+  const manualRange =
+    manualRangeMin !== null && manualRangeMax !== null
+      ? ([Math.round(manualRangeMin), Math.round(manualRangeMax)] as const)
+      : null;
+  return { manualTarget, manualRange, hasInvalidManualRange };
+}
+
+function validateProfileLifestyle(body: Record<string, unknown>) {
   const wakeTime =
     typeof body.wakeTime === 'string' && /^([01]\d|2[0-3]):[0-5]\d$/.test(body.wakeTime)
       ? body.wakeTime
@@ -161,35 +204,80 @@ async function putProfile(c: AppContext) {
     Array.isArray(body.dailyActionHidden) ? body.dailyActionHidden : []
   );
   const cycleDate = validDateKey(body.cycleDate) ?? dateKey(Date.now(), 'UTC');
+  const genderIdentity = optionalText(body.genderIdentity, 40);
+  const onboardingComplete = body.onboardingComplete === false ? 0 : 1;
+  const initialWeightId = optionalText(body.initialWeightId, 80);
+  return {
+    wakeTime,
+    dailyActionOrder,
+    dailyActionHidden,
+    cycleDate,
+    genderIdentity,
+    onboardingComplete,
+    initialWeightId,
+  };
+}
+
+function parseProfileFields(body: Record<string, unknown>): ParsedProfileFields | null {
+  const displayName = requiredText(body.displayName, 60);
+  const settings = validateProfileSettings(body);
+  const measurements = validateProfileMeasurements(body);
+  const calorie = validateManualCalorieRange(body);
+  const lifestyle = validateProfileLifestyle(body);
 
   if (
     !displayName ||
-    !units ||
-    ageYears === null ||
-    heightCm === null ||
-    !equationProfile ||
-    !activityLevel ||
-    !goal ||
-    sleepHours === null ||
-    waterTargetMl === null ||
-    hasInvalidManualRange ||
-    fastingThreshold === null ||
-    !wakeTime
+    !settings.units ||
+    measurements.ageYears === null ||
+    measurements.heightCm === null ||
+    !settings.equationProfile ||
+    !settings.activityLevel ||
+    !settings.goal ||
+    measurements.sleepHours === null ||
+    measurements.waterTargetMl === null ||
+    calorie.hasInvalidManualRange ||
+    settings.fastingThreshold === null ||
+    !lifestyle.wakeTime
   ) {
-    return c.json(jsonError('Check the highlighted profile details and try again.'), 400);
+    return null;
   }
 
-  const now = Date.now();
-  const userId = c.get('userId');
-  const genderIdentity = optionalText(body.genderIdentity, 40);
-  const onboardingComplete = body.onboardingComplete === false ? 0 : 1;
-  const manualRange =
-    manualRangeMin !== null && manualRangeMax !== null
-      ? ([Math.round(manualRangeMin), Math.round(manualRangeMax)] as const)
-      : null;
+  return {
+    displayName,
+    units: settings.units as 'imperial' | 'metric',
+    ageYears: measurements.ageYears,
+    heightCm: measurements.heightCm,
+    equationProfile: settings.equationProfile,
+    activityLevel: settings.activityLevel,
+    goal: settings.goal,
+    targetWeightKg: measurements.targetWeightKg,
+    initialWeightKg: measurements.initialWeightKg,
+    initialWeightId: lifestyle.initialWeightId,
+    manualTarget: calorie.manualTarget,
+    manualRange: calorie.manualRange,
+    sleepHours: measurements.sleepHours,
+    waterTargetMl: measurements.waterTargetMl,
+    fastingThreshold: settings.fastingThreshold,
+    wakeTime: lifestyle.wakeTime,
+    dailyActionOrder: lifestyle.dailyActionOrder as DailyActionKey[],
+    dailyActionHidden: lifestyle.dailyActionHidden as DailyActionKey[],
+    cycleDate: lifestyle.cycleDate,
+    genderIdentity: lifestyle.genderIdentity,
+    onboardingComplete: lifestyle.onboardingComplete as 0 | 1,
+  };
+}
 
-  const statements = [
-    c.env.DB.prepare(
+function buildProfileStatement(
+  db: D1Database,
+  userId: string,
+  f: ParsedProfileFields,
+  now: number
+): D1PreparedStatement {
+  const manualCalorieTarget = f.manualRange
+    ? Math.round((f.manualRange[0] + f.manualRange[1]) / 2)
+    : f.manualTarget;
+  return db
+    .prepare(
       `INSERT INTO profiles (
       user_id, display_name, units, age_years, gender_identity, equation_profile,
       height_cm, activity_level, goal, target_weight_kg, manual_calorie_target,
@@ -218,130 +306,162 @@ async function putProfile(c: AppContext) {
       daily_action_hidden = excluded.daily_action_hidden,
       onboarding_complete = excluded.onboarding_complete,
       updated_at = excluded.updated_at`
-    ).bind(
+    )
+    .bind(
       userId,
-      displayName,
-      units,
-      ageYears,
-      genderIdentity,
-      equationProfile,
-      heightCm,
-      activityLevel,
-      goal,
-      targetWeightKg,
-      manualRange ? Math.round((manualRange[0] + manualRange[1]) / 2) : manualTarget,
-      manualRange?.[0] ?? null,
-      manualRange?.[1] ?? null,
-      wakeTime,
-      sleepHours,
-      fastingThreshold,
-      Math.round(waterTargetMl),
-      dailyActionOrder.join(','),
-      dailyActionHidden.join(','),
-      onboardingComplete,
+      f.displayName,
+      f.units,
+      f.ageYears,
+      f.genderIdentity,
+      f.equationProfile,
+      f.heightCm,
+      f.activityLevel,
+      f.goal,
+      f.targetWeightKg,
+      manualCalorieTarget,
+      f.manualRange?.[0] ?? null,
+      f.manualRange?.[1] ?? null,
+      f.wakeTime,
+      f.sleepHours,
+      f.fastingThreshold,
+      Math.round(f.waterTargetMl),
+      f.dailyActionOrder.join(','),
+      f.dailyActionHidden.join(','),
+      f.onboardingComplete,
       now,
       now
-    ),
-  ];
+    );
+}
 
-  const initialWeightId = optionalText(body.initialWeightId, 80);
-  if (initialWeightKg !== null && initialWeightId) {
+function buildNextProfile(userId: string, f: ParsedProfileFields): UserProfile {
+  const manualCalorieTarget = f.manualRange
+    ? Math.round((f.manualRange[0] + f.manualRange[1]) / 2)
+    : f.manualTarget;
+  return {
+    userId,
+    displayName: f.displayName,
+    units: f.units,
+    ageYears: f.ageYears,
+    genderIdentity: f.genderIdentity,
+    equationProfile: f.equationProfile,
+    heightCm: f.heightCm,
+    activityLevel: f.activityLevel,
+    goal: f.goal,
+    targetWeightKg: f.targetWeightKg,
+    manualCalorieTarget,
+    manualCalorieRange: f.manualRange ? [f.manualRange[0], f.manualRange[1]] : null,
+    wakeTime: f.wakeTime,
+    sleepHours: f.sleepHours,
+    fastingThresholdHours: f.fastingThreshold as 12 | 14 | 16,
+    waterTargetMl: Math.round(f.waterTargetMl),
+    dailyActionOrder: f.dailyActionOrder,
+    dailyActionHidden: f.dailyActionHidden,
+    onboardingComplete: Boolean(f.onboardingComplete),
+  };
+}
+
+async function syncGoalCycle(
+  db: D1Database,
+  statements: D1PreparedStatement[],
+  userId: string,
+  f: ParsedProfileFields,
+  target: NutritionTarget,
+  now: number
+): Promise<void> {
+  const activeCycle = await db
+    .prepare('SELECT * FROM goal_cycles WHERE user_id = ? AND end_on IS NULL')
+    .bind(userId)
+    .first<GoalCycleRow>();
+  if (!activeCycle) {
+    statements.push(
+      cycleInsertStatement(db, {
+        id: crypto.randomUUID(),
+        userId,
+        goal: f.goal,
+        startOn: f.cycleDate,
+        calorieRange: target.calorieRange,
+        proteinRangeG: target.proteinRangeG,
+        now,
+      })
+    );
+  } else if (activeCycle.cycle === cycleFromGoal(f.goal)) {
+    statements.push(
+      db
+        .prepare(
+          `UPDATE goal_cycles SET goal = ?, calorie_range_low = ?, calorie_range_high = ?,
+          protein_range_low = ?, protein_range_high = ?, updated_at = ?
+         WHERE id = ? AND user_id = ? AND end_on IS NULL`
+        )
+        .bind(
+          f.goal,
+          target.calorieRange?.[0] ?? null,
+          target.calorieRange?.[1] ?? null,
+          target.proteinRangeG?.[0] ?? null,
+          target.proteinRangeG?.[1] ?? null,
+          now,
+          activeCycle.id,
+          userId
+        )
+    );
+  } else {
+    statements.push(
+      db
+        .prepare(
+          'UPDATE goal_cycles SET end_on = ?, updated_at = ? WHERE id = ? AND user_id = ? AND end_on IS NULL'
+        )
+        .bind(f.cycleDate, now, activeCycle.id, userId),
+      cycleInsertStatement(db, {
+        id: crypto.randomUUID(),
+        userId,
+        goal: f.goal,
+        startOn: f.cycleDate,
+        calorieRange: target.calorieRange,
+        proteinRangeG: target.proteinRangeG,
+        now,
+      })
+    );
+  }
+}
+
+async function putProfile(c: AppContext) {
+  const body = await c.req.json<Record<string, unknown>>().catch(() => null);
+  if (!body) return c.json(jsonError('Profile details are required.'), 400);
+
+  const fields = parseProfileFields(body);
+  if (!fields) {
+    return c.json(jsonError('Check the highlighted profile details and try again.'), 400);
+  }
+
+  const now = Date.now();
+  const userId = c.get('userId');
+  const statements = [buildProfileStatement(c.env.DB, userId, fields, now)];
+
+  if (fields.initialWeightKg !== null && fields.initialWeightId) {
     statements.push(
       c.env.DB.prepare(
         `INSERT OR IGNORE INTO weight_entries
         (id, user_id, weight_kg, recorded_at, created_at)
       VALUES (?, ?, ?, ?, ?)`
-      ).bind(initialWeightId, userId, initialWeightKg, now, now)
+      ).bind(fields.initialWeightId, userId, fields.initialWeightKg, now, now)
     );
   }
 
-  const nextProfile: UserProfile = {
-    userId,
-    displayName,
-    units,
-    ageYears,
-    genderIdentity,
-    equationProfile,
-    heightCm,
-    activityLevel,
-    goal,
-    targetWeightKg,
-    manualCalorieTarget: manualRange
-      ? Math.round((manualRange[0] + manualRange[1]) / 2)
-      : manualTarget,
-    manualCalorieRange: manualRange ? [manualRange[0], manualRange[1]] : null,
-    wakeTime,
-    sleepHours,
-    fastingThresholdHours: fastingThreshold as 12 | 14 | 16,
-    waterTargetMl: Math.round(waterTargetMl),
-    dailyActionOrder,
-    dailyActionHidden,
-    onboardingComplete: Boolean(onboardingComplete),
-  };
-  const target = initialWeightKg
+  const nextProfile = buildNextProfile(userId, fields);
+  const target = fields.initialWeightKg
     ? calculateNutritionTarget({
-        weightKg: initialWeightKg,
-        heightCm,
-        ageYears,
-        equationProfile,
-        activityLevel,
-        goal,
+        weightKg: fields.initialWeightKg,
+        heightCm: fields.heightCm,
+        ageYears: fields.ageYears,
+        equationProfile: fields.equationProfile,
+        activityLevel: fields.activityLevel,
+        goal: fields.goal,
         manualCalorieTarget: nextProfile.manualCalorieTarget,
         manualCalorieRange: nextProfile.manualCalorieRange,
       })
     : await currentTarget(c.env.DB, nextProfile, userId);
-  const activeCycle = await c.env.DB.prepare(
-    'SELECT * FROM goal_cycles WHERE user_id = ? AND end_on IS NULL'
-  )
-    .bind(userId)
-    .first<GoalCycleRow>();
-  if (!activeCycle) {
-    statements.push(
-      cycleInsertStatement(c.env.DB, {
-        id: crypto.randomUUID(),
-        userId,
-        goal,
-        startOn: cycleDate,
-        calorieRange: target.calorieRange,
-        proteinRangeG: target.proteinRangeG,
-        now,
-      })
-    );
-  } else if (activeCycle.cycle === cycleFromGoal(goal)) {
-    statements.push(
-      c.env.DB.prepare(
-        `UPDATE goal_cycles SET goal = ?, calorie_range_low = ?, calorie_range_high = ?,
-          protein_range_low = ?, protein_range_high = ?, updated_at = ?
-         WHERE id = ? AND user_id = ? AND end_on IS NULL`
-      ).bind(
-        goal,
-        target.calorieRange?.[0] ?? null,
-        target.calorieRange?.[1] ?? null,
-        target.proteinRangeG?.[0] ?? null,
-        target.proteinRangeG?.[1] ?? null,
-        now,
-        activeCycle.id,
-        userId
-      )
-    );
-  } else {
-    statements.push(
-      c.env.DB.prepare(
-        'UPDATE goal_cycles SET end_on = ?, updated_at = ? WHERE id = ? AND user_id = ? AND end_on IS NULL'
-      ).bind(cycleDate, now, activeCycle.id, userId),
-      cycleInsertStatement(c.env.DB, {
-        id: crypto.randomUUID(),
-        userId,
-        goal,
-        startOn: cycleDate,
-        calorieRange: target.calorieRange,
-        proteinRangeG: target.proteinRangeG,
-        now,
-      })
-    );
-  }
+  await syncGoalCycle(c.env.DB, statements, userId, fields, target, now);
   await c.env.DB.batch(statements);
-  return c.json(await readProfile(c.env.DB, userId, displayName));
+  return c.json(await readProfile(c.env.DB, userId, fields.displayName));
 }
 
 async function getCycles(c: AppContext) {

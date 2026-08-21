@@ -155,18 +155,15 @@ async function deleteFoodsId(c: AppContext) {
   return result.meta.changes ? c.body(null, 204) : c.json({ message: 'Food not found.' }, 404);
 }
 
-export async function createEntry(c: AppContext, body: Record<string, unknown> | null) {
-  const id = body ? optionalText(body.id, 80) : null;
-  const foodId = body ? optionalText(body.foodId, 80) : null;
-  const amount = body ? finiteNumber(body.amount, 0.01, 10000) : null;
-  const eatenAt = body ? validTimestamp(body.eatenAt) : null;
-  if (!body || !id || amount === null || eatenAt === null) {
-    return c.json(jsonError('Add a valid amount and time.'), 400);
-  }
-  let entry: FoodEntry;
-  let foodUpdate: D1PreparedStatement | null = null;
-  const now = Date.now();
-
+async function resolveEntry(
+  c: AppContext,
+  body: Record<string, unknown>,
+  id: string,
+  foodId: string | null,
+  amount: number,
+  eatenAt: number,
+  now: number
+): Promise<{ entry: FoodEntry; foodUpdate: D1PreparedStatement | null } | Response> {
   if (foodId) {
     const foodRow = await c.env.DB.prepare(
       'SELECT * FROM foods WHERE id = ? AND user_id = ? AND archived_at IS NULL'
@@ -175,27 +172,40 @@ export async function createEntry(c: AppContext, body: Record<string, unknown> |
       .first<FoodRow>();
     if (!foodRow) return c.json({ message: 'Food not found.' }, 404);
     const food = mapFood(foodRow);
-    entry = {
-      id,
-      foodId: food.id,
-      foodName: food.name,
-      amount,
-      unitLabel: food.servingMode === 'per_100g' ? 'g' : food.unitLabel,
-      ...scaleNutrients(food, food.servingMode, amount),
-      eatenAt,
-      isPackaged: food.isPackaged,
-      labels: food.labels,
+    return {
+      entry: {
+        id,
+        foodId: food.id,
+        foodName: food.name,
+        amount,
+        unitLabel: food.servingMode === 'per_100g' ? 'g' : food.unitLabel,
+        ...scaleNutrients(food, food.servingMode, amount),
+        eatenAt,
+        isPackaged: food.isPackaged,
+        labels: food.labels,
+      },
+      foodUpdate: c.env.DB.prepare(
+        'UPDATE foods SET last_used_at = ?, updated_at = ? WHERE id = ? AND user_id = ?'
+      ).bind(eatenAt, now, food.id, c.get('userId')),
     };
-    foodUpdate = c.env.DB.prepare(
-      'UPDATE foods SET last_used_at = ?, updated_at = ? WHERE id = ? AND user_id = ?'
-    ).bind(eatenAt, now, food.id, c.get('userId'));
-  } else {
-    const directEntry = directEntryFromBody(body, id, amount, eatenAt);
-    if (!directEntry) {
-      return c.json(jsonError('Add a name, unit, and valid nutrient totals.'), 400);
-    }
-    entry = directEntry;
   }
+  const directEntry = directEntryFromBody(body, id, amount, eatenAt);
+  if (!directEntry) return c.json(jsonError('Add a name, unit, and valid nutrient totals.'), 400);
+  return { entry: directEntry, foodUpdate: null };
+}
+
+export async function createEntry(c: AppContext, body: Record<string, unknown> | null) {
+  const id = body ? optionalText(body.id, 80) : null;
+  const foodId = body ? optionalText(body.foodId, 80) : null;
+  const amount = body ? finiteNumber(body.amount, 0.01, 10000) : null;
+  const eatenAt = body ? validTimestamp(body.eatenAt) : null;
+  if (!body || !id || amount === null || eatenAt === null) {
+    return c.json(jsonError('Add a valid amount and time.'), 400);
+  }
+  const now = Date.now();
+  const resolved = await resolveEntry(c, body, id, foodId, amount, eatenAt, now);
+  if (resolved instanceof Response) return resolved;
+  const { entry, foodUpdate } = resolved;
 
   const insert = c.env.DB.prepare(
     `INSERT OR IGNORE INTO food_entries (
@@ -393,29 +403,33 @@ async function postMedications(c: AppContext) {
   return c.json(mapMedication(row), 201);
 }
 
-async function patchMedicationsId(c: AppContext) {
-  const body = await c.req.json<Record<string, unknown>>().catch(() => null);
-  const name = body ? requiredText(body.name, 80) : null;
-  const schedule =
-    body && ['morning', 'evening', 'either'].includes(String(body.schedule))
-      ? (body.schedule as MedicationSchedule)
-      : null;
+function parseMedicationPatch(body: Record<string, unknown> | null) {
+  if (!body) return null;
+  const name = requiredText(body.name, 80);
+  const schedule = ['morning', 'evening', 'either'].includes(String(body.schedule))
+    ? (body.schedule as MedicationSchedule)
+    : null;
   const archivedAt =
-    body?.archivedAt === null
+    body.archivedAt === null
       ? null
-      : body?.archivedAt === undefined
+      : body.archivedAt === undefined
         ? undefined
         : validTimestamp(body.archivedAt);
   const hasInvalidArchivedAt =
-    body?.archivedAt !== null && body?.archivedAt !== undefined && archivedAt === null;
-  if (!body || !name || !schedule || archivedAt === undefined || hasInvalidArchivedAt) {
-    return c.json(jsonError('Add a medication name and when you take it.'), 400);
-  }
+    body.archivedAt !== null && body.archivedAt !== undefined && archivedAt === null;
+  if (!name || !schedule || archivedAt === undefined || hasInvalidArchivedAt) return null;
+  return { name, schedule, archivedAt };
+}
+
+async function patchMedicationsId(c: AppContext) {
+  const body = await c.req.json<Record<string, unknown>>().catch(() => null);
+  const parsed = parseMedicationPatch(body);
+  if (!parsed) return c.json(jsonError('Add a medication name and when you take it.'), 400);
   const result = await c.env.DB.prepare(
     `UPDATE medications SET name = ?, schedule = ?, archived_at = ?, updated_at = ?
    WHERE id = ? AND user_id = ?`
   )
-    .bind(name, schedule, archivedAt, Date.now(), paramId(c), c.get('userId'))
+    .bind(parsed.name, parsed.schedule, parsed.archivedAt, Date.now(), paramId(c), c.get('userId'))
     .run();
   if (!result.meta.changes) return c.json({ message: 'Medication not found.' }, 404);
   const row = await c.env.DB.prepare(
