@@ -89,6 +89,10 @@ async function findByPersonalUserId(db: D1Database, userId: string) {
     .first<CalorieUser>();
 }
 
+export async function findCalorieUserByPersonalId(db: D1Database, userId: string) {
+  return findByPersonalUserId(db, userId);
+}
+
 async function findByAppleSubject(db: D1Database, appleSubject: string) {
   return db
     .prepare(
