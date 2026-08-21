@@ -176,24 +176,29 @@ actor KeychainSessionStore {
 
 actor NativeAccountClient: NativeAccountServing {
     static let productionBaseURL = URL(string: "https://calorie.significanthobbies.com")!
+    static let productionIdentityURL = URL(string: "https://significanthobbies.com")!
 
     private let baseURL: URL
+    private let identityBaseURL: URL
     private let urlSession: URLSession
     private let sessionStore: KeychainSessionStore
 
     init(
         baseURL: URL = productionBaseURL,
+        identityBaseURL: URL? = nil,
         urlSession: URLSession = .shared,
         sessionStore: KeychainSessionStore = KeychainSessionStore()
     ) {
         self.baseURL = baseURL
+        self.identityBaseURL = identityBaseURL
+            ?? (baseURL == Self.productionBaseURL ? Self.productionIdentityURL : baseURL)
         self.urlSession = urlSession
         self.sessionStore = sessionStore
     }
 
     var googleStartURL: URL {
         var components = URLComponents(
-            url: endpoint("/api/native/auth/google/start"),
+            url: endpoint("/api/native/auth/google/start", target: .identity),
             resolvingAgainstBaseURL: false
         )!
         components.queryItems = [URLQueryItem(name: "callback", value: "calorie://auth")]
@@ -214,7 +219,8 @@ actor NativeAccountClient: NativeAccountServing {
         let response = try await request(
             path: "/api/native/auth/exchange",
             body: ["code": code],
-            authenticated: false
+            authenticated: false,
+            target: .identity
         )
         let payload = try JSONDecoder().decode(TokenResponse.self, from: response.data)
         try await sessionStore.save(payload.token)
@@ -276,12 +282,22 @@ actor NativeAccountClient: NativeAccountServing {
     }
 
     func signOut() async {
-        _ = try? await request(path: "/api/auth/sign-out", body: [String: String](), authenticated: true)
+        _ = try? await request(
+            path: "/api/auth/sign-out",
+            body: [String: String](),
+            authenticated: true,
+            target: .identity
+        )
         try? await sessionStore.delete()
     }
 
     func deleteAccount() async throws {
-        _ = try await request(path: "/api/auth/delete-user", body: [String: String](), authenticated: true)
+        _ = try await request(
+            path: "/api/app/data",
+            method: "DELETE",
+            jsonBody: nil,
+            authenticated: true
+        )
         try await sessionStore.delete()
     }
 
@@ -303,14 +319,25 @@ actor NativeAccountClient: NativeAccountServing {
         return try await request(
             path: path,
             jsonBody: ["provider": "apple", "idToken": idToken],
-            authenticated: authenticated
+            authenticated: authenticated,
+            target: .identity
         )
     }
 
     private func account() async throws -> CalorieAccount {
-        let sessionResponse = try await request(path: "/api/auth/get-session", method: "GET", authenticated: true)
+        let sessionResponse = try await request(
+            path: "/api/auth/get-session",
+            method: "GET",
+            authenticated: true,
+            target: .identity
+        )
         let session = try JSONDecoder().decode(SessionResponse.self, from: sessionResponse.data)
-        let accountsResponse = try await request(path: "/api/auth/list-accounts", method: "GET", authenticated: true)
+        let accountsResponse = try await request(
+            path: "/api/auth/list-accounts",
+            method: "GET",
+            authenticated: true,
+            target: .identity
+        )
         let accounts = try JSONDecoder().decode([ProviderAccount].self, from: accountsResponse.data)
         return CalorieAccount(
             name: session.user.name,
@@ -513,18 +540,26 @@ actor NativeAccountClient: NativeAccountServing {
         path: String,
         method: String = "POST",
         body: [String: String],
-        authenticated: Bool
+        authenticated: Bool,
+        target: RequestTarget = .calorie
     ) async throws -> NetworkResponse {
-        try await request(path: path, method: method, jsonBody: body, authenticated: authenticated)
+        try await request(
+            path: path,
+            method: method,
+            jsonBody: body,
+            authenticated: authenticated,
+            target: target
+        )
     }
 
     private func request(
         path: String,
         method: String = "POST",
         jsonBody: Any? = nil,
-        authenticated: Bool
+        authenticated: Bool,
+        target: RequestTarget = .calorie
     ) async throws -> NetworkResponse {
-        var request = URLRequest(url: endpoint(path))
+        var request = URLRequest(url: endpoint(path, target: target))
         request.httpMethod = method
         request.setValue("application/json", forHTTPHeaderField: "Accept")
         if let jsonBody {
@@ -549,9 +584,14 @@ actor NativeAccountClient: NativeAccountServing {
         return NetworkResponse(data: data, response: response)
     }
 
-    private func endpoint(_ path: String) -> URL {
-        URL(string: path, relativeTo: baseURL)!.absoluteURL
+    private func endpoint(_ path: String, target: RequestTarget = .calorie) -> URL {
+        URL(string: path, relativeTo: target == .identity ? identityBaseURL : baseURL)!.absoluteURL
     }
+}
+
+private enum RequestTarget {
+    case calorie
+    case identity
 }
 
 @MainActor
