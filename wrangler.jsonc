@@ -30,6 +30,12 @@
       "migrations_dir": "migrations"
     }
   ],
+  "services": [
+    {
+      "binding": "AUTH_SERVICE",
+      "service": "significanthobbies"
+    }
+  ],
   "placement": {
     "mode": "smart"
   },

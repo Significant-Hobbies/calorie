@@ -14,6 +14,24 @@ import type { App } from './types';
 
 const MCP_DAY_MS = 24 * 60 * 60 * 1000;
 
+export function nutritionTotals(entries: Array<ReturnType<typeof mapFoodEntry>>) {
+  const totals = entries.reduce(
+    (sum, entry) => ({
+      calories: sum.calories + entry.calories,
+      carbsG: sum.carbsG + entry.carbsG,
+      proteinG: sum.proteinG + entry.proteinG,
+      fibreG: sum.fibreG + entry.fibreG,
+    }),
+    { calories: 0, carbsG: 0, proteinG: 0, fibreG: 0 }
+  );
+  return {
+    calories: round(totals.calories),
+    carbsG: round(totals.carbsG, 1),
+    proteinG: round(totals.proteinG, 1),
+    fibreG: round(totals.fibreG, 1),
+  };
+}
+
 function mcpLimit(value: string | undefined, fallback = 30, maximum = 90) {
   const parsed = Number(value);
   return Number.isInteger(parsed) && parsed > 0 ? Math.min(parsed, maximum) : fallback;
@@ -24,7 +42,7 @@ function mcpOffset(value: string | undefined) {
   return Number.isInteger(parsed) && parsed >= 0 ? Math.min(parsed, 10_000) : 0;
 }
 
-function addUtcDays(date: string, amount: number) {
+export function addUtcDays(date: string, amount: number) {
   const [year, month, day] = date.split('-').map(Number);
   return new Date(Date.UTC(year, month - 1, day + amount)).toISOString().slice(0, 10);
 }
@@ -54,7 +72,7 @@ function timezoneOffset(timestamp: number, timezone: string) {
   );
 }
 
-function localMidnight(date: string, timezone: string): number | null {
+export function localMidnight(date: string, timezone: string): number | null {
   if (!validDateKey(date)) return null;
   const [year, month, day] = date.split('-').map(Number);
   const approximate = Date.UTC(year, month - 1, day);
@@ -82,7 +100,7 @@ type McpTargetRow = {
   fasting_threshold_hours: 12 | 14 | 16;
 };
 
-async function readMcpTargets(db: D1Database, userId: string) {
+export async function readMcpTargets(db: D1Database, userId: string) {
   const row = await db
     .prepare(
       `SELECT manual_calorie_target, manual_calorie_min, manual_calorie_max,
@@ -151,15 +169,6 @@ export function registerMcpRoutes(app: App) {
     ]);
     const entries = entriesResult.results.slice(0, 250).map(mapFoodEntry);
     const waterEntries = waterResult.results.slice(0, 250).map(mapWater);
-    const totals = entries.reduce(
-      (sum, entry) => ({
-        calories: sum.calories + entry.calories,
-        carbsG: sum.carbsG + entry.carbsG,
-        proteinG: sum.proteinG + entry.proteinG,
-        fibreG: sum.fibreG + entry.fibreG,
-      }),
-      { calories: 0, carbsG: 0, proteinG: 0, fibreG: 0 }
-    );
     const completedFasts = calculateCompletedFasts(
       [...(priorEntry ? [{ eatenAt: priorEntry.eaten_at }] : []), ...entries],
       timezone
@@ -175,10 +184,7 @@ export function registerMcpRoutes(app: App) {
       date,
       timezone,
       totals: {
-        calories: round(totals.calories),
-        carbsG: round(totals.carbsG, 1),
-        proteinG: round(totals.proteinG, 1),
-        fibreG: round(totals.fibreG, 1),
+        ...nutritionTotals(entries),
         waterMl: waterEntries.reduce((sum, entry) => sum + entry.amountMl, 0),
       },
       targets: {

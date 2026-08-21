@@ -5,6 +5,7 @@ import { registerAuthRoutes, registerSessionMiddleware } from './worker/auth';
 import { SECURITY_HEADERS } from './worker/http';
 import { registerJournalRoutes } from './worker/journal';
 import { registerMcpRoutes } from './worker/mcp';
+import { registerPersonalPlatformRoutes } from './worker/personal-platform';
 import { registerReadRoutes } from './worker/reads';
 import type { AppBindings, AppVariables } from './worker/types';
 
@@ -18,8 +19,10 @@ app.use('*', async (c, next) => {
 
 app.get('/app', (c) => c.redirect('/app/', 302));
 
-app.use('/api/*', async (c, next) => {
+app.use('*', async (c, next) => {
   await next();
+  const path = new URL(c.req.url).pathname;
+  if (!path.startsWith('/api/') && !path.startsWith('/v1/')) return;
   for (const [name, value] of Object.entries(SECURITY_HEADERS)) c.header(name, value);
   // Read-only GETs set their own Cache-Control via conditionalJson; everything
   // else stays no-store.
@@ -32,6 +35,7 @@ registerAccountRoutes(app);
 registerJournalRoutes(app);
 registerReadRoutes(app);
 registerMcpRoutes(app);
+registerPersonalPlatformRoutes(app);
 
 app.notFound((c) =>
   c.json({ code: 'NOT_FOUND', message: 'That Calorie route does not exist.' }, 404)

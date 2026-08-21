@@ -155,8 +155,7 @@ async function deleteFoodsId(c: AppContext) {
   return result.meta.changes ? c.body(null, 204) : c.json({ message: 'Food not found.' }, 404);
 }
 
-async function postEntries(c: AppContext) {
-  const body = await c.req.json<Record<string, unknown>>().catch(() => null);
+export async function createEntry(c: AppContext, body: Record<string, unknown> | null) {
   const id = body ? optionalText(body.id, 80) : null;
   const foodId = body ? optionalText(body.foodId, 80) : null;
   const amount = body ? finiteNumber(body.amount, 0.01, 10000) : null;
@@ -228,6 +227,10 @@ async function postEntries(c: AppContext) {
     .first<FoodEntryRow>();
   if (!row) return c.json({ message: 'The food entry could not be read back.' }, 500);
   return c.json(mapFoodEntry(row), 201);
+}
+
+async function postEntries(c: AppContext) {
+  return createEntry(c, await c.req.json<Record<string, unknown>>().catch(() => null));
 }
 
 async function patchEntriesId(c: AppContext) {
