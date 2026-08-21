@@ -19,17 +19,13 @@ app.use('*', async (c, next) => {
 
 app.get('/app', (c) => c.redirect('/app/', 302));
 
-app.use('/api/*', async (c, next) => {
+app.use('*', async (c, next) => {
   await next();
+  const path = new URL(c.req.url).pathname;
+  if (!path.startsWith('/api/') && !path.startsWith('/v1/')) return;
   for (const [name, value] of Object.entries(SECURITY_HEADERS)) c.header(name, value);
   // Read-only GETs set their own Cache-Control via conditionalJson; everything
   // else stays no-store.
-  if (!c.res.headers.has('Cache-Control')) c.header('Cache-Control', 'no-store');
-});
-
-app.use('/v1/*', async (c, next) => {
-  await next();
-  for (const [name, value] of Object.entries(SECURITY_HEADERS)) c.header(name, value);
   if (!c.res.headers.has('Cache-Control')) c.header('Cache-Control', 'no-store');
 });
 

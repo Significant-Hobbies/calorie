@@ -1,8 +1,7 @@
-import { round } from '../lib/recommendations';
 import { type FoodEntryRow, mapFoodEntry } from './db';
 import { dateKey, jsonError, validDateKey } from './http';
 import { createEntry } from './journal';
-import { addUtcDays, localMidnight, readMcpTargets } from './mcp';
+import { addUtcDays, localMidnight, nutritionTotals, readMcpTargets } from './mcp';
 import type { App, AppContext } from './types';
 
 type PersonalIdentity = { appleSubject?: unknown };
@@ -83,25 +82,11 @@ async function summary(c: AppContext) {
       .all<FoodEntryRow>(),
   ]);
   const entries = entriesResult.results.slice(0, 250).map(mapFoodEntry);
-  const totals = entries.reduce(
-    (sum, entry) => ({
-      calories: sum.calories + entry.calories,
-      carbsG: sum.carbsG + entry.carbsG,
-      proteinG: sum.proteinG + entry.proteinG,
-      fibreG: sum.fibreG + entry.fibreG,
-    }),
-    { calories: 0, carbsG: 0, proteinG: 0, fibreG: 0 }
-  );
   const latestEntry = entries.at(-1);
   return c.json({
     date,
     timezone,
-    totals: {
-      calories: round(totals.calories),
-      carbsG: round(totals.carbsG, 1),
-      proteinG: round(totals.proteinG, 1),
-      fibreG: round(totals.fibreG, 1),
-    },
+    totals: nutritionTotals(entries),
     targets: { calorieRange: targets.calorieRange, waterMl: targets.waterMl },
     entryCount: entries.length,
     lastUpdatedAt: latestEntry ? new Date(latestEntry.eatenAt).toISOString() : null,

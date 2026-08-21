@@ -39,7 +39,8 @@ describe('private Worker data controls', () => {
       expect(source).toContain(`FROM ${table} WHERE user_id = ?`);
     }
     expect(source).toContain('createJournalExport({');
-    expect(source).not.toMatch(/createJournalExport\(\{[\s\S]*?(session|token|email|cache):/);
+    const exportInput = source.match(/createJournalExport\(\{([\s\S]*?)\n\s*\}\)/)?.[1] ?? '';
+    expect(exportInput).not.toMatch(/(session|token|email|cache):/);
   });
 
   it('stores binary packaging snapshots while retaining legacy columns', () => {
