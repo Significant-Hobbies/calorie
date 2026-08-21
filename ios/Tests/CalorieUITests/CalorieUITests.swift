@@ -12,7 +12,9 @@ final class CalorieUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["Energy left today"].waitForExistence(timeout: 3))
         app.buttons["Log food"].tap()
         XCTAssertTrue(app.staticTexts["Greek yoghurt bowl"].waitForExistence(timeout: 3))
-        app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Greek yoghurt bowl")).firstMatch.tap()
+        app.descendants(matching: .any)
+            .matching(NSPredicate(format: "label BEGINSWITH %@", "Greek yoghurt bowl"))
+            .firstMatch.tap()
         app.buttons["Snack"].tap()
         app.buttons["Add to snack"].tap()
         XCTAssertTrue(app.staticTexts["Greek yoghurt bowl"].waitForExistence(timeout: 3))
@@ -71,7 +73,9 @@ final class CalorieUITests: XCTestCase {
 
         app.buttons["Log food"].tap()
         XCTAssertTrue(app.staticTexts["Greek yoghurt bowl"].waitForExistence(timeout: 3))
-        app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Greek yoghurt bowl")).firstMatch.tap()
+        app.descendants(matching: .any)
+            .matching(NSPredicate(format: "label BEGINSWITH %@", "Greek yoghurt bowl"))
+            .firstMatch.tap()
         XCTAssertTrue(
             app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "This amount")).firstMatch
                 .waitForExistence(timeout: 2)
