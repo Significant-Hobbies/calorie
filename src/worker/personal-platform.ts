@@ -2,63 +2,13 @@ import { type FoodEntryRow, mapFoodEntry } from './db';
 import { dateKey, jsonError, validDateKey } from './http';
 import { createEntry } from './journal';
 import { addUtcDays, localMidnight, nutritionTotals, readMcpTargets } from './mcp';
+import { applyCalorieUser, authenticateSharedIdentity } from './shared-identity';
 import type { App, AppContext } from './types';
 
-type PersonalIdentity = { appleSubject?: unknown };
-type CalorieUser = { id: string; name: string; email: string; image: string | null };
-
 async function authenticatePersonalRequest(c: AppContext): Promise<Response | null> {
-  const authorization = c.req.header('Authorization');
-  if (!authorization?.startsWith('Bearer ')) {
-    return c.json({ code: 'UNAUTHORIZED', message: 'Sign in to continue.' }, 401);
-  }
-  if (!c.env.AUTH_SERVICE) {
-    return c.json(
-      { code: 'AUTH_SERVICE_UNAVAILABLE', message: 'Shared identity is unavailable.' },
-      503
-    );
-  }
-
-  const identityResponse = await c.env.AUTH_SERVICE.fetch(
-    'https://personal-auth.internal/api/personal-platform/session',
-    { headers: { Authorization: authorization } }
-  );
-  if (identityResponse.status === 401) {
-    return c.json({ code: 'UNAUTHORIZED', message: 'Sign in to continue.' }, 401);
-  }
-  if (!identityResponse.ok) {
-    return c.json(
-      { code: 'AUTH_SERVICE_UNAVAILABLE', message: 'Shared identity is unavailable.' },
-      503
-    );
-  }
-
-  const identity = (await identityResponse.json()) as PersonalIdentity;
-  if (typeof identity.appleSubject !== 'string' || identity.appleSubject.length === 0) {
-    return c.json(
-      { code: 'APPLE_ACCOUNT_REQUIRED', message: 'Link Sign in with Apple in Calorie first.' },
-      403
-    );
-  }
-
-  const user = await c.env.DB.prepare(
-    `SELECT u.id, u.name, u.email, u.image
-     FROM account a JOIN user u ON u.id = a.userId
-     WHERE a.providerId = 'apple' AND a.accountId = ? LIMIT 1`
-  )
-    .bind(identity.appleSubject)
-    .first<CalorieUser>();
-  if (!user) {
-    return c.json(
-      { code: 'CALORIE_ACCOUNT_NOT_FOUND', message: 'Sign in to Calorie with the same Apple ID.' },
-      403
-    );
-  }
-
-  c.set('userId', user.id);
-  c.set('userName', user.name);
-  c.set('userEmail', user.email);
-  c.set('userImage', user.image);
+  const result = await authenticateSharedIdentity(c);
+  if (result.status === 'error') return result.response;
+  applyCalorieUser(c, result.user);
   return null;
 }
 

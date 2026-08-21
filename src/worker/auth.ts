@@ -12,6 +12,7 @@ import {
   saveNativeHandoff,
 } from '../server/native-handoff';
 import { authenticateMcpRead } from '../server/read-tokens';
+import { applyCalorieUser, authenticateSharedIdentity } from './shared-identity';
 import type { App, AppContext } from './types';
 
 function health(c: AppContext) {
@@ -149,16 +150,21 @@ export function registerAuthRoutes(app: App) {
 
 export function registerSessionMiddleware(app: App) {
   app.use('/api/app/*', async (c, next) => {
-    const session = await createAuth(c.env, c.req.url).api.getSession({
-      headers: c.req.raw.headers,
-    });
-    if (!session?.user?.id) {
-      return c.json({ code: 'UNAUTHORIZED', message: 'Sign in to continue.' }, 401);
+    const session = await createAuth(c.env, c.req.url)
+      .api.getSession({ headers: c.req.raw.headers })
+      .catch(() => null);
+    if (session?.user?.id) {
+      c.set('userId', session.user.id);
+      c.set('userName', session.user.name || 'You');
+      c.set('userEmail', session.user.email || '');
+      c.set('userImage', session.user.image || null);
+      await next();
+      return;
     }
-    c.set('userId', session.user.id);
-    c.set('userName', session.user.name || 'You');
-    c.set('userEmail', session.user.email || '');
-    c.set('userImage', session.user.image || null);
+
+    const shared = await authenticateSharedIdentity(c);
+    if (shared.status === 'error') return shared.response;
+    applyCalorieUser(c, shared.user);
     await next();
   });
 

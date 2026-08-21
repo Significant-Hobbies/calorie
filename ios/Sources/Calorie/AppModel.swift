@@ -339,7 +339,7 @@ final class AppModel {
             syncRequestedAfterMutation = false
             document.syncState = .localOnly
             try await store.save(document)
-            accountNotice = "Cloud account deleted. This device journal was preserved."
+            accountNotice = "Calorie cloud data deleted. This device journal was preserved."
         } catch {
             message = accountErrorMessage(error, recovery: "Try deleting the cloud account again. Nothing was removed from this device.")
         }

@@ -463,6 +463,15 @@ async function getExport(c: AppContext) {
   );
 }
 
+async function deleteCalorieData(c: AppContext) {
+  const result = await c.env.DB.prepare('DELETE FROM user WHERE id = ?1')
+    .bind(c.get('userId'))
+    .run();
+  return result.meta.changes
+    ? c.body(null, 204)
+    : c.json({ message: 'Calorie data not found.' }, 404);
+}
+
 export function registerAccountRoutes(app: App) {
   app.get('/api/app/mcp-tokens', getMcpTokens);
   app.post('/api/app/mcp-tokens', postMcpTokens);
@@ -473,4 +482,5 @@ export function registerAccountRoutes(app: App) {
   app.get('/api/app/cycles', getCycles);
   app.patch('/api/app/cycles/active', patchCyclesActive);
   app.get('/api/app/export', getExport);
+  app.delete('/api/app/data', deleteCalorieData);
 }
