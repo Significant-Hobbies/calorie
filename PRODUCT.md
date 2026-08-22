@@ -6,7 +6,7 @@ product
 
 ## Platform
 
-iPhone and iPad
+ios
 
 ## Users
 

@@ -5,6 +5,15 @@ import XCTest
 @testable import Calorie
 
 final class CalorieOnboardingTests: XCTestCase {
+    func testSyncStatusUsesHumanLanguageForEveryState() {
+        XCTAssertEqual(CalorieSyncStatusCopy.text(for: .localOnly, pendingCount: 0), "On this device")
+        XCTAssertEqual(CalorieSyncStatusCopy.text(for: .pending, pendingCount: 1), "1 change waiting")
+        XCTAssertEqual(CalorieSyncStatusCopy.text(for: .pending, pendingCount: 3), "3 changes waiting")
+        XCTAssertEqual(CalorieSyncStatusCopy.text(for: .synced, pendingCount: 0), "Up to date")
+        XCTAssertEqual(CalorieSyncStatusCopy.text(for: .conflict, pendingCount: 0), "Choice required")
+        XCTAssertEqual(CalorieSyncStatusCopy.text(for: .failed, pendingCount: 0), "Sync needs attention")
+    }
+
     func testEmptyJournalPresentsOnboarding() {
         XCTAssertTrue(
             CalorieOnboardingPolicy.shouldPresent(

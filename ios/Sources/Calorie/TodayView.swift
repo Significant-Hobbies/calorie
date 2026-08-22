@@ -75,7 +75,13 @@ struct TodayView: View {
     }
 
     private var syncLabel: some View {
-        Text(model.document.syncState == .localOnly ? "On this device" : model.document.syncState.rawValue)
+        Label(
+            CalorieSyncStatusCopy.text(
+                for: model.document.syncState,
+                pendingCount: model.pendingSyncCount
+            ),
+            systemImage: CalorieSyncStatusCopy.symbol(for: model.document.syncState)
+        )
             .font(.caption.weight(.bold))
             .foregroundStyle(.secondary)
     }
@@ -313,6 +319,28 @@ struct TodayView: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .background(CaloriePalette.surface)
                 .clipShape(RoundedRectangle(cornerRadius: 13))
+        }
+    }
+}
+
+enum CalorieSyncStatusCopy {
+    static func text(for state: SyncState, pendingCount: Int) -> String {
+        switch state {
+        case .localOnly: "On this device"
+        case .pending: pendingCount == 1 ? "1 change waiting" : "\(pendingCount) changes waiting"
+        case .synced: "Up to date"
+        case .conflict: "Choice required"
+        case .failed: "Sync needs attention"
+        }
+    }
+
+    static func symbol(for state: SyncState) -> String {
+        switch state {
+        case .localOnly: "iphone.gen3"
+        case .pending: "arrow.triangle.2.circlepath.icloud"
+        case .synced: "checkmark.icloud.fill"
+        case .conflict: "arrow.triangle.branch"
+        case .failed: "exclamationmark.icloud.fill"
         }
     }
 }
