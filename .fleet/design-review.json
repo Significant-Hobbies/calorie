@@ -1,8 +1,8 @@
 {
   "$schema": "fleet.design-review.v1",
   "version": 1,
-  "project": "calorie",
-  "target": "Tracked quality scores across web and native food journals",
+  "project": "calorie-onboarding-65",
+  "target": "Calorie first-day onboarding",
   "mode": "preserve",
   "register": "product",
   "context": {
@@ -14,29 +14,25 @@
     "probes": [],
     "selected": "existing-design",
     "approval": "not-required",
-    "before": "artifacts/design/before.png"
+    "before": "ios/artifacts/simulator/today.png"
   },
   "evidence": {
     "screenshots": [
       {
         "width": 390,
-      "path": "artifacts/design/tracked-quality/after-390.png"
+        "path": "ios/artifacts/design/onboarding/after-390.png"
       },
       {
         "width": 768,
-      "path": "artifacts/design/tracked-quality/after-768.png"
+        "path": "ios/artifacts/design/onboarding/after-768.png"
       },
       {
         "width": 1440,
-      "path": "artifacts/design/tracked-quality/after-1440.png"
-      },
-      {
-        "width": 402,
-        "path": "artifacts/design/tracked-quality/native-after.png"
+        "path": "ios/artifacts/design/onboarding/after-1440.png"
       }
     ],
     "projectCheck": {
-      "command": "pnpm quality",
+      "command": "ios/scripts/check.sh",
       "status": "pass"
     },
     "critique": {
@@ -44,7 +40,7 @@
       "maximum": 40
     },
     "audit": {
-      "score": 19,
+      "score": 18,
       "maximum": 20
     },
     "unresolved": {
@@ -57,7 +53,7 @@
     }
   },
   "ownerFeedback": {
-    "decision": "pending",
-    "note": "Awaiting the owner's keep, close, or wrong-lane decision after reviewing the target-based daily score and dynamic historical-entry presentation."
+    "decision": "delegated",
+    "note": "Owner asked Codex to resolve the application tickets end to end and continue without per-app pauses."
   }
 }

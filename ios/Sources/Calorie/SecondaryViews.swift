@@ -617,23 +617,14 @@ struct YouView: View {
     }
 
     private var syncStatusText: String {
-        switch model.document.syncState {
-        case .localOnly: "On this device"
-        case .pending: model.pendingSyncCount == 1 ? "1 change pending" : "\(model.pendingSyncCount) changes pending"
-        case .synced: "Up to date"
-        case .conflict: "Choice required"
-        case .failed: "Sync needs attention"
-        }
+        CalorieSyncStatusCopy.text(
+            for: model.document.syncState,
+            pendingCount: model.pendingSyncCount
+        )
     }
 
     private var syncStatusSymbol: String {
-        switch model.document.syncState {
-        case .localOnly: "iphone.gen3"
-        case .pending: "arrow.triangle.2.circlepath.icloud"
-        case .synced: "checkmark.icloud.fill"
-        case .conflict: "arrow.triangle.branch"
-        case .failed: "exclamationmark.icloud.fill"
-        }
+        CalorieSyncStatusCopy.symbol(for: model.document.syncState)
     }
 
     private func youSection<Content: View>(_ title: String, @ViewBuilder content: () -> Content) -> some View {

@@ -22,6 +22,7 @@ final class AppModel {
     var isReconciliationPresented = false
     private(set) var pendingSyncCount = 0
     private(set) var isSyncing = false
+    private(set) var forceCalorieOnboarding = false
 
     private let store: CalorieStore
     private let accountClient: any NativeAccountServing
@@ -95,8 +96,17 @@ final class AppModel {
     func load() async {
         defer { isLoading = false }
         do {
-            document = ProcessInfo.processInfo.arguments.contains("--fresh-demo") ? .sample : try await store.load()
-            if ProcessInfo.processInfo.arguments.contains("--quick-log-demo") { isQuickLogPresented = true }
+            let arguments = ProcessInfo.processInfo.arguments
+            if arguments.contains("--reset-onboarding") {
+                CalorieOnboardingPreferences.reset()
+            }
+            if arguments.contains("--onboarding-demo") {
+                document = .starter
+                forceCalorieOnboarding = true
+            } else {
+                document = arguments.contains("--fresh-demo") ? .sample : try await store.load()
+            }
+            if arguments.contains("--quick-log-demo") { isQuickLogPresented = true }
             account = try? await accountClient.restoreAccount()
             pendingSyncCount = (try? await syncStore.pending().count) ?? 0
             if account != nil {
@@ -110,6 +120,51 @@ final class AppModel {
             document = .starter
             message = error.localizedDescription
         }
+    }
+
+    func shouldPresentCalorieOnboarding(completed: Bool) -> Bool {
+        let hasLocalActivity = !document.foodEntries.isEmpty
+            || !document.waterEntries.isEmpty
+            || !document.weightEntries.isEmpty
+            || !document.routineCheckIns.isEmpty
+            || document.foods.contains(where: \.isCustom)
+        return CalorieOnboardingPolicy.shouldPresent(
+            completed: completed || document.profile.onboardingComplete == true,
+            hasLocalActivity: hasLocalActivity,
+            cloudActivityCount: cloudSnapshot?.counts.activityTotal ?? 0,
+            forced: forceCalorieOnboarding
+        )
+    }
+
+    @discardableResult
+    func completeOnboarding(
+        configuration: CalorieOnboardingConfiguration,
+        food: Food,
+        servings: Double,
+        meal: Meal,
+        saveFood: Bool
+    ) async -> Bool {
+        let succeeded = await mutate { document in
+            document.profile.units = configuration.units
+            document.profile.onboardingComplete = true
+            switch configuration.targets {
+            case .later, .estimateLater:
+                document.profile.manualCalorieTarget = nil
+                document.profile.manualMacroTargets = nil
+            case let .manual(targets):
+                document.profile.manualCalorieTarget = targets.calories
+                document.profile.manualMacroTargets = targets
+            }
+            if saveFood {
+                document.addCustomFood(food)
+            }
+            document.log(food: food, servings: servings, meal: meal, at: selectedDate)
+        }
+        if succeeded {
+            selectedTab = 0
+            message = nil
+        }
+        return succeeded
     }
 
     func log(_ food: Food, servings: Double, meal: Meal, at date: Date) async {
@@ -492,9 +547,11 @@ final class AppModel {
         return "\(detail) \(recovery)"
     }
 
-    private func mutate(_ operation: (inout CalorieDocument) throws -> Void) async {
+    @discardableResult
+    private func mutate(_ operation: (inout CalorieDocument) throws -> Void) async -> Bool {
         activeLocalMutations += 1
         var shouldRequestSync = false
+        var succeeded = false
         do {
             let previous = document
             var next = document
@@ -514,6 +571,7 @@ final class AppModel {
                 }
                 pendingSyncCount = (try await syncStore.pending()).count
             }
+            succeeded = true
         } catch {
             message = error.localizedDescription
         }
@@ -523,5 +581,6 @@ final class AppModel {
             syncRequestedAfterMutation = false
             await syncNow()
         }
+        return succeeded
     }
 }
