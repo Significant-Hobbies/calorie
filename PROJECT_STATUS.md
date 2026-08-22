@@ -33,11 +33,12 @@ full sets/reps workout-programming system.
 
 ## Timeline
 
-- 2026-08-23 — uploaded native build `1.0.0 (6)` from the merged first-run and
-  sync-state readiness source. App Store Connect accepted the package and began
-  processing it for internal TestFlight. The submitted build was numbered 6 by
-  Xcode's App Store exporter; source is aligned here and future exports disable
-  automatic build-number management.
+- 2026-08-23 — released native build `1.0.0 (7)` from merged commit `6ea5e58`
+  after build 6 remained unassigned. Both GitHub checks passed, including the
+  full native-quality gate; the current-origin local gate also passed 54/54
+  tests and a Release simulator build. Build 7 was processed, assigned,
+  installed, and launched on the physical iPhone without replacing its local
+  data. The internal-only export keeps automatic build-number management off.
 
 - 2026-08-22 — added a local-first first-day journey that reaches a real food
   entry and visibly updates Today totals. Manual targets, a transparent
