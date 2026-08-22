@@ -1,6 +1,6 @@
 # Calorie — PROJECT STATUS
 
-Last updated: 2026-08-21
+Last updated: 2026-08-22
 
 ## Why / What
 
@@ -32,6 +32,13 @@ full sets/reps workout-programming system.
 - Fleet deployment, accessibility, and UI standards
 
 ## Timeline
+
+- 2026-08-22 — added a local-first first-day journey that reaches a real food
+  entry and visibly updates Today totals. Manual targets, a transparent
+  estimate-later path, and genuinely unset targets remain distinct; one-off and
+  reusable foods both use the existing journal service. Existing local/cloud
+  activity bypasses onboarding, partial input survives relaunch, and the full
+  native plus design-review gates pass on iPhone and iPad.
 
 - 2026-08-22 — Apple completed processing Calorie 1.0.0 (4) and confirmed it
   available to internal TestFlight testers on personal team `8F7LXHTJZR`.
