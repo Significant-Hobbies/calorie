@@ -359,17 +359,20 @@ struct CalorieOnboardingView: View {
 
     private func choice(_ label: String, detail: String, symbol: String, action: @escaping () -> Void) -> some View {
         Button(action: action) {
-            HStack(alignment: .top, spacing: 12) {
+            Label {
+                HStack(alignment: .top, spacing: 8) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(label).font(.headline)
+                        Text(detail).font(.subheadline).foregroundStyle(.secondary)
+                    }
+                    Spacer(minLength: 0)
+                    Image(systemName: "chevron.right").foregroundStyle(.tertiary)
+                }
+            } icon: {
                 Image(systemName: symbol)
                     .font(.title3)
                     .foregroundStyle(CaloriePalette.moss)
                     .frame(width: 30)
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(label).font(.headline)
-                    Text(detail).font(.subheadline).foregroundStyle(.secondary)
-                }
-                Spacer(minLength: 0)
-                Image(systemName: "chevron.right").foregroundStyle(.tertiary)
             }
             .frame(maxWidth: .infinity, minHeight: 64, alignment: .leading)
             .padding(14)
