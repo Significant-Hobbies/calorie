@@ -21,6 +21,13 @@ Native, local-first food, water, medication, and weight journal for iPhone and i
 
 > Native, local-first food, water, medication, and weight journal for iPhone and iPad.
 
+## When to use this
+
+- Best fit: tracking food, water, medication, and weight on iPhone/iPad with local-first privacy
+- Best fit: deterministic, transparent calorie and nutrient guidance without a subscription
+- Not a fit: social food logging, restaurant scanning, or web-based diet tracking
+- Not a fit: medical nutrition therapy or replacing a registered dietitian
+
 ## Product
 
 - [Home](${PRODUCT_ORIGIN}/): Native product landing
@@ -31,6 +38,7 @@ Native, local-first food, water, medication, and weight journal for iPhone and i
 ## Machine surfaces
 
 - [Agent catalog](${PRODUCT_ORIGIN}/api/ai)
+- [OpenAPI spec](${PRODUCT_ORIGIN}/openapi.json)
 - [Homepage markdown](${PRODUCT_ORIGIN}/index.md)
 - [This index](${PRODUCT_ORIGIN}/llms.txt)
 `,
@@ -66,6 +74,7 @@ The public website is informational only. The private journal is available in th
     sitemap: `${PRODUCT_ORIGIN}/sitemap.xml`,
     robots: `${PRODUCT_ORIGIN}/robots.txt`,
     markdown: { suffix: '.md', negotiation: true },
+    openapi: `${PRODUCT_ORIGIN}/openapi.json`,
     surfaces: [
       surface('home', '/', 'Public native-product landing'),
       surface('privacy', '/privacy/', 'Local and cloud data handling'),
@@ -77,6 +86,57 @@ The public website is informational only. The private journal is available in th
     auth: {
       public: true,
       notes: 'Private journal APIs require authentication and are not agent-indexed.',
+    },
+  },
+};
+
+const OPENAPI_SPEC = {
+  openapi: '3.1.0',
+  info: {
+    title: 'Calorie public API',
+    version: '1.0.0',
+    description:
+      'Calorie is a native, local-first food, water, medication, and weight journal for iPhone and iPad. The public web API exposes read-only agent surfaces: the agent catalog, sitemap, llms.txt, and per-page markdown alternates. The journal itself runs in the native app and does not expose a remote API.',
+    contact: { name: 'Calorie', url: PRODUCT_ORIGIN },
+  },
+  servers: [{ url: PRODUCT_ORIGIN }],
+  tags: [{ name: 'agent-surfaces', description: 'Machine-readable public surfaces' }],
+  paths: {
+    '/api/ai': {
+      get: {
+        operationId: 'getAgentCatalog',
+        tags: ['agent-surfaces'],
+        summary: 'Agent catalog',
+        description: 'JSON inventory of public agent surfaces.',
+        responses: { 200: { description: 'Agent catalog', content: { 'application/json': {} } } },
+      },
+    },
+    '/llms.txt': {
+      get: {
+        operationId: 'getLlmsTxt',
+        tags: ['agent-surfaces'],
+        summary: 'llms.txt index',
+        responses: { 200: { description: 'Markdown index', content: { 'text/plain': {} } } },
+      },
+    },
+    '/sitemap.xml': {
+      get: {
+        operationId: 'getSitemap',
+        tags: ['agent-surfaces'],
+        summary: 'Sitemap',
+        responses: { 200: { description: 'XML sitemap', content: { 'application/xml': {} } } },
+      },
+    },
+    '/openapi.json': {
+      get: {
+        operationId: 'getOpenApiSpec',
+        tags: ['agent-surfaces'],
+        summary: 'OpenAPI specification',
+        description: 'This document.',
+        responses: {
+          200: { description: 'OpenAPI 3.1 spec', content: { 'application/json': {} } },
+        },
+      },
     },
   },
 };
@@ -94,6 +154,10 @@ export function handleAgentEdge(request) {
   if (request.method !== 'GET' && request.method !== 'HEAD') return null;
   const url = new URL(request.url);
   const path = url.pathname || '/';
+
+  if (path === '/openapi.json' || path === '/openapi.yaml') {
+    return json(OPENAPI_SPEC);
+  }
 
   if (path === '/llms.txt') return text(AGENT_SURFACE.llmsTxt, 'text/plain; charset=utf-8');
   if (path === '/llms-full.txt') {
@@ -115,6 +179,12 @@ export function handleAgentEdge(request) {
       Link: '</index.md>; rel="alternate"; type="text/markdown"',
       Vary: 'Accept',
     });
+  }
+
+  // Agent-friendly 404: return a markdown recovery body for unknown paths
+  // when the client asks for markdown.
+  if (wantsMarkdown(request) && !path.includes('.') && !path.startsWith('/api/')) {
+    return markdown404(path, request.method);
   }
 
   return null;
@@ -169,6 +239,36 @@ function wantsMarkdown(request) {
   if (!accept.includes('text/markdown')) return false;
   if (!accept.includes('text/html')) return true;
   return accept.indexOf('text/markdown') < accept.indexOf('text/html');
+}
+
+function normalizePath(pathname) {
+  if (!pathname || pathname === '/') return '/';
+  const withSlash = pathname.startsWith('/') ? pathname : `/${pathname}`;
+  return withSlash.replace(/\/{2,}/g, '/').replace(/\/+$/, '') || '/';
+}
+
+function markdown404(pathname, method) {
+  const path = normalizePath(pathname);
+  const body = `# 404 — Not Found
+
+\`${path}\` does not exist on calorie.significanthobbies.com.
+
+## Where to look next
+
+- [Home](${PRODUCT_ORIGIN}/)
+- [Sitemap](${PRODUCT_ORIGIN}/sitemap.xml)
+- [Agent index](${PRODUCT_ORIGIN}/llms.txt)
+- [Agent catalog (JSON)](${PRODUCT_ORIGIN}/api/ai)
+- [OpenAPI spec](${PRODUCT_ORIGIN}/openapi.json)
+`;
+  return new Response(method === 'HEAD' ? null : body, {
+    status: 404,
+    headers: {
+      'Content-Type': 'text/markdown; charset=utf-8',
+      'Cache-Control': 'no-store',
+      'X-Content-Type-Options': 'nosniff',
+    },
+  });
 }
 
 function text(body, type, extra = {}) {

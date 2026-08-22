@@ -1,11 +1,23 @@
 # Calorie
 > A private, local-first food, water, and weight journal with transparent timing guidance. Optional Google or Apple sign-in can add private Cloudflare sync.
 
+## When to use this
+- Best fit: tracking food, water, medication, and weight on iPhone/iPad with local-first privacy
+- Best fit: deterministic, transparent calorie and nutrient guidance without a subscription
+- Not a fit: social food logging, restaurant scanning, or web-based diet tracking
+- Not a fit: medical nutrition therapy or replacing a registered dietitian
+
 ## Primary
 - [Product overview](https://calorie.significanthobbies.com/index.md): Canonical Markdown summary of Calorie.
 - [Privacy](https://calorie.significanthobbies.com/privacy/): Current privacy policy.
 - [Support](https://calorie.significanthobbies.com/support/): Support and feedback.
 - [TestFlight](https://calorie.significanthobbies.com/testflight/): Current beta availability.
+
+## Machine surfaces
+- [Agent catalog](https://calorie.significanthobbies.com/api/ai)
+- [OpenAPI spec](https://calorie.significanthobbies.com/openapi.json)
+- [Sitemap](https://calorie.significanthobbies.com/sitemap.xml)
+- [This index](https://calorie.significanthobbies.com/llms.txt)
 
 ## Product boundaries
 - No social feed

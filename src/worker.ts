@@ -39,9 +39,16 @@ registerReadRoutes(app);
 registerMcpRoutes(app);
 registerPersonalPlatformRoutes(app);
 
-app.notFound((c) =>
-  c.json({ code: 'NOT_FOUND', message: 'That Calorie route does not exist.' }, 404)
-);
+app.notFound((c) => {
+  const path = new URL(c.req.url).pathname;
+  if (path.startsWith('/api/')) {
+    return c.json(
+      { error: { code: 'not_found', message: `Unknown API path: ${path}`, path } },
+      404
+    );
+  }
+  return c.json({ code: 'NOT_FOUND', message: 'That Calorie route does not exist.' }, 404);
+});
 
 app.onError((error, c) => {
   console.error(

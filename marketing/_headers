@@ -1,0 +1,18 @@
+/*
+  X-Content-Type-Options: nosniff
+  Vary: Accept, Accept-Encoding
+
+/llms.txt
+  Content-Type: text/plain; charset=utf-8
+
+/index.md
+  Content-Type: text/markdown; charset=utf-8
+
+/api/ai
+  Content-Type: application/json; charset=utf-8
+  Access-Control-Allow-Origin: *
+
+/openapi.json
+  Content-Type: application/json; charset=utf-8
+  Access-Control-Allow-Origin: *
+  Cache-Control: public, max-age=3600, s-maxage=86400, stale-while-revalidate=604800
