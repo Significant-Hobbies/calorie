@@ -4,6 +4,56 @@ import XCTest
 final class CalorieUITests: XCTestCase {
     override func setUpWithError() throws { continueAfterFailure = false }
 
+    func testFirstDayLogsARealOneOffFoodAndShowsTotals() {
+        let app = XCUIApplication()
+        app.launchArguments = ["--onboarding-demo", "--reset-onboarding"]
+        app.launch()
+
+        XCTAssertTrue(app.staticTexts["Log food, see what changed."].waitForExistence(timeout: 3))
+        app.buttons["Set up my first log"].tap()
+        app.buttons["No targets for now"].tap()
+
+        fillFirstFood(in: app, name: "Apple and peanut butter")
+        app.switches["Save this as a reusable food"].tap()
+        app.buttons["Log my first food"].tap()
+
+        XCTAssertTrue(app.staticTexts["Your day changed."].waitForExistence(timeout: 3))
+        XCTAssertTrue(app.staticTexts["210"].exists)
+        app.buttons["Open Today"].tap()
+        XCTAssertTrue(app.staticTexts["Apple and peanut butter"].waitForExistence(timeout: 3))
+    }
+
+    func testReusableFoodPathAddsTheFoodToTheLibrary() {
+        let app = XCUIApplication()
+        app.launchArguments = ["--onboarding-demo", "--reset-onboarding", "--reduce-motion-demo"]
+        app.launch()
+
+        app.buttons["Set up my first log"].tap()
+        app.buttons["Explore an estimate later"].tap()
+        fillFirstFood(in: app, name: "Home lentil bowl")
+        app.buttons["Log my first food"].tap()
+        XCTAssertTrue(app.staticTexts["Your day changed."].waitForExistence(timeout: 3))
+        app.buttons["Open Today"].tap()
+        app.tabBars.buttons["Foods"].tap()
+        XCTAssertTrue(app.staticTexts["Home lentil bowl"].waitForExistence(timeout: 3))
+    }
+
+    func testOnboardingRestoresFoodDraftAcrossRelaunch() {
+        let app = XCUIApplication()
+        app.launchArguments = ["--onboarding-demo", "--reset-onboarding"]
+        app.launch()
+        app.buttons["Set up my first log"].tap()
+        app.buttons["No targets for now"].tap()
+        let name = app.textFields["Food name"]
+        name.tap()
+        name.typeText("Keep my draft")
+        app.terminate()
+
+        app.launchArguments = ["--onboarding-demo"]
+        app.launch()
+        XCTAssertEqual(app.textFields["Food name"].value as? String, "Keep my draft")
+    }
+
     func testQuickLogsFavoriteFood() {
         let app = XCUIApplication()
         app.launchArguments = ["--fresh-demo"]
@@ -85,5 +135,22 @@ final class CalorieUITests: XCTestCase {
                 .matching(NSPredicate(format: "label CONTAINS %@", "/100 tracked"))
                 .firstMatch.exists
         )
+    }
+
+    private func fillFirstFood(in app: XCUIApplication, name: String) {
+        let nameField = app.textFields["Food name"]
+        XCTAssertTrue(nameField.waitForExistence(timeout: 3))
+        nameField.tap()
+        nameField.typeText(name)
+        type("210", into: app.textFields["Calories"])
+        type("7", into: app.textFields["Protein"])
+        type("28", into: app.textFields["Carbohydrates"])
+        type("5", into: app.textFields["Fibre"])
+    }
+
+    private func type(_ value: String, into field: XCUIElement) {
+        XCTAssertTrue(field.waitForExistence(timeout: 3))
+        field.tap()
+        field.typeText(value)
     }
 }

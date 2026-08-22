@@ -3,22 +3,23 @@ import SwiftUI
 
 struct RootView: View {
     @Environment(AppModel.self) private var model
+    @AppStorage(CalorieOnboardingPreferences.completedKey) private var onboardingCompleted = false
+    @State private var isOnboardingSessionActive = false
 
     var body: some View {
         @Bindable var model = model
-        TabView(selection: $model.selectedTab) {
-            NavigationStack { TodayView() }
-                .tabItem { Label("Today", systemImage: "sun.max.fill") }
-                .tag(0)
-            NavigationStack { ProgressViewScreen() }
-                .tabItem { Label("Progress", systemImage: "chart.line.uptrend.xyaxis") }
-                .tag(1)
-            NavigationStack { FoodsView() }
-                .tabItem { Label("Foods", systemImage: "leaf.fill") }
-                .tag(2)
-            NavigationStack { YouView() }
-                .tabItem { Label("You", systemImage: "person.crop.circle.fill") }
-                .tag(3)
+        Group {
+            if model.isLoading {
+                ProgressView("Opening your food journal…")
+            } else if isOnboardingSessionActive || model.shouldPresentCalorieOnboarding(completed: onboardingCompleted) {
+                CalorieOnboardingView {
+                    onboardingCompleted = true
+                    isOnboardingSessionActive = false
+                }
+                .onAppear { isOnboardingSessionActive = true }
+            } else {
+                mainTabs(selection: $model.selectedTab)
+            }
         }
         .botanicalBackground()
         .sheet(isPresented: $model.isQuickLogPresented) { QuickLogView() }
@@ -44,6 +45,23 @@ struct RootView: View {
             Button("OK", role: .cancel) { model.message = nil }
         } message: {
             Text(model.message ?? "")
+        }
+    }
+
+    private func mainTabs(selection: Binding<Int>) -> some View {
+        TabView(selection: selection) {
+            NavigationStack { TodayView() }
+                .tabItem { Label("Today", systemImage: "sun.max.fill") }
+                .tag(0)
+            NavigationStack { ProgressViewScreen() }
+                .tabItem { Label("Progress", systemImage: "chart.line.uptrend.xyaxis") }
+                .tag(1)
+            NavigationStack { FoodsView() }
+                .tabItem { Label("Foods", systemImage: "leaf.fill") }
+                .tag(2)
+            NavigationStack { YouView() }
+                .tabItem { Label("You", systemImage: "person.crop.circle.fill") }
+                .tag(3)
         }
     }
 }
