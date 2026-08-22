@@ -47,7 +47,9 @@ app.notFound((c) => {
       404
     );
   }
-  return c.json({ code: 'NOT_FOUND', message: 'That Calorie route does not exist.' }, 404);
+  // For non-API paths, fall through to static assets so the landing page,
+  // marketing pages, and other static files are served correctly.
+  return c.env.ASSETS.fetch(c.req.raw);
 });
 
 app.onError((error, c) => {
