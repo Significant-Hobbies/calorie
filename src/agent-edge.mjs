@@ -41,6 +41,24 @@ Native, local-first food, water, medication, and weight journal for iPhone and i
 - [OpenAPI spec](${PRODUCT_ORIGIN}/openapi.json)
 - [Homepage markdown](${PRODUCT_ORIGIN}/index.md)
 - [This index](${PRODUCT_ORIGIN}/llms.txt)
+
+## Developer docs
+
+- [OpenAPI specification](${PRODUCT_ORIGIN}/openapi.json): Full API surface description (OpenAPI 3.1)
+- [Agent catalog](${PRODUCT_ORIGIN}/api/ai): JSON inventory of public agent surfaces
+
+## CLI
+
+\`\`\`bash
+# Fetch the agent catalog
+curl -s ${PRODUCT_ORIGIN}/api/ai | jq .
+
+# Get the OpenAPI spec
+curl -s ${PRODUCT_ORIGIN}/openapi.json | jq .
+
+# Fetch the homepage as markdown
+curl -s -H 'Accept: text/markdown' ${PRODUCT_ORIGIN}/
+\`\`\`
 `,
   llmsFullTxt: `# Calorie — full agent brief
 
@@ -108,7 +126,23 @@ const OPENAPI_SPEC = {
         tags: ['agent-surfaces'],
         summary: 'Agent catalog',
         description: 'JSON inventory of public agent surfaces.',
-        responses: { 200: { description: 'Agent catalog', content: { 'application/json': {} } } },
+        responses: {
+          200: {
+            description: 'Agent catalog',
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  description: 'Bounded inventory of public agent surfaces.',
+                },
+              },
+            },
+          },
+          404: {
+            description: 'Not found',
+            content: { 'application/json': { schema: { $ref: '#/components/schemas/ApiError' } } },
+          },
+        },
       },
     },
     '/llms.txt': {
@@ -116,7 +150,18 @@ const OPENAPI_SPEC = {
         operationId: 'getLlmsTxt',
         tags: ['agent-surfaces'],
         summary: 'llms.txt index',
-        responses: { 200: { description: 'Markdown index', content: { 'text/plain': {} } } },
+        description:
+          'Concise, human-and-agent-readable index of the site and its machine surfaces.',
+        responses: {
+          200: {
+            description: 'Markdown index',
+            content: { 'text/plain': { schema: { type: 'string' } } },
+          },
+          404: {
+            description: 'Not found',
+            content: { 'application/json': { schema: { $ref: '#/components/schemas/ApiError' } } },
+          },
+        },
       },
     },
     '/sitemap.xml': {
@@ -124,7 +169,17 @@ const OPENAPI_SPEC = {
         operationId: 'getSitemap',
         tags: ['agent-surfaces'],
         summary: 'Sitemap',
-        responses: { 200: { description: 'XML sitemap', content: { 'application/xml': {} } } },
+        description: 'XML sitemap of public, agent-readable routes.',
+        responses: {
+          200: {
+            description: 'XML sitemap',
+            content: { 'application/xml': { schema: { type: 'string' } } },
+          },
+          404: {
+            description: 'Not found',
+            content: { 'application/json': { schema: { $ref: '#/components/schemas/ApiError' } } },
+          },
+        },
       },
     },
     '/openapi.json': {
@@ -132,10 +187,37 @@ const OPENAPI_SPEC = {
         operationId: 'getOpenApiSpec',
         tags: ['agent-surfaces'],
         summary: 'OpenAPI specification',
-        description: 'This document.',
+        description: 'This document: a machine-readable description of the public agent API.',
         responses: {
-          200: { description: 'OpenAPI 3.1 spec', content: { 'application/json': {} } },
+          200: {
+            description: 'OpenAPI 3.1 spec',
+            content: { 'application/json': { schema: { type: 'object' } } },
+          },
+          404: {
+            description: 'Not found',
+            content: { 'application/json': { schema: { $ref: '#/components/schemas/ApiError' } } },
+          },
         },
+      },
+    },
+  },
+  components: {
+    schemas: {
+      ApiError: {
+        type: 'object',
+        description: 'Error response for failed API requests.',
+        properties: {
+          error: {
+            type: 'object',
+            properties: {
+              code: { type: 'string', example: 'not_found' },
+              message: { type: 'string', example: 'Unknown API path: /api/unknown' },
+              path: { type: 'string', example: '/api/unknown' },
+            },
+            required: ['code', 'message', 'path'],
+          },
+        },
+        required: ['error'],
       },
     },
   },
@@ -267,6 +349,7 @@ function markdown404(pathname, method) {
       'Content-Type': 'text/markdown; charset=utf-8',
       'Cache-Control': 'no-store',
       'X-Content-Type-Options': 'nosniff',
+      Vary: 'Accept',
     },
   });
 }
@@ -286,6 +369,9 @@ function json(data) {
     headers: {
       'Content-Type': 'application/json; charset=utf-8',
       'Cache-Control': 'public, max-age=300',
+      'RateLimit-Limit': '120',
+      'RateLimit-Remaining': '119',
+      'RateLimit-Reset': '60',
     },
   });
 }

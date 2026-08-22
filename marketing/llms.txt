@@ -19,6 +19,24 @@
 - [Sitemap](https://calorie.significanthobbies.com/sitemap.xml)
 - [This index](https://calorie.significanthobbies.com/llms.txt)
 
+## Developer docs
+
+- [OpenAPI specification](https://calorie.significanthobbies.com/openapi.json): Full API surface description (OpenAPI 3.1)
+- [Agent catalog](https://calorie.significanthobbies.com/api/ai): JSON inventory of public agent surfaces
+
+## CLI
+
+```bash
+# Fetch the agent catalog
+curl -s https://calorie.significanthobbies.com/api/ai | jq .
+
+# Get the OpenAPI spec
+curl -s https://calorie.significanthobbies.com/openapi.json | jq .
+
+# Fetch the homepage as markdown
+curl -s -H 'Accept: text/markdown' https://calorie.significanthobbies.com/
+```
+
 ## Product boundaries
 - No social feed
 - Not medical advice
