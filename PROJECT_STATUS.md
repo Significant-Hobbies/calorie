@@ -1,6 +1,6 @@
 # Calorie — PROJECT STATUS
 
-Last updated: 2026-08-22
+Last updated: 2026-08-23
 
 ## Why / What
 
@@ -32,6 +32,12 @@ full sets/reps workout-programming system.
 - Fleet deployment, accessibility, and UI standards
 
 ## Timeline
+
+- 2026-08-23 — uploaded native build `1.0.0 (6)` from the merged first-run and
+  sync-state readiness source. App Store Connect accepted the package and began
+  processing it for internal TestFlight. The submitted build was numbered 6 by
+  Xcode's App Store exporter; source is aligned here and future exports disable
+  automatic build-number management.
 
 - 2026-08-22 — added a local-first first-day journey that reaches a real food
   entry and visibly updates Today totals. Manual targets, a transparent
