@@ -56,7 +56,7 @@ final class CalorieUITests: XCTestCase {
 
     func testQuickLogsFavoriteFood() {
         let app = XCUIApplication()
-        app.launchArguments = ["--fresh-demo"]
+        app.launchArguments = ["--fresh-demo", "-calorie-illustrated-onboarding-seen-v1", "YES"]
         app.launch()
 
         XCTAssertTrue(app.staticTexts["Energy left today"].waitForExistence(timeout: 3))
@@ -72,7 +72,7 @@ final class CalorieUITests: XCTestCase {
 
     func testPrimaryTabsAreReachable() {
         let app = XCUIApplication()
-        app.launchArguments = ["--fresh-demo"]
+        app.launchArguments = ["--fresh-demo", "-calorie-illustrated-onboarding-seen-v1", "YES"]
         app.launch()
 
         for tab in ["Progress", "Foods", "You"] {
@@ -83,7 +83,7 @@ final class CalorieUITests: XCTestCase {
 
     func testFoodsExposeEditAndArchiveActions() {
         let app = XCUIApplication()
-        app.launchArguments = ["--fresh-demo"]
+        app.launchArguments = ["--fresh-demo", "-calorie-illustrated-onboarding-seen-v1", "YES"]
         app.launch()
 
         app.tabBars.buttons["Foods"].tap()
@@ -95,7 +95,7 @@ final class CalorieUITests: XCTestCase {
 
     func testProgressSupportsThirtyDayAndDateReview() {
         let app = XCUIApplication()
-        app.launchArguments = ["--fresh-demo"]
+        app.launchArguments = ["--fresh-demo", "-calorie-illustrated-onboarding-seen-v1", "YES"]
         app.launch()
 
         app.tabBars.buttons["Progress"].tap()
@@ -108,7 +108,7 @@ final class CalorieUITests: XCTestCase {
 
     func testDailyAndEntryScoresExposeTheirCalculationBasis() {
         let app = XCUIApplication()
-        app.launchArguments = ["--fresh-demo"]
+        app.launchArguments = ["--fresh-demo", "-calorie-illustrated-onboarding-seen-v1", "YES"]
         app.launch()
 
         XCTAssertTrue(

@@ -129,16 +129,11 @@ final class AppModel {
             || !document.routineCheckIns.isEmpty
             || document.foods.contains(where: \.isCustom)
         return CalorieOnboardingPolicy.shouldPresent(
-            completed: completed || document.profile.onboardingComplete == true,
+            completed: completed,
             hasLocalActivity: hasLocalActivity,
             cloudActivityCount: cloudSnapshot?.counts.activityTotal ?? 0,
             forced: forceCalorieOnboarding
         )
-    }
-
-    func replayOnboarding() {
-        CalorieOnboardingPreferences.reset()
-        forceCalorieOnboarding = true
     }
 
     func dismissOnboarding() {
