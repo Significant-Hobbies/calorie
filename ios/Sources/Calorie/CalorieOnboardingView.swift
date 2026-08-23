@@ -10,7 +10,7 @@ enum CalorieOnboardingStep: Int {
 }
 
 enum CalorieOnboardingPreferences {
-    static let completedKey = "calorie-onboarding-completed-v1"
+    static let completedKey = "calorie-illustrated-onboarding-seen-v1"
     static let stepKey = "calorie-onboarding-step-v1"
     static let targetPlanKey = "calorie-onboarding-target-plan-v1"
     static let foodNameKey = "calorie-onboarding-food-name-v1"
@@ -50,13 +50,12 @@ struct CalorieOnboardingConfiguration: Equatable {
 enum CalorieOnboardingPolicy {
     static func shouldPresent(
         completed: Bool,
-        hasLocalActivity: Bool,
-        cloudActivityCount: Int,
+        hasLocalActivity _: Bool,
+        cloudActivityCount _: Int,
         forced: Bool = false
     ) -> Bool {
         if forced { return true }
-        guard !completed else { return false }
-        return !hasLocalActivity && cloudActivityCount == 0
+        return !completed
     }
 }
 

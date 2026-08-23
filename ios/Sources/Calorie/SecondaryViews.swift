@@ -482,12 +482,6 @@ struct YouView: View {
                 }
                 youSection("About") {
                     LabeledContent("Version", value: appVersion)
-                    Button {
-                        model.replayOnboarding()
-                    } label: {
-                        Label("Replay onboarding", systemImage: "sparkles.rectangle.stack")
-                            .frame(maxWidth: .infinity, minHeight: 48, alignment: .leading)
-                    }
                     Link("Privacy", destination: URL(string: "https://calorie.significanthobbies.com/privacy")!).frame(minHeight: 44)
                     Link("Support", destination: URL(string: "https://calorie.significanthobbies.com")!).frame(minHeight: 44)
                 }
