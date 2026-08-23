@@ -247,6 +247,34 @@ final class NativeAccountTests: XCTestCase {
         XCTAssertEqual(model.document.syncState, .localOnly)
     }
 
+    @MainActor
+    func testUnclaimedAppleAccountReturnsToGoogleRecoveryWithoutChangingLocalJournal() async throws {
+        let directory = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+        let store = CalorieStore(fileURL: directory.appending(path: "journal.json"))
+        let syncStore = SyncIntentStore(fileURL: directory.appending(path: "sync.json"))
+        var local = CalorieDocument.starter
+        local.profile.manualCalorieTarget = 2_345
+        try await store.save(local)
+        let client = UnclaimedAppleAccountClient()
+        let model = AppModel(store: store, accountClient: client, syncStore: syncStore)
+        await model.load()
+
+        await model.completeAppleSignIn(
+            AppleIdentityPayload(
+                identityToken: "identity-token",
+                nonce: "nonce"
+            )
+        )
+
+        XCTAssertNil(model.account)
+        XCTAssertEqual(model.document.profile.manualCalorieTarget, 2_345)
+        XCTAssertEqual(model.document.syncState, .localOnly)
+        XCTAssertTrue(model.message?.contains("not linked") == true)
+        XCTAssertTrue(model.accountNotice?.contains("Google first") == true)
+        let didSignOut = await client.didSignOut
+        XCTAssertTrue(didSignOut)
+    }
+
     private static let cloudExport = #"""
     {
       "schema": "calorie-journal-backup",
@@ -322,6 +350,33 @@ private actor StubNativeAccountClient: NativeAccountServing {
     func setExportData(_ data: Data) { exportData = data }
     func apply(_: SyncIntent) async throws { applyRequestCount += 1 }
     func signOut() async {}
+    func deleteAccount() async throws {}
+}
+
+private actor UnclaimedAppleAccountClient: NativeAccountServing {
+    private(set) var didSignOut = false
+
+    var googleStartURL: URL { URL(string: "https://example.com/google")! }
+
+    func restoreAccount() async throws -> CalorieAccount? { nil }
+    func exchangeGoogleHandoff(_: String) async throws -> CalorieAccount {
+        CalorieAccount(name: "Cloud owner", email: "owner@example.com", providers: ["google"])
+    }
+    func signInWithApple(_: AppleIdentityPayload) async throws -> CalorieAccount {
+        CalorieAccount(name: "Cloud owner", email: "owner@example.com", providers: ["apple"])
+    }
+    func linkApple(_: AppleIdentityPayload) async throws -> CalorieAccount {
+        CalorieAccount(name: "Cloud owner", email: "owner@example.com", providers: ["apple", "google"])
+    }
+    func cloudExport() async throws -> Data {
+        throw NativeAccountError.http(
+            status: 403,
+            code: "CALORIE_LINK_REQUIRED",
+            message: "Link the existing Calorie account with Sign in with Apple once."
+        )
+    }
+    func apply(_: SyncIntent) async throws {}
+    func signOut() async { didSignOut = true }
     func deleteAccount() async throws {}
 }
 

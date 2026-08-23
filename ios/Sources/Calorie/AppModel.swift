@@ -367,9 +367,22 @@ final class AppModel {
                 await cloudQuery.clear()
                 await prepareCloudReconciliation()
             }
+        } catch let error as NativeAccountError where error.requiresExistingAccountRecovery {
+            await recoverFromUnclaimedAppleAccount()
         } catch {
             message = accountErrorMessage(error, recovery: "Try Apple sign-in again. Your device journal has not changed.")
         }
+    }
+
+    private func recoverFromUnclaimedAppleAccount() async {
+        await cloudQuery.clear()
+        await accountClient.signOut()
+        account = nil
+        cloudSnapshot = nil
+        document.syncState = .localOnly
+        try? await store.save(document)
+        accountNotice = "Reopen your existing Calorie account with Google first, then add Sign in with Apple."
+        message = "This Apple sign-in is not linked to your existing Calorie journal. Your journal on this device has not changed."
     }
 
     func signOut() async {
@@ -453,6 +466,8 @@ final class AppModel {
             document.syncState = .conflict
             try await store.save(document)
             isReconciliationPresented = true
+        } catch let error as NativeAccountError where error.requiresExistingAccountRecovery {
+            await recoverFromUnclaimedAppleAccount()
         } catch {
             document.syncState = .failed
             try? await store.save(document)
@@ -500,6 +515,8 @@ final class AppModel {
                 guard try await syncStore.pending().isEmpty else { continue }
                 break
             }
+        } catch let error as NativeAccountError where error.requiresExistingAccountRecovery {
+            await recoverFromUnclaimedAppleAccount()
         } catch {
             pendingSyncCount = (try? await syncStore.pending().count) ?? pendingSyncCount
             document.syncState = pendingSyncCount > 0 ? .pending : .failed

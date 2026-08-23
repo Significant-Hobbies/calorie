@@ -581,15 +581,18 @@ struct YouView: View {
             Text(CalorieAccountCopy.unsignedOverview)
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
-            appleButton
             Text(CalorieAccountCopy.googleRecovery)
                 .font(.caption)
                 .foregroundStyle(.secondary)
             Button { Task { await model.connectExistingAccount() } } label: {
-                Label("Reopen account with Google", systemImage: "person.crop.circle.badge.checkmark")
+                Label("Reopen existing account", systemImage: "person.crop.circle.badge.checkmark")
                     .frame(maxWidth: .infinity, minHeight: 48)
             }
-            .buttonStyle(.bordered)
+            .buttonStyle(.borderedProminent)
+            Text("Starting a new cloud journal instead?")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            appleButton
         }
         if model.isAccountWorking {
             ProgressView("Securing your account…")
