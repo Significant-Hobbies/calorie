@@ -14,6 +14,30 @@ final class CalorieOnboardingTests: XCTestCase {
         XCTAssertEqual(CalorieSyncStatusCopy.text(for: .failed, pendingCount: 0), "Sync needs attention")
     }
 
+    func testAccountCopyIsAppleFirstLocalFirstAndCustomerFacing() {
+        XCTAssertTrue(CalorieAccountCopy.unsignedOverview.contains("without an account"))
+        XCTAssertTrue(CalorieAccountCopy.unsignedOverview.contains("Sign in with Apple"))
+        XCTAssertTrue(CalorieAccountCopy.googleRecovery.contains("Previously connected"))
+        XCTAssertTrue(CalorieAccountCopy.googleRecovery.contains("Google"))
+        XCTAssertTrue(CalorieAccountCopy.connectedOverview.lowercased().contains("food, water, weight, and routine records"))
+        XCTAssertTrue(CalorieAccountCopy.connectedOverview.contains("stay on this device"))
+
+        let customerFacingCopy = [
+            CalorieAccountCopy.unsignedOverview,
+            CalorieAccountCopy.googleRecovery,
+            CalorieAccountCopy.connectedOverview,
+            CalorieAccountCopy.appleLinked,
+            CalorieAccountCopy.appleLinkPrompt,
+            CalorieAccountCopy.onboardingLocalFirst,
+            CalorieAccountCopy.existingAccountConnected,
+            CalorieAccountCopy.accountJournalReplacement,
+        ].joined(separator: " ").lowercased()
+
+        for implementationTerm in ["cloudflare", "d1", "identity matching", "on the web", "web history", "web journal"] {
+            XCTAssertFalse(customerFacingCopy.contains(implementationTerm))
+        }
+    }
+
     func testEmptyJournalPresentsOnboarding() {
         XCTAssertTrue(
             CalorieOnboardingPolicy.shouldPresent(

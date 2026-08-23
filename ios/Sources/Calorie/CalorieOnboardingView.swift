@@ -232,7 +232,7 @@ struct CalorieOnboardingView: View {
             .buttonStyle(BotanicalButtonStyle())
             .disabled(firstFood == nil || isSaving)
 
-            Text("Calorie stores this entry locally first. A connected account may also sync a private copy to Cloudflare.")
+            Text(CalorieAccountCopy.onboardingLocalFirst)
                 .font(.caption)
                 .foregroundStyle(.secondary)
             backButton(to: targetPlan == "manual" ? .manualTargets : .targets)

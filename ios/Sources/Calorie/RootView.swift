@@ -79,7 +79,7 @@ private struct ReconciliationView: View {
                     comparison
                     choice(
                         title: "Use cloud journal",
-                        detail: "Replace supported records on this device with your existing web history. Appearance stays the same.",
+                        detail: CalorieAccountCopy.accountJournalReplacement,
                         symbol: "icloud.and.arrow.down.fill",
                         choice: .keepCloud
                     )

@@ -342,7 +342,7 @@ final class AppModel {
             else { throw NativeAccountError.invalidCallback }
             account = try await accountClient.exchangeGoogleHandoff(code)
             await cloudQuery.clear()
-            accountNotice = "Cloud journal connected. Apple sign-in is optional."
+            accountNotice = CalorieAccountCopy.existingAccountConnected
             await prepareCloudReconciliation()
         } catch {
             message = accountErrorMessage(error, recovery: "Try connecting your existing journal again.")

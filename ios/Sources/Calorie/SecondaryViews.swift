@@ -4,6 +4,17 @@ import Charts
 import SwiftUI
 import UniformTypeIdentifiers
 
+enum CalorieAccountCopy {
+    static let unsignedOverview = "Calorie keeps working on this device without an account. Sign in with Apple to privately sync supported food, water, weight, and routine records across your devices."
+    static let googleRecovery = "Previously connected this journal with Google? Use Google to reopen that existing Calorie account."
+    static let connectedOverview = "Food, water, weight, and routine records privately sync with this account. Notes, meal labels, cycle context, fat values, and appearance stay on this device."
+    static let appleLinked = "Sign in with Apple can reopen this account. Choosing to share or hide your Apple email does not change your journal."
+    static let appleLinkPrompt = "Add Sign in with Apple so you can reopen this account without the Google recovery step."
+    static let onboardingLocalFirst = "Calorie stores this entry on this device first. If you connect an account later, supported journal records can also sync privately."
+    static let existingAccountConnected = "Existing Calorie account connected. Review both journals before anything changes."
+    static let accountJournalReplacement = "Replace supported records on this device with the records already saved to your account. Appearance stays the same."
+}
+
 struct ProgressViewScreen: View {
     @Environment(AppModel.self) private var model
     @State private var rangeDays = 7
@@ -523,7 +534,7 @@ struct YouView: View {
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
                 .textSelection(.enabled)
-            Text("Your supported journal records sync with your private Calorie account in Cloudflare D1. Apple is only an optional sign-in method.")
+            Text(CalorieAccountCopy.connectedOverview)
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
             HStack {
@@ -548,11 +559,11 @@ struct YouView: View {
                     .frame(maxWidth: .infinity, minHeight: 48)
             }
             if account.hasApple {
-                Text("Apple sign-in is linked to this same cloud journal. Sharing or hiding your Apple email does not change which journal opens.")
+                Text(CalorieAccountCopy.appleLinked)
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
             } else {
-                Text("Optional: add Apple sign-in for a native way to reopen this same cloud journal.")
+                Text(CalorieAccountCopy.appleLinkPrompt)
                     .font(.caption)
                     .foregroundStyle(.secondary)
                 appleButton
@@ -561,18 +572,18 @@ struct YouView: View {
             Label("On this device", systemImage: "ipad.and.iphone")
                 .font(.headline)
                 .frame(minHeight: 44)
-            Text("Already use Calorie on the web? Connect that cloud journal directly. Apple sign-in is optional and email matching is never used to guess ownership.")
+            Text(CalorieAccountCopy.unsignedOverview)
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
-            Button { Task { await model.connectExistingAccount() } } label: {
-                Label("Connect existing Calorie data", systemImage: "arrow.triangle.2.circlepath.icloud")
-                    .frame(maxWidth: .infinity, minHeight: 48)
-            }
-            .buttonStyle(BotanicalButtonStyle())
-            Text("Starting fresh? Continue with Apple to create a new private cloud journal.")
+            appleButton
+            Text(CalorieAccountCopy.googleRecovery)
                 .font(.caption)
                 .foregroundStyle(.secondary)
-            appleButton
+            Button { Task { await model.connectExistingAccount() } } label: {
+                Label("Reopen account with Google", systemImage: "person.crop.circle.badge.checkmark")
+                    .frame(maxWidth: .infinity, minHeight: 48)
+            }
+            .buttonStyle(.bordered)
         }
         if model.isAccountWorking {
             ProgressView("Securing your account…")
@@ -613,6 +624,7 @@ struct YouView: View {
         .signInWithAppleButtonStyle(colorScheme == .dark ? .white : .black)
         .frame(maxWidth: .infinity, minHeight: 48)
         .clipShape(RoundedRectangle(cornerRadius: 12))
+        .accessibilityIdentifier("account-sign-in-with-apple")
         .disabled(model.isAccountWorking)
     }
 
