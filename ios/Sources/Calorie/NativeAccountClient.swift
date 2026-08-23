@@ -45,7 +45,7 @@ enum NativeAccountError: LocalizedError {
     case invalidCallback
     case missingSession
     case server(String)
-    case http(Int, String)
+    case http(status: Int, code: String?, message: String)
 
     var errorDescription: String? {
         switch self {
@@ -53,8 +53,13 @@ enum NativeAccountError: LocalizedError {
         case .invalidCallback: "The account handoff could not be verified."
         case .missingSession: "Your Calorie session expired. Sign in again."
         case let .server(message): message
-        case let .http(_, message): message
+        case let .http(_, _, message): message
         }
+    }
+
+    var requiresExistingAccountRecovery: Bool {
+        guard case let .http(_, code, _) = self else { return false }
+        return code == "CALORIE_LINK_REQUIRED" || code == "CALORIE_ACCOUNT_NOT_FOUND"
     }
 }
 
@@ -353,7 +358,7 @@ actor NativeAccountClient: NativeAccountServing {
                 jsonBody: update,
                 authenticated: true
             )
-        } catch NativeAccountError.http(404, _) {
+        } catch NativeAccountError.http(status: 404, code: _, message: _) {
             _ = try await request(
                 path: "/api/app/medications",
                 jsonBody: [
@@ -401,7 +406,7 @@ actor NativeAccountClient: NativeAccountServing {
                 jsonBody: body,
                 authenticated: true
             )
-        } catch NativeAccountError.http(404, _) {
+        } catch NativeAccountError.http(status: 404, code: _, message: _) {
             _ = try await request(path: createPath, jsonBody: body, authenticated: true)
         }
     }
@@ -409,7 +414,7 @@ actor NativeAccountClient: NativeAccountServing {
     private func delete(path: String) async throws {
         do {
             _ = try await request(path: path, method: "DELETE", authenticated: true)
-        } catch NativeAccountError.http(404, _) {
+        } catch NativeAccountError.http(status: 404, code: _, message: _) {
             return
         }
     }
@@ -452,8 +457,9 @@ actor NativeAccountClient: NativeAccountServing {
         guard (200..<300).contains(response.statusCode) else {
             let error = try? JSONDecoder().decode(ServerError.self, from: data)
             throw NativeAccountError.http(
-                response.statusCode,
-                error?.message ?? "Calorie could not complete the request."
+                status: response.statusCode,
+                code: error?.code,
+                message: error?.message ?? "Calorie could not complete the request."
             )
         }
         return NetworkResponse(data: data, response: response)
@@ -509,7 +515,10 @@ private struct NetworkResponse {
     let response: HTTPURLResponse
 }
 
-private struct ServerError: Decodable { let message: String }
+private struct ServerError: Decodable {
+    let code: String?
+    let message: String
+}
 
 private extension Date {
     var millisecondsSince1970: Double { timeIntervalSince1970 * 1_000 }
