@@ -33,6 +33,12 @@ full sets/reps workout-programming system.
 
 ## Timeline
 
+- 2026-08-23 — released native build `1.0.0 (8)` with Apple-first account and
+  sync language from merged PR #77. Both release-branch CI jobs passed; the
+  Xcode 27 Beta 5 package was accepted as `VALID`, entered internal beta
+  testing, and was installed on the connected iPhone. Delivery UUID:
+  `a9b2f974-a124-4be7-a095-7ceddfafbcc6`.
+
 - 2026-08-23 — released native build `1.0.0 (7)` from merged commit `6ea5e58`
   after build 6 remained unassigned. Both GitHub checks passed, including the
   full native-quality gate; the current-origin local gate also passed 54/54
