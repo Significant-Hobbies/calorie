@@ -515,19 +515,26 @@ final class AppModel {
                 guard try await syncStore.pending().isEmpty else { continue }
                 break
             }
-        } catch let error as NativeAccountError where error.requiresExistingAccountRecovery {
-            await recoverFromUnclaimedAppleAccount()
         } catch {
-            pendingSyncCount = (try? await syncStore.pending().count) ?? pendingSyncCount
-            document.syncState = pendingSyncCount > 0 ? .pending : .failed
-            try? await store.save(document)
-            message = accountErrorMessage(error, recovery: "Your changes are saved on this device and cloud sync can be retried.")
+            await handleSyncFailure(error)
         }
         isSyncing = false
         if account != nil, activeLocalMutations == 0, syncRequestedAfterMutation {
             syncRequestedAfterMutation = false
             await syncNow()
         }
+    }
+
+    private func handleSyncFailure(_ error: Error) async {
+        if let accountError = error as? NativeAccountError,
+           accountError.requiresExistingAccountRecovery {
+            await recoverFromUnclaimedAppleAccount()
+            return
+        }
+        pendingSyncCount = (try? await syncStore.pending().count) ?? pendingSyncCount
+        document.syncState = pendingSyncCount > 0 ? .pending : .failed
+        try? await store.save(document)
+        message = accountErrorMessage(error, recovery: "Your changes are saved on this device and cloud sync can be retried.")
     }
 
     private func replayPendingSyncIntents() async throws -> Bool {
