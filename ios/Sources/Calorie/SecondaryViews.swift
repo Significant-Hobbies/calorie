@@ -414,6 +414,12 @@ struct YouView: View {
     @State private var isRoutineManagerPresented = false
     @State private var appleNonce = AppleNonce.make()
 
+    private var appVersion: String {
+        let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "—"
+        let build = Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "—"
+        return "\(version) (\(build))"
+    }
+
     var body: some View {
         @Bindable var model = model
         ScrollView {
@@ -475,7 +481,7 @@ struct YouView: View {
                     .frame(minHeight: 48)
                 }
                 youSection("About") {
-                    LabeledContent("Version", value: "1.0.0 (1)")
+                    LabeledContent("Version", value: appVersion)
                     Link("Privacy", destination: URL(string: "https://calorie.significanthobbies.com/privacy")!).frame(minHeight: 44)
                     Link("Support", destination: URL(string: "https://calorie.significanthobbies.com")!).frame(minHeight: 44)
                 }
