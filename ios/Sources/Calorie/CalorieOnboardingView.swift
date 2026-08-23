@@ -54,8 +54,8 @@ enum CalorieOnboardingPolicy {
         cloudActivityCount: Int,
         forced: Bool = false
     ) -> Bool {
-        guard !completed else { return false }
         if forced { return true }
+        guard !completed else { return false }
         return !hasLocalActivity && cloudActivityCount == 0
     }
 }
@@ -127,6 +127,13 @@ struct CalorieOnboardingView: View {
 
     private var promise: some View {
         VStack(alignment: .leading, spacing: 22) {
+            Image("CalorieOnboarding")
+                .resizable()
+                .scaledToFit()
+                .frame(maxHeight: dynamicTypeSize.isAccessibilitySize ? 140 : 220)
+                .frame(maxWidth: .infinity)
+                .accessibilityLabel("A hand-drawn figure turns one meal into a simple nutrition log.")
+
             title(
                 "Log food, see what changed.",
                 detail: "Start with one honest entry. No account, weight, body measurements, or goal is required."
@@ -144,6 +151,9 @@ struct CalorieOnboardingView: View {
 
             Button("Set up my first log") { advance(to: .targets) }
                 .buttonStyle(BotanicalButtonStyle())
+
+            Button("Explore Calorie first") { completion() }
+                .frame(maxWidth: .infinity, minHeight: 44)
         }
     }
 

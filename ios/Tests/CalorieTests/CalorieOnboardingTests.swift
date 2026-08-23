@@ -66,7 +66,7 @@ final class CalorieOnboardingTests: XCTestCase {
     }
 
     func testCompletedAndForcedPoliciesStayExplicit() {
-        XCTAssertFalse(
+        XCTAssertTrue(
             CalorieOnboardingPolicy.shouldPresent(
                 completed: true,
                 hasLocalActivity: false,
@@ -82,6 +82,24 @@ final class CalorieOnboardingTests: XCTestCase {
                 forced: true
             )
         )
+    }
+
+    @MainActor
+    func testReplayIsNonDestructiveAndOverridesPriorCompletion() async throws {
+        let directory = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+        let store = CalorieStore(fileURL: directory.appending(path: "journal.json"))
+        let model = AppModel(
+            store: store,
+            accountClient: NoAccountClient(),
+            syncStore: SyncIntentStore(fileURL: directory.appending(path: "sync.json"))
+        )
+        await model.load()
+        let before = model.document
+
+        model.replayOnboarding()
+
+        XCTAssertTrue(model.shouldPresentCalorieOnboarding(completed: true))
+        XCTAssertEqual(model.document, before)
     }
 
     func testTargetPlansDistinguishManualEstimateAndUnset() {

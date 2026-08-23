@@ -15,6 +15,7 @@ struct RootView: View {
                 CalorieOnboardingView {
                     onboardingCompleted = true
                     isOnboardingSessionActive = false
+                    model.dismissOnboarding()
                 }
                 .onAppear { isOnboardingSessionActive = true }
             } else {

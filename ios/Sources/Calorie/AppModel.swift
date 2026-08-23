@@ -136,6 +136,15 @@ final class AppModel {
         )
     }
 
+    func replayOnboarding() {
+        CalorieOnboardingPreferences.reset()
+        forceCalorieOnboarding = true
+    }
+
+    func dismissOnboarding() {
+        forceCalorieOnboarding = false
+    }
+
     @discardableResult
     func completeOnboarding(
         configuration: CalorieOnboardingConfiguration,
