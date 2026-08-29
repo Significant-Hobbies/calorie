@@ -9,6 +9,7 @@
     "suffix": ".md",
     "negotiation": false
   },
+  "openapi": "https://calorie.significanthobbies.com/openapi.json",
   "surfaces": [
     {
       "id": "home",
@@ -19,46 +20,51 @@
     {
       "id": "privacy",
       "url": "/privacy/",
+      "md": "/privacy/index.md",
       "kind": "static"
     },
     {
       "id": "support",
       "url": "/support/",
+      "md": "/support/index.md",
       "kind": "static"
     },
     {
       "id": "terms",
       "url": "/terms/",
+      "md": "/terms/index.md",
       "kind": "static"
     },
     {
       "id": "accessibility",
       "url": "/accessibility/",
+      "md": "/accessibility/index.md",
       "kind": "static"
     },
     {
       "id": "testflight",
       "url": "/testflight/",
+      "md": "/testflight/index.md",
       "kind": "static"
     }
   ],
   "auth": {
     "public": true,
-    "notes": "No product account."
+    "notes": "Public discovery requires no account. Product account behavior is described in the privacy page and product boundaries."
   },
   "product": {
     "name": "Calorie",
-    "tagline": "A little log for feeling good.",
-    "summary": "A private, local-first food, water, and weight journal with transparent timing guidance. Optional Google or Apple sign-in can add private Cloudflare sync.",
-    "status": "Internal TestFlight beta. Not publicly distributed.",
+    "tagline": "A private food journal for weight loss.",
+    "summary": "A private, local-first iPhone and iPad journal for food, four core nutrients, water, weight, routines, and transparent timing guidance. Optional Apple sign-in can add private Cloudflare sync.",
+    "status": "Internal TestFlight only. No public invite or App Store listing.",
     "platforms": [
       "iPhone",
       "iPad"
     ],
     "capabilities": [
-      "Today: food, water, medicine, and timing for this date",
-      "Foods: reusable items per 100 g or per unit",
-      "Progress: 7- and 30-day trends without streak scoring"
+      "Today: food, calories, carbs, protein, fibre, water, routines, weight, and transparent timing for this date",
+      "Foods: fast one-off entries and reusable items per 100 g or per unit",
+      "Progress: visible-sample 7- and 30-day trends without streak scoring"
     ],
     "boundaries": [
       "No social feed",

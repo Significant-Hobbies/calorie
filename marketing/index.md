@@ -1,16 +1,16 @@
 # Calorie
 
-> A little log for feeling good.
+> A private food journal for weight loss.
 
-A private, local-first food, water, and weight journal with transparent timing guidance. Optional Google or Apple sign-in can add private Cloudflare sync.
+A private, local-first iPhone and iPad journal for food, four core nutrients, water, weight, routines, and transparent timing guidance. Optional Apple sign-in can add private Cloudflare sync.
 
-Status: Internal TestFlight beta. Not publicly distributed..
+Status: Internal TestFlight only. No public invite or App Store listing..
 
 ## Product areas
 
-- Today: food, water, medicine, and timing for this date
-- Foods: reusable items per 100 g or per unit
-- Progress: 7- and 30-day trends without streak scoring
+- Today: food, calories, carbs, protein, fibre, water, routines, weight, and transparent timing for this date
+- Foods: fast one-off entries and reusable items per 100 g or per unit
+- Progress: visible-sample 7- and 30-day trends without streak scoring
 
 ## Important boundaries
 
@@ -28,4 +28,4 @@ Status: Internal TestFlight beta. Not publicly distributed..
 - accessibility: https://calorie.significanthobbies.com/accessibility/
 - testflight: https://calorie.significanthobbies.com/testflight/
 
-Last updated: 2026-08-21
+Last updated: 2026-08-28

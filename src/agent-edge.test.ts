@@ -12,7 +12,63 @@ describe('public agent surfaces', () => {
     const response = await app.request('https://calorie.significanthobbies.com/api/ai');
     expect(response.status).toBe(200);
     expect(response.headers.get('content-type')).toContain('application/json');
-    expect(await response.json()).toMatchObject({ name: 'Calorie' });
+    const catalog = (await response.json()) as {
+      name: string;
+      surfaces: Array<{ url: string; md: string }>;
+    };
+    expect(catalog).toMatchObject({ name: 'Calorie' });
+    expect(catalog.surfaces).toHaveLength(6);
+    expect(catalog.surfaces.every((surface) => surface.url && surface.md)).toBe(true);
+  });
+
+  it.each([
+    ['/privacy/', '/privacy/index.md', 'Calorie privacy'],
+    ['/support/', '/support/index.md', 'Calorie support'],
+    ['/terms/', '/terms/index.md', 'Calorie terms'],
+    ['/accessibility/', '/accessibility/index.md', 'Calorie accessibility'],
+    ['/testflight/', '/testflight/index.md', 'Calorie TestFlight status'],
+  ])('serves a truthful Markdown alternate for %s', async (route, markdownPath, heading) => {
+    const [negotiated, direct] = await Promise.all([
+      app.request(`https://calorie.significanthobbies.com${route}`, {
+        headers: { accept: 'text/markdown' },
+      }),
+      app.request(`https://calorie.significanthobbies.com${markdownPath}`),
+    ]);
+
+    for (const response of [negotiated, direct]) {
+      expect(response.status).toBe(200);
+      expect(response.headers.get('content-type')).toContain('text/markdown');
+      expect(await response.text()).toContain(`# ${heading}`);
+    }
+  });
+
+  it('serves truthful pricing, instructions, and digest-verified skill discovery', async () => {
+    const [pricing, instructions, skill, index, aiCatalog] = await Promise.all([
+      app.request('https://calorie.significanthobbies.com/pricing.md'),
+      app.request('https://calorie.significanthobbies.com/agents.md'),
+      app.request(
+        'https://calorie.significanthobbies.com/.well-known/agent-skills/calorie-product-guide/SKILL.md'
+      ),
+      app.request('https://calorie.significanthobbies.com/.well-known/agent-skills/index.json'),
+      app.request('https://calorie.significanthobbies.com/.well-known/ai-catalog.json'),
+    ]);
+
+    expect(await pricing.text()).toContain('no paid plan, subscription, or checkout');
+    expect(await instructions.text()).toContain('Do not claim access');
+    expect(await skill.text()).toContain('name: calorie-product-guide');
+    expect(await index.json()).toMatchObject({
+      skills: [
+        {
+          name: 'calorie-product-guide',
+          digest: 'sha256:4a380ff01f3b2d3cb20efca4c40c981e9d00fbf71c7fe0e0b7ce4392bad926fd',
+        },
+      ],
+    });
+    const aiCatalogBody = await aiCatalog.json();
+    expect(aiCatalogBody).toMatchObject({ specVersion: '1.0' });
+    expect(aiCatalogBody.entries).toEqual(
+      expect.arrayContaining([expect.objectContaining({ displayName: 'Calorie product guide' })])
+    );
   });
 
   it('negotiates homepage Markdown without exposing journal data', async () => {

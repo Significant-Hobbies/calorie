@@ -1,0 +1,106 @@
+{
+  "$schema": "fleet.design-review.v1",
+  "version": 1,
+  "project": "calorie",
+  "target": "Native product landing and public beta entry",
+  "surfaceMode": "persuade",
+  "mode": "preserve",
+  "register": "product",
+  "context": {
+    "product": "PRODUCT.md",
+    "design": "DESIGN.md"
+  },
+  "direction": {
+    "references": [],
+    "probes": [],
+    "selected": "botanical-product-journal",
+    "approval": "not-required",
+    "before": "artifacts/design/before.png",
+    "library": {
+      "strategy": "upstream-first",
+      "primary": "existing-project-system",
+      "sources": [],
+      "runtime": "existing",
+      "customReplacement": {
+        "used": false,
+        "authorization": "not-required",
+        "reason": ""
+      }
+    },
+    "contract": {
+      "purpose": "Explain Calorie as a private native food and body journal that turns quick logging into transparent timing guidance.",
+      "purposeSource": "site-health/docs/project-dossiers/calorie.yaml plus PRODUCT.md and PROJECT_STATUS.md",
+      "canonicalPurpose": "Calorie is a private food and body journal that turns lightweight logging into transparent daily and timing guidance.",
+      "purposeAlignment": "match",
+      "driftNote": "",
+      "audience": "A person pursuing weight loss who logs food one-handed and checks progress in short daily moments.",
+      "job": "Show what to log, how timestamps become fasting, exercise, and sleep estimates, where the app runs, and how current beta access works.",
+      "thesis": "A calorie total cannot explain the day; visible inputs and rules can provide practical context without becoming an opaque coach.",
+      "system": "Botanical editorial landing with real iPhone screens, a three-step product loop, fit boundaries, privacy, beta status, project strip, and Ask AI footer.",
+      "signature": "The real Today screen sits inside a gridded botanical work surface beside the product promise.",
+      "risk": "Avoid medical certainty, punitive diet language, invented public installation links, and permanent free-or-paid promises."
+    }
+  },
+  "evidence": {
+    "screenshots": [
+      {
+        "width": 390,
+        "path": ".fleet/evidence/landing-audit/after-390.png"
+      },
+      {
+        "width": 768,
+        "path": ".fleet/evidence/landing-audit/after-768.png"
+      },
+      {
+        "width": 1440,
+        "path": ".fleet/evidence/landing-audit/after-1440.png"
+      }
+    ],
+    "projectCheck": {
+      "command": "pnpm quality",
+      "status": "pass"
+    },
+    "critique": {
+      "score": 38,
+      "maximum": 40
+    },
+    "audit": {
+      "score": 19,
+      "maximum": 20
+    },
+    "unresolved": {
+      "p0": 0,
+      "p1": 0
+    },
+    "detector": {
+      "posture": "advisory",
+      "findings": []
+    },
+    "comprehension": {
+      "status": "pass",
+      "reviewer": "Codex fresh-visitor purpose readback",
+      "answers": {
+        "product": "A private local-first food and body journal for iPhone and iPad.",
+        "audience": "Someone pursuing weight loss who wants fast daily logging without a punitive or opaque diet coach.",
+        "value": "It connects food, nutrients, water, routines, and weight to useful fasting, exercise, sleep, and progress context.",
+        "mechanism": "The app uses timestamps, personal targets, and visible formulas or rules rather than an AI coaching layer.",
+        "proof": "The page uses real native product screens and names the Today, quick-log, Foods, Progress, and settings surfaces.",
+        "nextAction": "Check the honest internal TestFlight status or inspect the real product screens."
+      },
+      "purposeScore": {
+        "product": 25,
+        "audience": 15,
+        "value": 15,
+        "mechanism": 15,
+        "proof": 14,
+        "nextAction": 15,
+        "total": 99
+      },
+      "mismatches": []
+    }
+  },
+  "ownerFeedback": {
+    "decision": "delegated",
+    "note": "The owner delegated fleet landing repairs and asked the agent to continue without project-by-project feedback pauses."
+  }
+}
