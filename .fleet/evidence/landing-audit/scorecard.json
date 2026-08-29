@@ -1,0 +1,43 @@
+{
+  "$schema": "fleet.landing-audit.v1",
+  "project": "calorie",
+  "priority": "P2",
+  "candidate": "https://lib-relations-eugene-toolkit.trycloudflare.com/",
+  "production": "https://calorie.significanthobbies.com/",
+  "productionChanged": false,
+  "scores": {
+    "purpose": 99,
+    "visualDesign": 96,
+    "seo": 98,
+    "geoAgentReadiness": 100,
+    "performance": 100
+  },
+  "truth": {
+    "form": "Native iPhone and iPad app with a static public product site and optional private sync API",
+    "availability": "Invited internal TestFlight only; no public invite or App Store listing",
+    "commercialState": "No paid plan, subscription, or checkout; no permanent future pricing promise",
+    "medicalBoundary": "Informational estimates, not diagnosis, treatment, or clinical nutrition advice"
+  },
+  "checks": {
+    "quality": "pass: 18 test files, 87 tests, typecheck, lint, format, dependency health, build, and hygiene",
+    "responsive": "pass: exact 390, 768, and 1440 CSS viewports with zero horizontal overflow",
+    "footer": "pass: cycling project strip and Ask AI composer both visibly present",
+    "seo": "pass: 16 critical checks, 0 failures; valid application JSON-LD without invented review evidence",
+    "linkGraph": "pass: 6 sitemap pages, 0 internal errors, 0 redirects, 0 orphan candidates",
+    "geo": "pass: S tier, 100 percent through the actual agent-edge boundary",
+    "performance": "pass: 20 of 20 PSI Swarm runs; weighted LCP 702ms, slow-mobile p75 1953ms, CLS 0, TBT 0"
+  },
+  "evidence": {
+    "mobile": ".fleet/evidence/landing-audit/after-390.png",
+    "tablet": ".fleet/evidence/landing-audit/after-768.png",
+    "desktop": ".fleet/evidence/landing-audit/after-1440.png",
+    "mobileFooter": ".fleet/evidence/landing-audit/footer-390.png",
+    "desktopFooter": ".fleet/evidence/landing-audit/footer-1440.png",
+    "performanceReport": ".fleet/evidence/landing-audit/performance.html"
+  },
+  "limitations": [
+    "The candidate is a temporary local Cloudflare tunnel, not a production deployment.",
+    "The public install path remains intentionally unavailable until a real public TestFlight or App Store URL exists.",
+    "Performance is lab evidence; INP requires real-user interaction data."
+  ]
+}
