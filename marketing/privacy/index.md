@@ -11,6 +11,10 @@ last_updated: 2026-08-28
 
 How Calorie handles local journal data, optional private cloud sync, and deletion.
 
+## Marketing-site analytics
+
+This static marketing site uses Microsoft Clarity to understand aggregate page use, heatmaps, and session replays. Clarity may process interaction and device data under Microsoft's privacy terms; sensitive page content is masked. This tracking is limited to the website and is not included in the native app.
+
 ## The default journal stays on your device
 
 Foods, entries, calories, carbs, protein, fibre, water, routine check-offs, weight, goals, and profile fields are stored locally on your iPhone or iPad. You can use the journal without creating an account.
@@ -21,7 +25,7 @@ If you choose Sign in with Apple, Calorie can keep a private, user-scoped copy i
 
 ## Account and service data
 
-Signed-in mode stores the account identifier and service records needed for authentication, synchronization, reliability, and abuse prevention. The static marketing pages do not receive the contents of a local-only journal and do not run a product analytics script.
+Signed-in mode stores the account identifier and service records needed for authentication, synchronization, reliability, and abuse prevention. The static marketing pages never receive the contents of a local-only journal. Website analytics is disclosed separately and is not included in the native app.
 
 ## Your controls
 
