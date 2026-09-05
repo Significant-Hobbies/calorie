@@ -3,6 +3,7 @@ import { drizzleAdapter } from 'better-auth/adapters/drizzle';
 import { bearer } from 'better-auth/plugins';
 import { drizzle } from 'drizzle-orm/d1';
 import { account, session, user, verification } from './schema';
+import { createPing } from './ping';
 
 export type AuthBindings = {
   DB: D1Database;
@@ -17,6 +18,8 @@ export type AuthBindings = {
   APPLE_CLIENT_SECRET?: string;
   APPLE_APP_BUNDLE_IDENTIFIER?: string;
   APPLE_NATIVE_AUDIENCES?: string;
+  APP_HEALTH_INGEST_KEY?: string;
+  APP_HEALTH_ENVIRONMENT?: string;
 };
 
 const LOCAL_ORIGINS = [
@@ -63,6 +66,10 @@ export function createAuth(env: AuthBindings, requestUrl: string) {
     env.BETTER_AUTH_SECRET ??
     (isLocalUrl(baseURL) ? 'calorie-local-dev-secret-never-use-in-production' : undefined);
   const appleBundleIdentifier = env.APPLE_APP_BUNDLE_IDENTIFIER?.trim() ?? '';
+  const ping = createPing({
+    key: env.APP_HEALTH_INGEST_KEY,
+    environment: env.APP_HEALTH_ENVIRONMENT,
+  });
 
   return betterAuth({
     database: drizzleAdapter(drizzle(env.DB), {
@@ -94,6 +101,18 @@ export function createAuth(env: AuthBindings, requestUrl: string) {
         disableImplicitLinking: true,
         trustedProviders: ['google', 'apple'],
         allowDifferentEmails: true,
+      },
+    },
+    databaseHooks: {
+      user: {
+        create: {
+          after: async (newUser) => {
+            await ping('signup', {
+              title: newUser.email,
+              props: { id: newUser.id, name: newUser.name },
+            });
+          },
+        },
       },
     },
     user: {
