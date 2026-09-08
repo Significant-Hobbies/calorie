@@ -33,6 +33,18 @@ full sets/reps workout-programming system.
 
 ## Timeline
 
+- 2026-09-08 — prepared build 13 to preserve the sync queue after failed
+  persistence. Failed compaction, acknowledgement and clear operations now
+  retain the prior in-memory queue until their atomic write succeeds. Failed
+  queue reads remain retryable and cannot silently become an empty loaded
+  queue or be overwritten by a later edit. Four filesystem regressions fail
+  against the old source and pass with the repair; all 30 core tests pass in
+  an isolated Swift 6 package using the repository sources and tests. The local
+  native gate found no available iPhone simulator and did not execute tests;
+  these core checks do not qualify iPhone UI, Release or coverage. Full hosted
+  native verification, physical use and signed-in sync remain required under
+  issue 88. Build 12 remains the last verified phone installation.
+
 - 2026-09-08 — priority reliability repair in progress under issue #88: reproduced failed-save false success, lost overlapping water entries and unread-file overwrite. Local writes now serialize, editors acknowledge committed outcomes, failed delete/undo retains recovery, and the existing backup controls remain available after read failure. Local launch and save completion no longer await optional account/network work. Failed outbox writes require reconciliation before cloud refresh, including after relaunch; one-off serving edits scale their logged nutrients. Build 12 passed pnpm check and the full native gate: 26 core, 32 app and 9 UI tests, Release build and 66.2357% production coverage. Physical use, signed-in sync and public distribution remain unqualified.
 
 - 2026-08-23 — released native build `1.0.0 (8)` with Apple-first account and

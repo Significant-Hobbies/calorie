@@ -32,6 +32,7 @@
 		909325DDD59D256FDE585104 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 582EBD53FE4DBDD1F1280E47 /* Assets.xcassets */; };
 		986CAE0FE6FF868ADADE80A3 /* Calculations.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB27B9879B2822A834344B04 /* Calculations.swift */; };
 		9A3D45CEDC31C27CC3147C08 /* CalorieCore.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = DC17149D5C06CBF45F708679 /* CalorieCore.framework */; };
+		A1DBC499DC26BE5F150C88C5 /* SyncIntentPersistenceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E7A9F84CB665A34F0058E08 /* SyncIntentPersistenceTests.swift */; };
 		A8224A20DD29245A504AD39D /* CalorieUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B02FB98A0C748A0D823CFF0E /* CalorieUITests.swift */; };
 		AD3C9AC8E8E54DAA43140F1E /* AppModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 038969CDF1B5BC7ACD39E9BA /* AppModel.swift */; };
 		B3B258069F32F20F9DB3C832 /* CalorieCore.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = DC17149D5C06CBF45F708679 /* CalorieCore.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
@@ -109,6 +110,7 @@
 		6418886902F9A6D965085EB8 /* NativeAccountClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeAccountClient.swift; sourceTree = "<group>"; };
 		72D5C2AB785FC4AB4B577760 /* CalorieOnboardingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CalorieOnboardingView.swift; sourceTree = "<group>"; };
 		7E37CD42D2D735AEC0AD67FA /* TodayView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TodayView.swift; sourceTree = "<group>"; };
+		7E7A9F84CB665A34F0058E08 /* SyncIntentPersistenceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SyncIntentPersistenceTests.swift; sourceTree = "<group>"; };
 		82843A6E095B0D695BE975A9 /* QuickLogView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuickLogView.swift; sourceTree = "<group>"; };
 		8ACE5415BD48E3808BAF96FF /* Domain.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Domain.swift; sourceTree = "<group>"; };
 		999A9A642DBE09F3AF3DFEC7 /* CalorieTests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = CalorieTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -211,6 +213,7 @@
 			isa = PBXGroup;
 			children = (
 				5B7DFC8284B00F4651697FFE /* CalorieCoreTests.swift */,
+				7E7A9F84CB665A34F0058E08 /* SyncIntentPersistenceTests.swift */,
 			);
 			name = CalorieCoreTests;
 			path = Tests/CalorieCoreTests;
@@ -429,6 +432,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				78E4CFBE00AEC0B522208260 /* CalorieCoreTests.swift in Sources */,
+				A1DBC499DC26BE5F150C88C5 /* SyncIntentPersistenceTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -652,7 +656,7 @@
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				CODE_SIGN_STYLE = Automatic;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 12;
+				CURRENT_PROJECT_VERSION = 13;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				DEVELOPMENT_TEAM = 8F7LXHTJZR;
 				ENABLE_NS_ASSERTIONS = NO;
@@ -754,7 +758,7 @@
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				CODE_SIGN_STYLE = Automatic;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 12;
+				CURRENT_PROJECT_VERSION = 13;
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				DEVELOPMENT_TEAM = 8F7LXHTJZR;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;

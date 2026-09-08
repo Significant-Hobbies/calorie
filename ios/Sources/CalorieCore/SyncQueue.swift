@@ -128,40 +128,46 @@ public actor SyncIntentStore {
            }).first {
             compactedOperation = .updateProfile(before: originalBefore, after: after)
         }
+        var next = intents
         if case .snapshot = compactedOperation {
-            intents.removeAll {
+            next.removeAll {
                 if case .snapshot = $0.operation { return true }
                 return false
             }
         } else if let key = compactedOperation.compactionKey {
-            intents.removeAll { $0.operation.compactionKey == key }
+            next.removeAll { $0.operation.compactionKey == key }
         }
-        intents.append(SyncIntent(operation: compactedOperation))
-        try persist()
+        next.append(SyncIntent(operation: compactedOperation))
+        try persist(next)
+        intents = next
     }
 
     public func complete(_ id: UUID) throws {
         try loadIfNeeded()
-        intents.removeAll { $0.id == id }
-        try persist()
+        let next = intents.filter { $0.id != id }
+        try persist(next)
+        intents = next
     }
 
     public func removeAll() throws {
+        try persist([])
         intents = []
         loaded = true
-        try persist()
     }
 
     private func loadIfNeeded() throws {
         guard !loaded else { return }
-        defer { loaded = true }
-        guard FileManager.default.fileExists(atPath: fileURL.path) else { return }
+        guard FileManager.default.fileExists(atPath: fileURL.path) else {
+            loaded = true
+            return
+        }
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .iso8601
         intents = try decoder.decode([SyncIntent].self, from: Data(contentsOf: fileURL))
+        loaded = true
     }
 
-    private func persist() throws {
+    private func persist(_ candidate: [SyncIntent]) throws {
         try FileManager.default.createDirectory(
             at: fileURL.deletingLastPathComponent(),
             withIntermediateDirectories: true
@@ -169,7 +175,7 @@ public actor SyncIntentStore {
         let encoder = JSONEncoder()
         encoder.dateEncodingStrategy = .iso8601
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
-        try encoder.encode(intents).write(
+        try encoder.encode(candidate).write(
             to: fileURL,
             options: [.atomic, .completeFileProtectionUnlessOpen]
         )
