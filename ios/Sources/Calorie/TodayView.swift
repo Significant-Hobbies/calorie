@@ -410,6 +410,7 @@ private struct EntryEditorView: View {
     var body: some View {
         NavigationStack {
             Form {
+                LocalSaveErrorView()
                 Section(entry.foodName) {
                     Stepper(
                         "Servings: \(servings.formatted(.number.precision(.fractionLength(2))))",
@@ -440,8 +441,9 @@ private struct EntryEditorView: View {
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Save") {
                         Task {
-                            await model.update(entry, servings: servings, meal: meal, timestamp: timestamp)
-                            dismiss()
+                            if await model.update(entry, servings: servings, meal: meal, timestamp: timestamp) {
+                                dismiss()
+                            }
                         }
                     }
                 }
@@ -463,6 +465,7 @@ private struct DailyContextEditorView: View {
     var body: some View {
         NavigationStack {
             Form {
+                LocalSaveErrorView()
                 Section {
                     TextField("Weight (kg, optional)", text: $weight)
                         .keyboardType(.decimalPad)
@@ -511,12 +514,12 @@ private struct DailyContextEditorView: View {
                             typicalCycleDays: cycleEnabled ? cycleDays : nil
                         )
                         Task {
-                            await model.saveDailyContext(
+                            let saved = await model.saveDailyContext(
                                 weightKilograms: Double(weight),
                                 note: note,
                                 cycle: cycle
                             )
-                            dismiss()
+                            if saved { dismiss() }
                         }
                     }
                     .disabled(!weight.isEmpty && Double(weight) == nil)

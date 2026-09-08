@@ -11,6 +11,8 @@ struct RootView: View {
         Group {
             if model.isLoading {
                 ProgressView("Opening your food journal…")
+            } else if !model.hasLoadedDocument {
+                NavigationStack { YouView(recoveryOnly: true) }
             } else if isOnboardingSessionActive || model.shouldPresentCalorieOnboarding(completed: onboardingCompleted) {
                 CalorieOnboardingView {
                     onboardingCompleted = true
@@ -40,7 +42,7 @@ struct RootView: View {
             }
         }
         .alert("Calorie", isPresented: Binding(
-            get: { model.message != nil && model.lastDeletedEntry == nil },
+            get: { model.message != nil && (model.lastDeletedEntry == nil || model.saveError != nil) },
             set: { if !$0 { model.message = nil } }
         )) {
             Button("OK", role: .cancel) { model.message = nil }
@@ -232,6 +234,19 @@ private struct ReconciliationView: View {
         case .keepCloud: "Use cloud records"
         case .keepIPhone: "Keep and upload device records"
         case .merge: "Merge journals"
+        }
+    }
+}
+
+struct LocalSaveErrorView: View {
+    @Environment(AppModel.self) private var model
+
+    var body: some View {
+        if let error = model.saveError {
+            Text("Could not save. Your input is still here. \(error)")
+                .font(.callout)
+                .foregroundStyle(.red)
+                .accessibilityIdentifier("local-save-error")
         }
     }
 }

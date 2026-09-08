@@ -10,8 +10,12 @@ final class AppModel {
     var selectedDate = Date.now
     var selectedTab = 0
     var isLoading = true
+    private(set) var hasLoadedDocument = false
+    private(set) var isSaving = false
+    private var localWriteWaiters: [CheckedContinuation<Void, Never>] = []
     var isQuickLogPresented = false
     var message: String?
+    private(set) var saveError: String?
     var lastDeletedEntry: FoodEntry?
     var importPreview: CalorieDocument?
     var isImportConfirmationPresented = false
@@ -97,6 +101,7 @@ final class AppModel {
         defer { isLoading = false }
         do {
             let arguments = ProcessInfo.processInfo.arguments
+            if arguments.contains("--recovery-demo") { throw CocoaError(.fileReadCorruptFile) }
             if arguments.contains("--reset-onboarding") {
                 CalorieOnboardingPreferences.reset()
             }
@@ -106,19 +111,27 @@ final class AppModel {
             } else {
                 document = arguments.contains("--fresh-demo") ? .sample : try await store.load()
             }
+            hasLoadedDocument = true
             if arguments.contains("--quick-log-demo") { isQuickLogPresented = true }
-            account = try? await accountClient.restoreAccount()
-            pendingSyncCount = (try? await syncStore.pending().count) ?? 0
-            if account != nil {
-                if document.syncState == .localOnly {
-                    await prepareCloudReconciliation()
-                } else {
-                    await syncNow()
-                }
-            }
         } catch {
-            document = .starter
             message = error.localizedDescription
+        }
+    }
+
+    func restoreAccountAndSync() async {
+        let fixtures = ["--fresh-demo", "--onboarding-demo", "--recovery-demo"]
+        guard hasLoadedDocument, !isAccountWorking,
+              !ProcessInfo.processInfo.arguments.contains(where: fixtures.contains) else { return }
+        isAccountWorking = true
+        defer { isAccountWorking = false }
+        account = try? await accountClient.restoreAccount()
+        pendingSyncCount = (try? await syncStore.pending().count) ?? 0
+        if account != nil {
+            if document.syncState == .localOnly {
+                await prepareCloudReconciliation()
+            } else {
+                await syncNow()
+            }
         }
     }
 
@@ -172,32 +185,34 @@ final class AppModel {
     }
 
     func log(_ food: Food, servings: Double, meal: Meal, at date: Date) async {
-        await mutate { $0.log(food: food, servings: servings, meal: meal, at: date) }
+        guard await mutate({ $0.log(food: food, servings: servings, meal: meal, at: date) }) else { return }
         isQuickLogPresented = false
         message = "\(food.name) added."
     }
 
     func delete(_ entry: FoodEntry) async {
-        await mutate { document in
-            lastDeletedEntry = try document.deleteEntry(entry.id)
-        }
+        guard await mutate({ document in
+            _ = try document.deleteEntry(entry.id)
+        }) else { return }
+        lastDeletedEntry = entry
         message = "Entry removed. Undo is available below."
     }
 
     func undoDelete() async {
         guard let entry = lastDeletedEntry else { return }
-        await mutate { $0.restoreEntry(entry) }
+        guard await mutate({ $0.restoreEntry(entry) }) else { return }
         lastDeletedEntry = nil
         message = "Entry restored."
     }
 
     func duplicate(_ entry: FoodEntry) async {
-        await mutate { try $0.duplicateEntry(entry.id) }
+        guard await mutate({ try $0.duplicateEntry(entry.id) }) else { return }
         message = "Entry duplicated."
     }
 
-    func update(_ entry: FoodEntry, servings: Double, meal: Meal, timestamp: Date) async {
-        await mutate { document in
+    @discardableResult
+    func update(_ entry: FoodEntry, servings: Double, meal: Meal, timestamp: Date) async -> Bool {
+        let committed = await mutate { document in
             guard let index = document.foodEntries.firstIndex(where: { $0.id == entry.id }) else {
                 throw CalorieError.entryNotFound
             }
@@ -208,19 +223,25 @@ final class AppModel {
             if let food = document.foods.first(where: { $0.id == entry.foodID }) {
                 updated.foodName = food.name
                 updated.nutrients = food.nutrients.scaled(by: updated.servings)
+            } else {
+                updated.nutrients = entry.nutrients.scaled(by: updated.servings / max(entry.servings, 0.0001))
             }
             document.foodEntries[index] = updated
         }
+        guard committed else { return false }
         message = "Food entry updated."
+        return committed
     }
 
     func addWater(_ millilitres: Int) async {
-        await mutate { $0.addWater(millilitres, at: selectedDate) }
+        let date = selectedDate
+        await mutate { $0.addWater(millilitres, at: date) }
     }
 
     func toggleRoutine(_ routine: MedicationRoutine) async {
+        let date = selectedDate
         await mutate {
-            $0.toggleRoutine(routine.id, on: selectedDate)
+            $0.toggleRoutine(routine.id, on: date)
         }
     }
 
@@ -228,20 +249,26 @@ final class AppModel {
         await mutate { $0.toggleFavorite(food.id) }
     }
 
-    func addCustomFood(_ food: Food) async {
-        await mutate { $0.addCustomFood(food) }
+    @discardableResult
+    func addCustomFood(_ food: Food) async -> Bool {
+        let committed = await mutate { $0.addCustomFood(food) }
+        guard committed else { return false }
         message = "Custom food saved."
+        return committed
     }
 
-    func saveFood(_ food: Food) async {
-        await mutate { document in
+    @discardableResult
+    func saveFood(_ food: Food) async -> Bool {
+        let committed = await mutate { document in
             if let index = document.foods.firstIndex(where: { $0.id == food.id }) {
                 document.foods[index] = food
             } else {
                 document.addCustomFood(food)
             }
         }
+        guard committed else { return false }
         message = "Food saved."
+        return committed
     }
 
     func toggleArchive(_ food: Food) async {
@@ -251,14 +278,16 @@ final class AppModel {
         }
     }
 
-    func saveDailyContext(weightKilograms: Double?, note: String, cycle: CycleContext) async {
-        await mutate { document in
+    @discardableResult
+    func saveDailyContext(weightKilograms: Double?, note: String, cycle: CycleContext) async -> Bool {
+        let date = selectedDate
+        let committed = await mutate { document in
             let calendar = Calendar.current
-            document.weightEntries.removeAll { calendar.isDate($0.date, inSameDayAs: selectedDate) }
+            document.weightEntries.removeAll { calendar.isDate($0.date, inSameDayAs: date) }
             if let weightKilograms, weightKilograms > 0 {
-                document.weightEntries.append(WeightEntry(date: selectedDate, kilograms: weightKilograms))
+                document.weightEntries.append(WeightEntry(date: date, kilograms: weightKilograms))
             }
-            let key = DateKey.string(selectedDate)
+            let key = DateKey.string(date)
             let trimmedNote = note.trimmingCharacters(in: .whitespacesAndNewlines)
             if trimmedNote.isEmpty {
                 document.dailyNotes.removeValue(forKey: key)
@@ -267,17 +296,21 @@ final class AppModel {
             }
             document.cycle = cycle
         }
+        guard committed else { return false }
         message = "Daily context saved."
+        return committed
     }
 
-    func saveRoutine(_ routine: MedicationRoutine) async {
-        await mutate { document in
+    @discardableResult
+    func saveRoutine(_ routine: MedicationRoutine) async -> Bool {
+        let committed = await mutate { document in
             if let index = document.routines.firstIndex(where: { $0.id == routine.id }) {
                 document.routines[index] = routine
             } else {
                 document.routines.append(routine)
             }
         }
+        return committed
     }
 
     func toggleArchive(_ routine: MedicationRoutine) async {
@@ -286,8 +319,10 @@ final class AppModel {
         await saveRoutine(updated)
     }
 
-    func updateProfile(_ profile: Profile) async {
-        await mutate { $0.profile = profile }
+    @discardableResult
+    func updateProfile(_ profile: Profile) async -> Bool {
+        let committed = await mutate { $0.profile = profile }
+        return committed
     }
 
     func setTheme(_ theme: AppTheme) async {
@@ -305,28 +340,17 @@ final class AppModel {
 
     func confirmImport() async {
         guard let importPreview else { return }
-        do {
-            let previous = document
-            try await store.replace(with: importPreview)
-            document = importPreview
-            if account != nil {
-                for operation in CloudJournalDiff.operations(from: previous, to: importPreview) {
-                    try await syncStore.enqueue(operation)
-                }
-                await syncNow()
-            }
-            self.importPreview = nil
-            isImportConfirmationPresented = false
-            message = "Calorie journal replaced."
-        } catch {
-            message = error.localizedDescription
-        }
+        guard await mutate(allowUnread: true, { $0 = importPreview }) else { return }
+        self.importPreview = nil
+        isImportConfirmationPresented = false
+        message = "Calorie journal replaced."
     }
 
     func resetLocalData() async {
         do {
-            try await store.reset()
-            document = .starter
+            try await commitLocalChange(allowUnread: true) { $0 = .starter }
+            hasLoadedDocument = true
+            saveError = nil
             message = "Local journal reset."
         } catch {
             message = error.localizedDescription
@@ -377,8 +401,7 @@ final class AppModel {
     private func recoverFromUnlinkedCalorieAccount() async {
         await cloudQuery.clear()
         cloudSnapshot = nil
-        document.syncState = .localOnly
-        try? await store.save(document)
+        _ = try? await commitLocalChange { $0.syncState = .localOnly }
         if let account, !account.hasApple {
             accountNotice = "Existing Calorie account connected. Add Sign in with Apple to finish linking your cloud journal."
             message = "Add Sign in with Apple once to connect this account to the retained Calorie journal. Your journal on this device has not changed."
@@ -397,8 +420,7 @@ final class AppModel {
         account = nil
         cloudSnapshot = nil
         syncRequestedAfterMutation = false
-        document.syncState = .localOnly
-        try? await store.save(document)
+        _ = try? await commitLocalChange { $0.syncState = .localOnly }
         isAccountWorking = false
         accountNotice = "Signed out. This device journal is still here."
     }
@@ -414,8 +436,7 @@ final class AppModel {
             account = nil
             cloudSnapshot = nil
             syncRequestedAfterMutation = false
-            document.syncState = .localOnly
-            try await store.save(document)
+            try await commitLocalChange { $0.syncState = .localOnly }
             accountNotice = "Calorie cloud data deleted. This device journal was preserved."
         } catch {
             message = accountErrorMessage(error, recovery: "Try deleting the cloud account again. Nothing was removed from this device.")
@@ -426,29 +447,17 @@ final class AppModel {
         guard let cloudSnapshot else { return }
         isAccountWorking = true
         defer { isAccountWorking = false }
-        do {
-            let next = CloudJournalMapper.reconcile(local: document, cloud: cloudSnapshot, choice: choice)
-            if choice == .keepCloud {
-                try await syncStore.removeAll()
-                pendingSyncCount = 0
-            }
-            try await store.save(next)
-            document = next
-            if choice != .keepCloud {
-                for operation in CloudJournalDiff.operations(from: cloudSnapshot.document, to: next) {
-                    try await syncStore.enqueue(operation)
-                }
-                await syncNow()
-            }
-            self.cloudSnapshot = nil
-            isReconciliationPresented = false
+        guard await mutate(cloudBaseline: cloudSnapshot.document, clearPending: choice == .keepCloud, {
+            $0 = CloudJournalMapper.reconcile(local: $0, cloud: cloudSnapshot, choice: choice)
+        }) else { return }
+        self.cloudSnapshot = nil
+        isReconciliationPresented = false
+        if document.syncState != .conflict {
             accountNotice = switch choice {
             case .keepCloud: "Your current cloud journal is now on this device."
             case .keepIPhone: "This device journal is preserved and queued for cloud sync."
             case .merge: "Cloud and device records were merged without duplicate IDs."
             }
-        } catch {
-            message = accountErrorMessage(error, recovery: "Try this journal choice again. Neither journal was discarded.")
         }
     }
 
@@ -467,15 +476,12 @@ final class AppModel {
 
     private func prepareCloudReconciliation() async {
         do {
+            try await commitLocalChange { $0.syncState = .conflict }
             cloudSnapshot = try await fetchCloud(policy: .always).value
-            document.syncState = .conflict
-            try await store.save(document)
             isReconciliationPresented = true
         } catch let error as NativeAccountError where error.requiresExistingAccountRecovery {
             await recoverFromUnlinkedCalorieAccount()
         } catch {
-            document.syncState = .failed
-            try? await store.save(document)
             message = accountErrorMessage(error, recovery: "Try loading your cloud journal again. This device journal has not changed.")
         }
     }
@@ -490,7 +496,7 @@ final class AppModel {
             syncRequestedAfterMutation = true
             return
         }
-        if document.syncState == .conflict {
+        if await requiresJournalChoice() {
             await resumeReconciliation()
             return
         }
@@ -509,13 +515,11 @@ final class AppModel {
                 }
                 guard try await syncStore.pending().isEmpty else { continue }
                 if query.source == .network {
-                    let refreshed = CloudJournalMapper.reconcile(
-                        local: document,
-                        cloud: query.value,
-                        choice: .keepCloud
-                    )
-                    document = refreshed
-                    try await store.save(refreshed)
+                    let applied = try await applyCloudSnapshot(query.value, revision: revisionBeforeFetch)
+                    if !applied {
+                        syncRequestedAfterMutation = true
+                        break
+                    }
                 }
                 guard try await syncStore.pending().isEmpty else { continue }
                 break
@@ -530,6 +534,15 @@ final class AppModel {
         }
     }
 
+    private func requiresJournalChoice() async -> Bool {
+        if document.syncState == .pending, (try? await syncStore.pending().isEmpty) == true {
+            // An older build may have committed a journal without its intent.
+            // Preserve that journal for an explicit choice after a restart.
+            _ = try? await commitLocalChange { $0.syncState = .conflict }
+        }
+        return document.syncState == .conflict
+    }
+
     private func handleSyncFailure(_ error: Error) async {
         if let accountError = error as? NativeAccountError,
            accountError.requiresExistingAccountRecovery {
@@ -537,8 +550,9 @@ final class AppModel {
             return
         }
         pendingSyncCount = (try? await syncStore.pending().count) ?? pendingSyncCount
-        document.syncState = pendingSyncCount > 0 ? .pending : .failed
-        try? await store.save(document)
+        _ = try? await commitLocalChange {
+            if $0.syncState != .conflict { $0.syncState = pendingSyncCount > 0 ? .pending : .failed }
+        }
         message = accountErrorMessage(error, recovery: "Your changes are saved on this device and cloud sync can be retried.")
     }
 
@@ -581,39 +595,136 @@ final class AppModel {
     }
 
     @discardableResult
-    private func mutate(_ operation: (inout CalorieDocument) throws -> Void) async -> Bool {
+    private func commitLocalChange(
+        allowUnread: Bool = false,
+        _ operation: (inout CalorieDocument) throws -> Void
+    ) async throws -> CalorieDocument {
+        guard hasLoadedDocument || allowUnread else { throw CocoaError(.fileReadCorruptFile) }
+        await acquireLocalWrite()
+        defer { releaseLocalWrite() }
+        let previous = document
+        var next = previous
+        try operation(&next)
+        try await store.save(next)
+        document = next
+        localMutationRevision += 1
+        return previous
+    }
+
+    private func applyCloudSnapshot(_ snapshot: CloudJournalSnapshot, revision: Int) async throws -> Bool {
+        await acquireLocalWrite()
+        defer { releaseLocalWrite() }
+        guard hasLoadedDocument, account != nil, document.syncState != .conflict,
+              activeLocalMutations == 0, localMutationRevision == revision else { return false }
+        let next = CloudJournalMapper.reconcile(local: document, cloud: snapshot, choice: .keepCloud)
+        try await store.save(next)
+        document = next
+        localMutationRevision += 1
+        return true
+    }
+
+    private func acquireLocalWrite() async {
+        if isSaving {
+            await withCheckedContinuation { localWriteWaiters.append($0) }
+        } else {
+            isSaving = true
+        }
+    }
+
+    private func releaseLocalWrite() {
+        if localWriteWaiters.isEmpty {
+            isSaving = false
+        } else {
+            localWriteWaiters.removeFirst().resume()
+        }
+    }
+
+    private func prepareLocalCommit(_ next: CalorieDocument, stagesSync: Bool) async -> CalorieDocument {
+        var prepared = next
+        if account != nil, stagesSync {
+            // Retain the journal if the app stops before its separate outbox
+            // becomes durable, including explicit imports and choices.
+            prepared.syncState = .conflict
+            await cloudQuery.invalidate()
+        } else if account == nil {
+            prepared.syncState = .localOnly
+        }
+        return prepared
+    }
+
+    private func persistSyncOperations(
+        _ operations: [SyncOperation],
+        clearPending: Bool,
+        canAutomaticallySync: Bool,
+        stagesSync: Bool
+    ) async throws -> Bool {
+        guard account != nil else { return false }
+        if clearPending { try await syncStore.removeAll() }
+        for operation in operations { try await syncStore.enqueue(operation) }
+        pendingSyncCount = (try await syncStore.pending()).count
+        guard canAutomaticallySync, stagesSync else { return false }
+        var ready = document
+        ready.syncState = pendingSyncCount > 0 ? .pending : .synced
+        try await store.save(ready)
+        document = ready
+        return pendingSyncCount > 0
+    }
+
+    @discardableResult
+    private func mutate(
+        allowUnread: Bool = false,
+        cloudBaseline: CalorieDocument? = nil,
+        clearPending: Bool = false,
+        _ operation: (inout CalorieDocument) throws -> Void
+    ) async -> Bool {
+        guard hasLoadedDocument || allowUnread else {
+            message = "Your journal could not be opened. Retry opening it or restore a backup before making changes."
+            return false
+        }
         activeLocalMutations += 1
+        await acquireLocalWrite()
         var shouldRequestSync = false
         var succeeded = false
         do {
             let previous = document
-            var next = document
+            var next = previous
             try operation(&next)
-            let syncOperations = account == nil ? [] : CloudJournalDiff.operations(from: previous, to: next)
-            if !syncOperations.isEmpty {
-                next.syncState = .pending
-                localMutationRevision += 1
-                await cloudQuery.invalidate()
-                shouldRequestSync = true
-            }
+            let syncOperations = account == nil || clearPending ? []
+                : CloudJournalDiff.operations(from: cloudBaseline ?? previous, to: next)
+            let stagesSync = !syncOperations.isEmpty || clearPending || allowUnread
+            next = await prepareLocalCommit(next, stagesSync: stagesSync)
             try await store.save(next)
             document = next
-            if !syncOperations.isEmpty {
-                for operation in syncOperations {
-                    try await syncStore.enqueue(operation)
-                }
-                pendingSyncCount = (try await syncStore.pending()).count
-            }
+            localMutationRevision += 1
+            hasLoadedDocument = true
             succeeded = true
+            saveError = nil
+            shouldRequestSync = try await persistSyncOperations(
+                syncOperations,
+                clearPending: clearPending,
+                canAutomaticallySync: previous.syncState != .conflict || cloudBaseline != nil,
+                stagesSync: stagesSync
+            )
         } catch {
-            message = error.localizedDescription
+            if succeeded {
+                syncRequestedAfterMutation = false
+                accountNotice = "Saved on this device. Review your journals before retrying cloud sync: \(error.localizedDescription)"
+            } else {
+                saveError = error.localizedDescription
+                message = error.localizedDescription
+            }
         }
-        if shouldRequestSync { syncRequestedAfterMutation = true }
+        finishLocalMutation(requestSync: shouldRequestSync)
+        return succeeded
+    }
+
+    private func finishLocalMutation(requestSync: Bool) {
+        if requestSync { syncRequestedAfterMutation = true }
         activeLocalMutations -= 1
+        releaseLocalWrite()
         if activeLocalMutations == 0, syncRequestedAfterMutation {
             syncRequestedAfterMutation = false
-            await syncNow()
+            Task { await syncNow() }
         }
-        return succeeded
     }
 }

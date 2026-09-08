@@ -1,6 +1,6 @@
 # Calorie — PROJECT STATUS
 
-Last updated: 2026-08-23
+Last updated: 2026-09-08
 
 ## Why / What
 
@@ -32,6 +32,8 @@ full sets/reps workout-programming system.
 - Fleet deployment, accessibility, and UI standards
 
 ## Timeline
+
+- 2026-09-08 — priority reliability repair in progress under issue #88: reproduced failed-save false success, lost overlapping water entries and unread-file overwrite. Local writes now serialize, editors acknowledge committed outcomes, failed delete/undo retains recovery, and the existing backup controls remain available after read failure. Local launch and save completion no longer await optional account/network work. Failed outbox writes require reconciliation before cloud refresh, including after relaunch; one-off serving edits scale their logged nutrients. Build 12 passed pnpm check and the full native gate: 26 core, 32 app and 9 UI tests, Release build and 66.2357% production coverage. Physical use, signed-in sync and public distribution remain unqualified.
 
 - 2026-08-23 — released native build `1.0.0 (8)` with Apple-first account and
   sync language from merged PR #77. Both release-branch CI jobs passed; the

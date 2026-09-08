@@ -11,7 +11,10 @@ struct CalorieApp: App {
             RootView()
                 .environment(model)
                 .preferredColorScheme(model.preferredColorScheme)
-                .task { await model.load() }
+                .task {
+                    await model.load()
+                    await model.restoreAccountAndSync()
+                }
                 .onChange(of: scenePhase) { _, phase in
                     guard phase == .active else { return }
                     Task { await model.refreshFromCloud() }

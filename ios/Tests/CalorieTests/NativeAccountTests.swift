@@ -119,6 +119,7 @@ final class NativeAccountTests: XCTestCase {
         let model = AppModel(store: store, accountClient: client, syncStore: syncStore)
 
         await model.load()
+        await model.restoreAccountAndSync()
 
         XCTAssertEqual(model.account?.providers, ["google"])
         XCTAssertEqual(model.document.syncState, .conflict)
@@ -137,6 +138,7 @@ final class NativeAccountTests: XCTestCase {
         let model = AppModel(store: store, accountClient: client, syncStore: syncStore)
 
         await model.load()
+        await model.restoreAccountAndSync()
 
         XCTAssertEqual(model.document.foods.map(\.name), ["Cloud oats"])
         XCTAssertEqual(model.document.syncState, .synced)
@@ -161,6 +163,7 @@ final class NativeAccountTests: XCTestCase {
             cloudQuery: ServerStateQueryCache(staleAfter: 0)
         )
         await model.load()
+        await model.restoreAccountAndSync()
         let changed = Self.cloudExport.replacingOccurrences(of: "Cloud oats", with: "Website oats")
         await client.setExportData(Data(changed.utf8))
 
@@ -180,6 +183,7 @@ final class NativeAccountTests: XCTestCase {
         let client = StubNativeAccountClient(exportData: Data(Self.cloudExport.utf8))
         let model = AppModel(store: store, accountClient: client, syncStore: syncStore)
         await model.load()
+        await model.restoreAccountAndSync()
         let changed = Self.cloudExport.replacingOccurrences(of: "Cloud oats", with: "Website oats")
         await client.setExportData(Data(changed.utf8))
 
@@ -207,15 +211,75 @@ final class NativeAccountTests: XCTestCase {
         let client = StubNativeAccountClient(exportData: Data(Self.cloudExport.utf8))
         let model = AppModel(store: store, accountClient: client, syncStore: syncStore)
         await model.load()
+        await model.restoreAccountAndSync()
         var profile = model.document.profile
         profile.waterTargetMillilitres += 250
 
         await model.updateProfile(profile)
+        XCTAssertEqual(model.document.profile.waterTargetMillilitres, profile.waterTargetMillilitres)
+        let clock = ContinuousClock()
+        let deadline = clock.now.advanced(by: .seconds(3))
+        while await client.exportRequestCount < 2, clock.now < deadline {
+            try await Task.sleep(for: .milliseconds(10))
+        }
         let applyRequestCount = await client.applyRequestCount
         let exportRequestCount = await client.exportRequestCount
 
         XCTAssertEqual(applyRequestCount, 1)
         XCTAssertEqual(exportRequestCount, 2)
+    }
+
+    @MainActor
+    func testFailedSyncQueueCannotOverwriteCommittedLocalChange() async throws {
+        let directory = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let store = CalorieStore(fileURL: directory.appending(path: "journal.json"))
+        let blocker = directory.appending(path: "blocked")
+        let syncStore = SyncIntentStore(fileURL: blocker.appending(path: "sync.json"))
+        var local = CalorieDocument.starter
+        local.syncState = .synced
+        try await store.save(local)
+        let client = StubNativeAccountClient(exportData: Data(Self.cloudExport.utf8))
+        let model = AppModel(store: store, accountClient: client, syncStore: syncStore)
+        await model.load()
+        await model.restoreAccountAndSync()
+        try Data("not a directory".utf8).write(to: blocker)
+        var profile = model.document.profile
+        profile.waterTargetMillilitres += 250
+        let saved = await model.updateProfile(profile)
+        XCTAssertTrue(saved, "The local journal committed even though its outbox failed")
+        XCTAssertEqual(model.document.syncState, .conflict)
+        await model.syncNow()
+        let reloaded = try await store.load()
+        XCTAssertEqual(reloaded.profile.waterTargetMillilitres, profile.waterTargetMillilitres)
+        XCTAssertTrue(model.isReconciliationPresented)
+        XCTAssertEqual(reloaded.syncState, .conflict)
+
+        // Recover a journal left pending by an earlier build whose outbox
+        // never reached disk. Restoring an account must not discard it.
+        var interrupted = reloaded
+        interrupted.syncState = .pending
+        try await store.save(interrupted)
+        let reopened = AppModel(store: store, accountClient: client,
+                                syncStore: SyncIntentStore(fileURL: blocker.appending(path: "sync.json")))
+        await reopened.load()
+        await reopened.restoreAccountAndSync()
+        XCTAssertEqual(reopened.document.profile.waterTargetMillilitres, profile.waterTargetMillilitres)
+        XCTAssertEqual(reopened.document.syncState, .conflict)
+        XCTAssertTrue(reopened.isReconciliationPresented)
+
+        var backup = reopened.document
+        backup.profile.waterTargetMillilitres += 250
+        backup.syncState = .synced
+        let data = try await store.export(backup)
+        await reopened.prepareImport(data)
+        await reopened.confirmImport()
+        XCTAssertFalse(reopened.isImportConfirmationPresented)
+        XCTAssertEqual(reopened.document.syncState, .conflict)
+        await reopened.syncNow()
+        let imported = try await store.load()
+        XCTAssertEqual(imported.profile.waterTargetMillilitres, backup.profile.waterTargetMillilitres)
+        XCTAssertTrue(reopened.isReconciliationPresented)
     }
 
     @MainActor
@@ -235,6 +299,7 @@ final class NativeAccountTests: XCTestCase {
             cloudQuery: cache
         )
         await model.load()
+        await model.restoreAccountAndSync()
         let cachedBeforeSignOut = await cache.cachedValue()
 
         XCTAssertNotNil(cachedBeforeSignOut)
@@ -258,6 +323,7 @@ final class NativeAccountTests: XCTestCase {
         let client = UnclaimedAppleAccountClient()
         let model = AppModel(store: store, accountClient: client, syncStore: syncStore)
         await model.load()
+        await model.restoreAccountAndSync()
 
         await model.completeAppleSignIn(
             AppleIdentityPayload(
@@ -287,6 +353,7 @@ final class NativeAccountTests: XCTestCase {
         let model = AppModel(store: store, accountClient: client, syncStore: syncStore)
 
         await model.load()
+        await model.restoreAccountAndSync()
 
         XCTAssertEqual(model.account?.email, "owner@example.com")
         XCTAssertEqual(model.account?.hasApple, false)

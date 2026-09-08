@@ -117,6 +117,7 @@ struct QuickLogView: View {
                     contextLabel: "This amount",
                     showsExplanation: true
                 )
+                LocalSaveErrorView()
                 Button("Add to \(meal.rawValue.lowercased())") {
                     let time = Calendar.current.date(
                         bySettingHour: Calendar.current.component(.hour, from: .now),

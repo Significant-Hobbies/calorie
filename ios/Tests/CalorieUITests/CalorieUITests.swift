@@ -4,6 +4,23 @@ import XCTest
 final class CalorieUITests: XCTestCase {
     override func setUpWithError() throws { continueAfterFailure = false }
 
+    func testUnreadJournalOffersRecoveryWithoutAnEmptyEditableJournal() {
+        let app = XCUIApplication()
+        app.launchArguments = ["--recovery-demo"]
+        app.launch()
+        let okay = app.alerts.buttons["OK"]
+        if okay.waitForExistence(timeout: 3) { okay.tap() }
+        XCTAssertTrue(app.staticTexts["Your journal needs attention"].waitForExistence(timeout: 3))
+        XCTAssertTrue(app.buttons["Retry opening journal"].exists)
+        XCTAssertTrue(app.buttons["Preview an import"].exists)
+        XCTAssertFalse(app.buttons["Export journal"].exists)
+        XCTAssertFalse(app.tabBars.buttons["Today"].exists)
+        let attachment = XCTAttachment(screenshot: app.screenshot())
+        attachment.name = "Unread journal recovery"
+        attachment.lifetime = .keepAlways
+        add(attachment)
+    }
+
     func testFirstDayLogsARealOneOffFoodAndShowsTotals() {
         let app = XCUIApplication()
         app.launchArguments = ["--onboarding-demo", "--reset-onboarding"]

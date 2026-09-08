@@ -358,6 +358,7 @@ private struct CustomFoodView: View {
     var body: some View {
         NavigationStack {
             Form {
+                LocalSaveErrorView()
                 Section("Food") {
                     TextField("Name", text: $name)
                     TextField("Serving", text: $serving)
@@ -391,7 +392,7 @@ private struct CustomFoodView: View {
                             isArchived: existingFood?.isArchived ?? false,
                             isCustom: existingFood?.isCustom ?? true
                         )
-                        Task { await model.saveFood(food); dismiss() }
+                        Task { if await model.saveFood(food) { dismiss() } }
                     }
                     .disabled(name.trimmingCharacters(in: .whitespaces).isEmpty || Double(calories) == nil)
                 }
@@ -405,6 +406,7 @@ private struct CustomFoodView: View {
 }
 
 struct YouView: View {
+    var recoveryOnly = false
     @Environment(AppModel.self) private var model
     @Environment(\.colorScheme) private var colorScheme
     @State private var isProfilePresented = false
@@ -424,7 +426,14 @@ struct YouView: View {
         @Bindable var model = model
         ScrollView {
             VStack(alignment: .leading, spacing: 26) {
-                botanicalHeader("You", subtitle: "Your inputs, your formulas, your journal.")
+                if recoveryOnly {
+                    botanicalHeader("Your journal needs attention", subtitle: "The original file has been preserved. Retry opening it or restore a backup.")
+                    Button("Retry opening journal") { Task { await model.load() } }
+                        .buttonStyle(BotanicalButtonStyle())
+                } else {
+                    botanicalHeader("You", subtitle: "Your inputs, your formulas, your journal.")
+                }
+                if !recoveryOnly {
                 if let explanation = model.targetExplanation {
                     VStack(alignment: .leading, spacing: 10) {
                         HStack {
@@ -466,11 +475,14 @@ struct YouView: View {
                 youSection("Account & sync") {
                     accountControls
                 }
+                }
                 youSection("Your data") {
+                    if !recoveryOnly {
                     ShareLink(item: CalorieExportPayload(document: model.document), preview: SharePreview("Calorie journal")) {
                         Label("Export journal", systemImage: "square.and.arrow.up").frame(maxWidth: .infinity, alignment: .leading)
                     }
                     .frame(minHeight: 48)
+                    }
                     Button { isImporterPresented = true } label: {
                         Label("Preview an import", systemImage: "doc.badge.plus").frame(maxWidth: .infinity, alignment: .leading)
                     }
@@ -666,6 +678,7 @@ private struct RoutineManagerView: View {
     var body: some View {
         NavigationStack {
             Form {
+                LocalSaveErrorView()
                 Section("Add routine") {
                     TextField("Routine name", text: $name)
                     Picker("Preferred time", selection: $period) {
@@ -725,6 +738,7 @@ private struct ProfileEditorView: View {
     var body: some View {
         NavigationStack {
             Form {
+                LocalSaveErrorView()
                 Section("You") {
                     TextField("Name (optional)", text: $profile.name)
                     Picker("Goal", selection: $profile.goal) { ForEach(Goal.allCases, id: \.self) { Text($0.rawValue).tag($0) } }
@@ -766,7 +780,7 @@ private struct ProfileEditorView: View {
                             profile.equationProfile = nil
                             profile.manualMacroTargets = nil
                         }
-                        Task { await model.updateProfile(profile); dismiss() }
+                        Task { if await model.updateProfile(profile) { dismiss() } }
                     }
                 }
             }
