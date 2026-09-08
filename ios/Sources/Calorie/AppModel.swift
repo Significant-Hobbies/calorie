@@ -413,6 +413,10 @@ final class AppModel {
     }
 
     private func recoverFromUnlinkedCalorieAccount() async {
+        let wasAccountWorking = isAccountWorking
+        isAccountWorking = true
+        defer { isAccountWorking = wasAccountWorking }
+        accountRevision += 1
         await cloudQuery.clear()
         cloudSnapshot = nil
         _ = try? await commitLocalChange { $0.syncState = .localOnly }
@@ -537,7 +541,9 @@ final class AppModel {
             let journal = try await accountClient.journal(for: ownerID)
             try await synchronizeJournal(journal, revision: accountRevisionBeforeSync, forceRefresh: forceRefresh)
         } catch {
-            if accountRevision == accountRevisionBeforeSync { await handleSyncFailure(error) }
+            if accountRevision == accountRevisionBeforeSync {
+                await handleSyncFailure(error, revision: accountRevisionBeforeSync)
+            }
         }
         isSyncing = false
         if account != nil, activeLocalMutations == 0, syncRequestedAfterMutation {
@@ -594,16 +600,20 @@ final class AppModel {
         return document.syncState == .conflict
     }
 
-    private func handleSyncFailure(_ error: Error) async {
+    private func handleSyncFailure(_ error: Error, revision: Int) async {
         if let accountError = error as? NativeAccountError,
            accountError.requiresExistingAccountRecovery {
             await recoverFromUnlinkedCalorieAccount()
             return
         }
-        pendingSyncCount = (try? await syncStore.pending().count) ?? pendingSyncCount
+        let pendingCount = (try? await syncStore.pending().count) ?? pendingSyncCount
+        guard accountRevision == revision else { return }
+        pendingSyncCount = pendingCount
         _ = try? await commitLocalChange {
-            if $0.syncState != .conflict { $0.syncState = pendingSyncCount > 0 ? .pending : .failed }
+            try self.requireCurrentAccount(revision)
+            if $0.syncState != .conflict { $0.syncState = pendingCount > 0 ? .pending : .failed }
         }
+        guard accountRevision == revision else { return }
         message = accountErrorMessage(error, recovery: "Your changes are saved on this device and cloud sync can be retried.")
     }
 
@@ -611,6 +621,7 @@ final class AppModel {
         journal: any NativeJournalServing, accountRevision revision: Int
     ) async throws -> Bool {
         let pending = try await syncStore.pending()
+        try requireCurrentAccount(revision)
         pendingSyncCount = pending.count
         guard !pending.isEmpty else { return false }
         await cloudQuery.invalidate()
@@ -621,6 +632,7 @@ final class AppModel {
             do {
                 try requireCurrentAccount(revision)
                 try await syncStore.complete(intent.id)
+                try requireCurrentAccount(revision)
                 pendingSyncCount -= 1
                 releaseLocalWrite()
             } catch {

@@ -39,7 +39,7 @@ full sets/reps workout-programming system.
   acknowledge a new session's queue. Journal ownership persists across restart;
   legacy or differently owned journals require an explicit choice. Every choice
   rebuilds the outbox; keeping cloud data does not upload local-only differences.
-  Synthetic transport and old-AppModel baselines reproduced the failures; 31
+  Synthetic transport and old-AppModel baselines reproduced the failures; 32
   account/local-save tests pass in a temporary Mac harness. The harness replaces
   only browser UI and file-protection behavior unavailable to that host; it does
   not qualify physical use or iOS protection. Local native qualification still

@@ -73,6 +73,16 @@ final class NativeAccountTests: XCTestCase {
 
     @MainActor
     func testOldQueueReceiptCannotAcknowledgeWorkAfterAnotherAccountConnects() async throws {
+        try await checkOldQueueResult(fails: false)
+    }
+
+    @MainActor
+    func testOldQueueFailureCannotChangeAnotherAccountsStatus() async throws {
+        try await checkOldQueueResult(fails: true)
+    }
+
+    @MainActor
+    private func checkOldQueueResult(fails: Bool) async throws {
         let directory = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
         defer { try? FileManager.default.removeItem(at: directory) }
         let store = CalorieStore(fileURL: directory.appending(path: "journal.json"))
@@ -87,7 +97,7 @@ final class NativeAccountTests: XCTestCase {
         await model.restoreAccountAndSync()
         try await queue.enqueue(.deleteFoodEntry(UUID()))
         let original = try await queue.pending()
-        await client.holdNextApply()
+        await client.holdNextApply(fails: fails)
         let sync = Task { await model.syncNow() }
         await client.waitUntilApplyHeld()
         await model.signOut()
@@ -101,6 +111,7 @@ final class NativeAccountTests: XCTestCase {
         XCTAssertEqual(model.document.cloudAccountID, "synthetic-owner")
         XCTAssertEqual(model.document.syncState, .conflict)
         XCTAssertTrue(model.isReconciliationPresented)
+        XCTAssertNil(model.message)
     }
 
     @MainActor
@@ -564,7 +575,11 @@ private actor StubNativeAccountClient: NativeAccountServing {
     private var shouldHoldApply = false
     private var applyRelease: CheckedContinuation<Void, Never>?
     private var applyWaiter: CheckedContinuation<Void, Never>?
-    func holdNextApply() { shouldHoldApply = true }
+    private var failHeldApply = false
+    func holdNextApply(fails: Bool = false) {
+        shouldHoldApply = true
+        failHeldApply = fails
+    }
     func waitUntilApplyHeld() async {
         if applyRelease != nil { return }
         await withCheckedContinuation { applyWaiter = $0 }
@@ -628,6 +643,7 @@ private actor StubNativeAccountClient: NativeAccountServing {
                 applyWaiter?.resume()
                 applyWaiter = nil
             }
+            if failHeldApply { throw NativeAccountError.server("Synthetic old-account failure") }
         }
     }
     func signOut() async {}
