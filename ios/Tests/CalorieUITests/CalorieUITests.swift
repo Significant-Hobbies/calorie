@@ -10,6 +10,7 @@ final class CalorieUITests: XCTestCase {
         app.launch()
         let okay = app.alerts.buttons["OK"]
         if okay.waitForExistence(timeout: 3) { okay.tap() }
+        XCTAssertTrue(app.alerts.firstMatch.waitForNonExistence(timeout: 3), "The read-error alert must dismiss so recovery controls can be used")
         XCTAssertTrue(app.staticTexts["Your journal needs attention"].waitForExistence(timeout: 3))
         XCTAssertTrue(app.buttons["Retry opening journal"].exists)
         XCTAssertTrue(app.buttons["Preview an import"].exists)
