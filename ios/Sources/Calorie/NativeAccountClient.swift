@@ -8,26 +8,35 @@ import UIKit
 typealias AppleIdentityPayload = PersonalAppleCredential
 
 struct CalorieAccount: Equatable, Sendable {
+    let userID: String
     let name: String
     let email: String
     let providers: Set<String>
 
     var hasApple: Bool { providers.contains("apple") }
 
-    init(name: String, email: String, providers: Set<String>) {
+    init(userID: String, name: String, email: String, providers: Set<String>) {
+        self.userID = userID
         self.name = name
         self.email = email
         self.providers = providers
     }
 
     init(_ session: PersonalIdentitySession) {
+        userID = session.userId
         name = ""
         email = session.email
         providers = session.appleSubject == nil ? ["google"] : ["apple"]
     }
 }
 
-protocol NativeAccountServing: Sendable {
+protocol NativeJournalServing: Sendable {
+    func cloudExport() async throws -> Data
+    func apply(_ intent: SyncIntent) async throws
+}
+
+protocol NativeAccountServing: NativeJournalServing {
+    func journal(for userID: String) async throws -> any NativeJournalServing
     var googleStartURL: URL { get async }
 
     func restoreAccount() async throws -> CalorieAccount?
@@ -40,10 +49,19 @@ protocol NativeAccountServing: Sendable {
     func deleteAccount() async throws
 }
 
+private actor JournalVerificationTokenStore: PersonalBearerTokenStore {
+    private var bearer: String?
+    init(_ bearer: String) { self.bearer = bearer }
+    func load() -> String? { bearer }
+    func save(_ token: String) { bearer = token }
+    func delete() { bearer = nil }
+}
+
 enum NativeAccountError: LocalizedError {
     case invalidAppleCredential
     case invalidCallback
     case missingSession
+    case accountChanged
     case server(String)
     case http(status: Int, code: String?, message: String)
 
@@ -52,6 +70,7 @@ enum NativeAccountError: LocalizedError {
         case .invalidAppleCredential: "Apple did not return a usable identity credential."
         case .invalidCallback: "The account handoff could not be verified."
         case .missingSession: "Your Calorie session expired. Sign in again."
+        case .accountChanged: "Your account changed during sync. Reconnect before continuing."
         case let .server(message): message
         case let .http(_, _, message): message
         }
@@ -128,6 +147,7 @@ actor NativeAccountClient: NativeAccountServing {
     private let urlSession: URLSession
     private let tokenStore: any PersonalBearerTokenStore
     private let identity: PersonalIdentityClient
+    private let requiredBearer: String?
 
     init(
         baseURL: URL = productionBaseURL,
@@ -135,7 +155,8 @@ actor NativeAccountClient: NativeAccountServing {
         urlSession: URLSession = .shared,
         tokenStore: any PersonalBearerTokenStore = KeychainBearerTokenStore(
             service: "com.significanthobbies.calorie.session"
-        )
+        ),
+        requiredBearer: String? = nil
     ) {
         self.baseURL = baseURL
         let resolvedIdentityBaseURL = identityBaseURL
@@ -143,6 +164,7 @@ actor NativeAccountClient: NativeAccountServing {
         self.identityBaseURL = resolvedIdentityBaseURL
         self.urlSession = urlSession
         self.tokenStore = tokenStore
+        self.requiredBearer = requiredBearer
         identity = PersonalIdentityClient(
             baseURL: resolvedIdentityBaseURL,
             session: urlSession,
@@ -175,12 +197,37 @@ actor NativeAccountClient: NativeAccountServing {
         CalorieAccount(try await identity.linkApple(payload))
     }
 
+    /// A queue replay and its final read share one verified identity and bearer.
+    /// The isolated verifier cannot delete a newer credential after a stale 401.
+    func journal(for userID: String) async throws -> any NativeJournalServing {
+        guard let bearer = try await tokenStore.load() else { throw NativeAccountError.missingSession }
+        let verifier = PersonalIdentityClient(
+            baseURL: identityBaseURL, session: urlSession,
+            tokenStore: JournalVerificationTokenStore(bearer)
+        )
+        guard let session = try await verifier.restoreSession(), session.userId == userID,
+              try await tokenStore.load() == bearer else { throw NativeAccountError.accountChanged }
+        return NativeAccountClient(
+            baseURL: baseURL, identityBaseURL: identityBaseURL,
+            urlSession: urlSession, tokenStore: tokenStore, requiredBearer: bearer
+        )
+    }
+
     func cloudExport() async throws -> Data {
         try await request(path: "/api/app/export", method: "GET", authenticated: true).data
     }
 
     func apply(_ intent: SyncIntent) async throws {
-        try await apply(intent.operation)
+        if requiredBearer != nil {
+            try await apply(intent.operation)
+            return
+        }
+        guard let bearer = try await tokenStore.load() else { throw NativeAccountError.missingSession }
+        let bound = NativeAccountClient(
+            baseURL: baseURL, identityBaseURL: identityBaseURL,
+            urlSession: urlSession, tokenStore: tokenStore, requiredBearer: bearer
+        )
+        try await bound.apply(intent.operation)
     }
 
     private func apply(_ operation: SyncOperation) async throws {
@@ -448,9 +495,13 @@ actor NativeAccountClient: NativeAccountServing {
         }
         if authenticated {
             guard let token = try await tokenStore.load() else { throw NativeAccountError.missingSession }
-            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+            if let requiredBearer, token != requiredBearer { throw NativeAccountError.accountChanged }
+            request.setValue("Bearer \(requiredBearer ?? token)", forHTTPHeaderField: "Authorization")
         }
         let (data, rawResponse) = try await urlSession.data(for: request)
+        if authenticated, let requiredBearer, try await tokenStore.load() != requiredBearer {
+            throw NativeAccountError.accountChanged
+        }
         guard let response = rawResponse as? HTTPURLResponse else {
             throw NativeAccountError.server("Calorie returned an invalid response.")
         }

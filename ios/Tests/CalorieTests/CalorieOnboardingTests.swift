@@ -172,6 +172,8 @@ final class CalorieOnboardingTests: XCTestCase {
 }
 
 private actor NoAccountClient: NativeAccountServing {
+    func journal(for userID: String) async throws -> any NativeJournalServing { self }
+
     var googleStartURL: URL { URL(string: "https://example.com")! }
 
     func restoreAccount() async throws -> CalorieAccount? { nil }

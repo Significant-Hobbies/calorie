@@ -33,6 +33,19 @@ full sets/reps workout-programming system.
 
 ## Timeline
 
+- 2026-09-08 — build 14 account-isolation repair prepared under issue #88.
+  A queue replay now verifies a stable account ID and binds all requests to
+  that session. Credential changes abort old requests and stale receipts cannot
+  acknowledge a new session's queue. Journal ownership persists across restart;
+  legacy or differently owned journals require an explicit choice. Every choice
+  rebuilds the outbox; keeping cloud data does not upload local-only differences.
+  Synthetic transport and old-AppModel baselines reproduced the failures; 31
+  account/local-save tests pass in a temporary Mac harness. The harness replaces
+  only browser UI and file-protection behavior unavailable to that host; it does
+  not qualify physical use or iOS protection. Local native qualification still
+  stops before tests because no iPhone simulator is available. Hosted iOS
+  verification and build-14 phone installation remain pending.
+
 - 2026-09-08 — prepared build 13 to preserve the sync queue after failed
   persistence. Failed compaction, acknowledgement and clear operations now
   retain the prior in-memory queue until their atomic write succeeds. Failed
@@ -42,8 +55,9 @@ full sets/reps workout-programming system.
   an isolated Swift 6 package using the repository sources and tests. The local
   native gate found no available iPhone simulator and did not execute tests;
   these core checks do not qualify iPhone UI, Release or coverage. Full hosted
-  native verification, physical use and signed-in sync remain required under
-  issue 88. Build 12 remains the last verified phone installation.
+  native verification subsequently passed in CI 34249949575: 30 core, 32 app
+  and 9 UI tests, Release and 66.2213% coverage. Build 13 was signed and installed
+  on the iPhone. Physical use and signed-in sync remain required under issue 88.
 
 - 2026-09-08 — priority reliability repair in progress under issue #88: reproduced failed-save false success, lost overlapping water entries and unread-file overwrite. Local writes now serialize, editors acknowledge committed outcomes, failed delete/undo retains recovery, and the existing backup controls remain available after read failure. Local launch and save completion no longer await optional account/network work. Failed outbox writes require reconciliation before cloud refresh, including after relaunch; one-off serving edits scale their logged nutrients. Build 12 passed pnpm check and the full native gate: 26 core, 32 app and 9 UI tests, Release build and 66.2357% production coverage. Physical use, signed-in sync and public distribution remain unqualified.
 

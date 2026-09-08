@@ -165,6 +165,8 @@ final class CalorieLocalSaveTests: XCTestCase {
 }
 
 private actor LocalSaveNoAccountClient: NativeAccountServing {
+    func journal(for userID: String) async throws -> any NativeJournalServing { self }
+
     private(set) var restoreCount = 0
     var googleStartURL: URL { URL(string: "https://example.com")! }
 

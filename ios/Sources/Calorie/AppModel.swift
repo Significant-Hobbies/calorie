@@ -19,7 +19,11 @@ final class AppModel {
     var lastDeletedEntry: FoodEntry?
     var importPreview: CalorieDocument?
     var isImportConfirmationPresented = false
-    private(set) var account: CalorieAccount?
+    private(set) var account: CalorieAccount? {
+        didSet { accountRevision += 1 }
+    }
+    private var accountRevision = 0
+    private var cloudSnapshotRevision: Int?
     private(set) var isAccountWorking = false
     private(set) var accountNotice: String?
     private(set) var cloudSnapshot: CloudJournalSnapshot?
@@ -357,7 +361,16 @@ final class AppModel {
         }
     }
 
+    private func beginAccountChange() -> Bool {
+        guard !isAccountWorking else { return false }
+        accountRevision += 1
+        cloudSnapshot = nil
+        cloudSnapshotRevision = nil
+        return true
+    }
+
     func connectExistingAccount() async {
+        guard beginAccountChange() else { return }
         accountNotice = nil
         isAccountWorking = true
         defer { isAccountWorking = false }
@@ -378,6 +391,7 @@ final class AppModel {
     }
 
     func completeAppleSignIn(_ payload: AppleIdentityPayload) async {
+        guard beginAccountChange() else { return }
         accountNotice = nil
         isAccountWorking = true
         defer { isAccountWorking = false }
@@ -414,6 +428,7 @@ final class AppModel {
     }
 
     func signOut() async {
+        guard beginAccountChange() else { return }
         isAccountWorking = true
         await cloudQuery.clear()
         await accountClient.signOut()
@@ -426,6 +441,7 @@ final class AppModel {
     }
 
     func deleteCloudAccount() async {
+        guard beginAccountChange() else { return }
         isAccountWorking = true
         defer { isAccountWorking = false }
         do {
@@ -444,11 +460,16 @@ final class AppModel {
     }
 
     func reconcileJournal(_ choice: JournalReconciliationChoice) async {
-        guard let cloudSnapshot else { return }
+        guard let cloudSnapshot, let ownerID = account?.userID,
+              cloudSnapshotRevision == accountRevision, !isAccountWorking else { return }
+        accountRevision += 1
+        let revision = accountRevision
         isAccountWorking = true
         defer { isAccountWorking = false }
-        guard await mutate(cloudBaseline: cloudSnapshot.document, clearPending: choice == .keepCloud, {
+        guard await mutate(cloudBaseline: cloudSnapshot.document, clearPending: true, enqueueChanges: choice != .keepCloud, {
+            guard self.accountRevision == revision else { throw NativeAccountError.accountChanged }
             $0 = CloudJournalMapper.reconcile(local: $0, cloud: cloudSnapshot, choice: choice)
+            $0.cloudAccountID = ownerID
         }) else { return }
         self.cloudSnapshot = nil
         isReconciliationPresented = false
@@ -475,19 +496,29 @@ final class AppModel {
     }
 
     private func prepareCloudReconciliation() async {
+        guard let ownerID = account?.userID else { return }
+        let revision = accountRevision
         do {
             try await commitLocalChange { $0.syncState = .conflict }
-            cloudSnapshot = try await fetchCloud(policy: .always).value
+            let journal = try await accountClient.journal(for: ownerID)
+            guard accountRevision == revision else { return }
+            let result = try await fetchCloud(policy: .always, journal: journal)
+            guard accountRevision == revision else { return }
+            cloudSnapshot = result.value
+            cloudSnapshotRevision = revision
             isReconciliationPresented = true
         } catch let error as NativeAccountError where error.requiresExistingAccountRecovery {
+            guard accountRevision == revision else { return }
             await recoverFromUnlinkedCalorieAccount()
         } catch {
+            guard accountRevision == revision else { return }
             message = accountErrorMessage(error, recovery: "Try loading your cloud journal again. This device journal has not changed.")
         }
     }
 
     func syncNow(forceRefresh: Bool = true) async {
-        guard account != nil else { return }
+        guard let ownerID = account?.userID else { return }
+        let accountRevisionBeforeSync = accountRevision
         guard !isSyncing else {
             syncRequestedAfterMutation = true
             return
@@ -500,32 +531,13 @@ final class AppModel {
             await resumeReconciliation()
             return
         }
+        guard accountRevision == accountRevisionBeforeSync else { return }
         isSyncing = true
         do {
-            while true {
-                let replayedPending = try await replayPendingSyncIntents()
-                guard try await syncStore.pending().isEmpty else { continue }
-                let revisionBeforeFetch = localMutationRevision
-                let query = try await fetchCloud(
-                    policy: cloudPolicy(forceRefresh: forceRefresh, replayedPending: replayedPending)
-                )
-                guard activeLocalMutations == 0, revisionBeforeFetch == localMutationRevision else {
-                    syncRequestedAfterMutation = true
-                    break
-                }
-                guard try await syncStore.pending().isEmpty else { continue }
-                if query.source == .network {
-                    let applied = try await applyCloudSnapshot(query.value, revision: revisionBeforeFetch)
-                    if !applied {
-                        syncRequestedAfterMutation = true
-                        break
-                    }
-                }
-                guard try await syncStore.pending().isEmpty else { continue }
-                break
-            }
+            let journal = try await accountClient.journal(for: ownerID)
+            try await synchronizeJournal(journal, revision: accountRevisionBeforeSync, forceRefresh: forceRefresh)
         } catch {
-            await handleSyncFailure(error)
+            if accountRevision == accountRevisionBeforeSync { await handleSyncFailure(error) }
         }
         isSyncing = false
         if account != nil, activeLocalMutations == 0, syncRequestedAfterMutation {
@@ -534,7 +546,46 @@ final class AppModel {
         }
     }
 
+    private func synchronizeJournal(
+        _ journal: any NativeJournalServing, revision: Int, forceRefresh: Bool
+    ) async throws {
+    while true {
+        try requireCurrentAccount(revision)
+        let replayedPending = try await replayPendingSyncIntents(
+            journal: journal, accountRevision: revision)
+        guard try await syncStore.pending().isEmpty else { continue }
+        let revisionBeforeFetch = localMutationRevision
+        let query = try await fetchCloud(
+            policy: cloudPolicy(forceRefresh: forceRefresh, replayedPending: replayedPending),
+            journal: journal
+        )
+        try requireCurrentAccount(revision)
+        guard activeLocalMutations == 0, revisionBeforeFetch == localMutationRevision else {
+            syncRequestedAfterMutation = true
+            break
+        }
+        guard try await syncStore.pending().isEmpty else { continue }
+        if query.source == .network {
+            let applied = try await applyCloudSnapshot(query.value, revision: revisionBeforeFetch, accountRevision: revision)
+            if !applied {
+                syncRequestedAfterMutation = true
+                break
+            }
+        }
+        guard try await syncStore.pending().isEmpty else { continue }
+        break
+    }
+    }
+
+    private func requireCurrentAccount(_ revision: Int) throws {
+        guard account != nil, accountRevision == revision else { throw NativeAccountError.accountChanged }
+    }
+
     private func requiresJournalChoice() async -> Bool {
+        if let ownerID = account?.userID, document.cloudAccountID != ownerID {
+            _ = try? await commitLocalChange { $0.syncState = .conflict }
+            return true
+        }
         if document.syncState == .pending, (try? await syncStore.pending().isEmpty) == true {
             // An older build may have committed a journal without its intent.
             // Preserve that journal for an explicit choice after a restart.
@@ -556,15 +607,26 @@ final class AppModel {
         message = accountErrorMessage(error, recovery: "Your changes are saved on this device and cloud sync can be retried.")
     }
 
-    private func replayPendingSyncIntents() async throws -> Bool {
+    private func replayPendingSyncIntents(
+        journal: any NativeJournalServing, accountRevision revision: Int
+    ) async throws -> Bool {
         let pending = try await syncStore.pending()
         pendingSyncCount = pending.count
         guard !pending.isEmpty else { return false }
         await cloudQuery.invalidate()
         for intent in pending {
-            try await accountClient.apply(intent)
-            try await syncStore.complete(intent.id)
-            pendingSyncCount -= 1
+            try requireCurrentAccount(revision)
+            try await journal.apply(intent)
+            await acquireLocalWrite()
+            do {
+                try requireCurrentAccount(revision)
+                try await syncStore.complete(intent.id)
+                pendingSyncCount -= 1
+                releaseLocalWrite()
+            } catch {
+                releaseLocalWrite()
+                throw error
+            }
         }
         return true
     }
@@ -582,10 +644,11 @@ final class AppModel {
     }
 
     private func fetchCloud(
-        policy: ServerStateQueryPolicy
+        policy: ServerStateQueryPolicy,
+        journal: any NativeJournalServing
     ) async throws -> ServerStateQueryResult<CloudJournalSnapshot> {
-        try await cloudQuery.value(policy: policy) { [accountClient] in
-            try CloudJournalMapper.decode(await accountClient.cloudExport())
+        try await cloudQuery.value(policy: policy) { [journal] in
+            try CloudJournalMapper.decode(await journal.cloudExport())
         }
     }
 
@@ -611,12 +674,16 @@ final class AppModel {
         return previous
     }
 
-    private func applyCloudSnapshot(_ snapshot: CloudJournalSnapshot, revision: Int) async throws -> Bool {
+    private func applyCloudSnapshot(
+        _ snapshot: CloudJournalSnapshot, revision: Int, accountRevision expectedAccountRevision: Int
+    ) async throws -> Bool {
         await acquireLocalWrite()
         defer { releaseLocalWrite() }
-        guard hasLoadedDocument, account != nil, document.syncState != .conflict,
+        guard hasLoadedDocument, let account, accountRevision == expectedAccountRevision,
+              document.cloudAccountID == account.userID, document.syncState != .conflict,
               activeLocalMutations == 0, localMutationRevision == revision else { return false }
-        let next = CloudJournalMapper.reconcile(local: document, cloud: snapshot, choice: .keepCloud)
+        var next = CloudJournalMapper.reconcile(local: document, cloud: snapshot, choice: .keepCloud)
+        next.cloudAccountID = account.userID
         try await store.save(next)
         document = next
         localMutationRevision += 1
@@ -658,7 +725,7 @@ final class AppModel {
         canAutomaticallySync: Bool,
         stagesSync: Bool
     ) async throws -> Bool {
-        guard account != nil else { return false }
+        guard let ownerID = account?.userID, document.cloudAccountID == ownerID else { return false }
         if clearPending { try await syncStore.removeAll() }
         for operation in operations { try await syncStore.enqueue(operation) }
         pendingSyncCount = (try await syncStore.pending()).count
@@ -675,6 +742,7 @@ final class AppModel {
         allowUnread: Bool = false,
         cloudBaseline: CalorieDocument? = nil,
         clearPending: Bool = false,
+        enqueueChanges: Bool = true,
         _ operation: (inout CalorieDocument) throws -> Void
     ) async -> Bool {
         guard hasLoadedDocument || allowUnread else {
@@ -689,7 +757,7 @@ final class AppModel {
             let previous = document
             var next = previous
             try operation(&next)
-            let syncOperations = account == nil || clearPending ? []
+            let syncOperations = account == nil || !enqueueChanges || (clearPending && cloudBaseline == nil) ? []
                 : CloudJournalDiff.operations(from: cloudBaseline ?? previous, to: next)
             let stagesSync = !syncOperations.isEmpty || clearPending || allowUnread
             next = await prepareLocalCommit(next, stagesSync: stagesSync)
@@ -702,7 +770,7 @@ final class AppModel {
             shouldRequestSync = try await persistSyncOperations(
                 syncOperations,
                 clearPending: clearPending,
-                canAutomaticallySync: previous.syncState != .conflict || cloudBaseline != nil,
+                canAutomaticallySync: !allowUnread && (previous.syncState != .conflict || cloudBaseline != nil),
                 stagesSync: stagesSync
             )
         } catch {

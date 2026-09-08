@@ -4,6 +4,150 @@ import CalorieCore
 import PersonalSyncKit
 
 final class NativeAccountTests: XCTestCase {
+    @MainActor
+    func testLegacyAndDifferentOwnerQueuesRequireChoiceAndNeverReplayAutomatically() async throws {
+        for owner in [nil, "another-owner"] as [String?] {
+            let directory = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+            defer { try? FileManager.default.removeItem(at: directory) }
+            let store = CalorieStore(fileURL: directory.appending(path: "journal.json"))
+            let queue = SyncIntentStore(fileURL: directory.appending(path: "sync.json"))
+            var local = CalorieDocument.starter
+            local.cloudAccountID = owner
+            local.syncState = .pending
+            try await store.save(local)
+            try await queue.enqueue(.deleteFoodEntry(UUID()))
+            let client = StubNativeAccountClient(exportData: Data(Self.cloudExport.utf8))
+            let model = AppModel(store: store, accountClient: client, syncStore: queue)
+            await model.load()
+            await model.restoreAccountAndSync()
+            let appliedBeforeChoice = await client.applyRequestCount
+            let queuedBeforeChoice = try await queue.pending()
+            XCTAssertEqual(appliedBeforeChoice, 0)
+            XCTAssertEqual(queuedBeforeChoice.count, 1)
+            XCTAssertEqual(model.document.foods, local.foods)
+            XCTAssertEqual(model.document.cloudAccountID, owner)
+            XCTAssertTrue(model.isReconciliationPresented)
+
+            await model.reconcileJournal(.keepCloud)
+            let remaining = try await queue.pending()
+            XCTAssertTrue(remaining.isEmpty, "Discard stale operations before adopting another account")
+            XCTAssertEqual(model.document.cloudAccountID, "synthetic-owner")
+            XCTAssertEqual(model.document.foods.map(\.name), ["Cloud oats"])
+            let reopened = AppModel(store: store, accountClient: client, syncStore: queue)
+            await reopened.load()
+            await reopened.restoreAccountAndSync()
+            XCTAssertEqual(reopened.document.cloudAccountID, "synthetic-owner")
+            XCTAssertFalse(reopened.isReconciliationPresented)
+        }
+    }
+
+    @MainActor
+    func testLateCloudResponseAfterSignOutCannotReplaceLocalJournal() async throws {
+        let directory = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let store = CalorieStore(fileURL: directory.appending(path: "journal.json"))
+        let queue = SyncIntentStore(fileURL: directory.appending(path: "sync.json"))
+        var local = CalorieDocument.starter
+        local.cloudAccountID = "synthetic-owner"
+        local.syncState = .synced
+        try await store.save(local)
+        let client = StubNativeAccountClient(exportData: Data(Self.cloudExport.utf8))
+        let model = AppModel(store: store, accountClient: client, syncStore: queue)
+        await model.load()
+        await model.restoreAccountAndSync()
+        let expectedFoods = model.document.foods
+        await client.setExportData(Data(Self.cloudExport.replacingOccurrences(of: "Cloud oats", with: "Late old-account oats").utf8))
+        await client.holdNextExport()
+        let sync = Task { await model.syncNow() }
+        await client.waitUntilExportHeld()
+        await model.signOut()
+        await client.releaseExport()
+        await sync.value
+        XCTAssertNil(model.account)
+        XCTAssertEqual(model.document.foods, expectedFoods)
+        XCTAssertEqual(model.document.syncState, .localOnly)
+        let persisted = try await store.load()
+        XCTAssertEqual(persisted.foods, expectedFoods)
+        XCTAssertEqual(persisted.syncState, .localOnly)
+    }
+
+    @MainActor
+    func testOldQueueReceiptCannotAcknowledgeWorkAfterAnotherAccountConnects() async throws {
+        let directory = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let store = CalorieStore(fileURL: directory.appending(path: "journal.json"))
+        let queue = SyncIntentStore(fileURL: directory.appending(path: "sync.json"))
+        var local = CalorieDocument.starter
+        local.cloudAccountID = "synthetic-owner"
+        local.syncState = .synced
+        try await store.save(local)
+        let client = StubNativeAccountClient(exportData: Data(Self.cloudExport.utf8))
+        let model = AppModel(store: store, accountClient: client, syncStore: queue)
+        await model.load()
+        await model.restoreAccountAndSync()
+        try await queue.enqueue(.deleteFoodEntry(UUID()))
+        let original = try await queue.pending()
+        await client.holdNextApply()
+        let sync = Task { await model.syncNow() }
+        await client.waitUntilApplyHeld()
+        await model.signOut()
+        await client.setUserID("synthetic-second-owner")
+        await model.restoreAccountAndSync()
+        await client.releaseApply()
+        await sync.value
+        let remaining = try await queue.pending()
+        XCTAssertEqual(remaining.map(\.id), original.map(\.id))
+        XCTAssertEqual(model.account?.userID, "synthetic-second-owner")
+        XCTAssertEqual(model.document.cloudAccountID, "synthetic-owner")
+        XCTAssertEqual(model.document.syncState, .conflict)
+        XCTAssertTrue(model.isReconciliationPresented)
+    }
+
+    @MainActor
+    func testKeepingOrMergingDeviceJournalRebuildsQueueForChosenAccount() async throws {
+        for choice in [JournalReconciliationChoice.keepIPhone, .merge] {
+            let directory = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+            defer { try? FileManager.default.removeItem(at: directory) }
+            let store = CalorieStore(fileURL: directory.appending(path: "journal.json"))
+            let queue = SyncIntentStore(fileURL: directory.appending(path: "sync.json"))
+            var local = CalorieDocument.starter
+            local.cloudAccountID = "previous-owner"
+            local.syncState = .pending
+            try await store.save(local)
+            try await queue.enqueue(.deleteFoodEntry(UUID()))
+            let staleIDs = Set(try await queue.pending().map(\.id))
+            let client = StubNativeAccountClient(exportData: Data(Self.cloudExport.utf8))
+            let model = AppModel(store: store, accountClient: client, syncStore: queue)
+            await model.load()
+            await model.restoreAccountAndSync()
+            await client.holdNextApply()
+            await model.reconcileJournal(choice)
+            await client.waitUntilApplyHeld()
+            let rebuilt = try await queue.pending()
+            XCTAssertFalse(rebuilt.isEmpty)
+            XCTAssertTrue(staleIDs.isDisjoint(with: rebuilt.map(\.id)))
+            XCTAssertEqual(model.document.cloudAccountID, "synthetic-owner")
+            let persisted = try await store.load()
+            XCTAssertEqual(persisted.cloudAccountID, "synthetic-owner")
+            // Invalidate the replay before releasing the synthetic server reply.
+            await model.signOut()
+            await client.releaseApply()
+            for _ in 0..<100 where model.isSyncing { await Task.yield() }
+            XCTAssertFalse(model.isSyncing)
+        }
+    }
+
+    func testJournalWithoutOwnershipFieldDecodesAndOwnershipRoundTrips() throws {
+        let encoder = JSONEncoder()
+        var json = try XCTUnwrap(JSONSerialization.jsonObject(with: encoder.encode(CalorieDocument.starter)) as? [String: Any])
+        json.removeValue(forKey: "cloudAccountID")
+        var document = try JSONDecoder().decode(CalorieDocument.self, from: JSONSerialization.data(withJSONObject: json))
+        XCTAssertNil(document.cloudAccountID)
+        document.cloudAccountID = "stable-owner"
+        let reopened = try JSONDecoder().decode(CalorieDocument.self, from: encoder.encode(document))
+        XCTAssertEqual(reopened.cloudAccountID, "stable-owner")
+    }
+
     func testNonceIsRandomAndUsesASHA256Digest() {
         let first = AppleNonce.make()
         let second = AppleNonce.make()
@@ -132,6 +276,7 @@ final class NativeAccountTests: XCTestCase {
         let store = CalorieStore(fileURL: directory.appending(path: "journal.json"))
         let syncStore = SyncIntentStore(fileURL: directory.appending(path: "sync.json"))
         var local = CalorieDocument.starter
+        local.cloudAccountID = "synthetic-owner"
         local.syncState = .synced
         try await store.save(local)
         let client = StubNativeAccountClient(exportData: Data(Self.cloudExport.utf8))
@@ -153,6 +298,7 @@ final class NativeAccountTests: XCTestCase {
         let store = CalorieStore(fileURL: directory.appending(path: "journal.json"))
         let syncStore = SyncIntentStore(fileURL: directory.appending(path: "sync.json"))
         var local = CalorieDocument.starter
+        local.cloudAccountID = "synthetic-owner"
         local.syncState = .synced
         try await store.save(local)
         let client = StubNativeAccountClient(exportData: Data(Self.cloudExport.utf8))
@@ -178,6 +324,7 @@ final class NativeAccountTests: XCTestCase {
         let store = CalorieStore(fileURL: directory.appending(path: "journal.json"))
         let syncStore = SyncIntentStore(fileURL: directory.appending(path: "sync.json"))
         var local = CalorieDocument.starter
+        local.cloudAccountID = "synthetic-owner"
         local.syncState = .synced
         try await store.save(local)
         let client = StubNativeAccountClient(exportData: Data(Self.cloudExport.utf8))
@@ -206,6 +353,7 @@ final class NativeAccountTests: XCTestCase {
         let store = CalorieStore(fileURL: directory.appending(path: "journal.json"))
         let syncStore = SyncIntentStore(fileURL: directory.appending(path: "sync.json"))
         var local = CalorieDocument.starter
+        local.cloudAccountID = "synthetic-owner"
         local.syncState = .synced
         try await store.save(local)
         let client = StubNativeAccountClient(exportData: Data(Self.cloudExport.utf8))
@@ -237,6 +385,7 @@ final class NativeAccountTests: XCTestCase {
         let blocker = directory.appending(path: "blocked")
         let syncStore = SyncIntentStore(fileURL: blocker.appending(path: "sync.json"))
         var local = CalorieDocument.starter
+        local.cloudAccountID = "synthetic-owner"
         local.syncState = .synced
         try await store.save(local)
         let client = StubNativeAccountClient(exportData: Data(Self.cloudExport.utf8))
@@ -288,6 +437,7 @@ final class NativeAccountTests: XCTestCase {
         let store = CalorieStore(fileURL: directory.appending(path: "journal.json"))
         let syncStore = SyncIntentStore(fileURL: directory.appending(path: "sync.json"))
         var local = CalorieDocument.starter
+        local.cloudAccountID = "synthetic-owner"
         local.syncState = .synced
         try await store.save(local)
         let client = StubNativeAccountClient(exportData: Data(Self.cloudExport.utf8))
@@ -407,9 +557,31 @@ final class NativeAccountTests: XCTestCase {
 }
 
 private actor StubNativeAccountClient: NativeAccountServing {
+    func journal(for userID: String) async throws -> any NativeJournalServing { self }
+
+    private var userID = "synthetic-owner"
+    func setUserID(_ value: String) { userID = value }
+    private var shouldHoldApply = false
+    private var applyRelease: CheckedContinuation<Void, Never>?
+    private var applyWaiter: CheckedContinuation<Void, Never>?
+    func holdNextApply() { shouldHoldApply = true }
+    func waitUntilApplyHeld() async {
+        if applyRelease != nil { return }
+        await withCheckedContinuation { applyWaiter = $0 }
+    }
+    func releaseApply() { applyRelease?.resume(); applyRelease = nil }
     var exportData: Data
     private(set) var exportRequestCount = 0
     private(set) var applyRequestCount = 0
+    private var shouldHoldExport = false
+    private var exportRelease: CheckedContinuation<Void, Never>?
+    private var exportWaiter: CheckedContinuation<Void, Never>?
+    func holdNextExport() { shouldHoldExport = true }
+    func waitUntilExportHeld() async {
+        if exportRelease != nil { return }
+        await withCheckedContinuation { exportWaiter = $0 }
+    }
+    func releaseExport() { exportRelease?.resume(); exportRelease = nil }
 
     init(exportData: Data) {
         self.exportData = exportData
@@ -418,45 +590,66 @@ private actor StubNativeAccountClient: NativeAccountServing {
     var googleStartURL: URL { URL(string: "https://example.com/google")! }
 
     func restoreAccount() async throws -> CalorieAccount? {
-        CalorieAccount(name: "Cloud owner", email: "owner@example.com", providers: ["google"])
+        CalorieAccount(userID: userID, name: "Cloud owner", email: "owner@example.com", providers: ["google"])
     }
 
     func exchangeGoogleHandoff(_: String) async throws -> CalorieAccount {
-        CalorieAccount(name: "Cloud owner", email: "owner@example.com", providers: ["google"])
+        CalorieAccount(userID: userID, name: "Cloud owner", email: "owner@example.com", providers: ["google"])
     }
 
     func signInWithApple(_: AppleIdentityPayload) async throws -> CalorieAccount {
-        CalorieAccount(name: "Cloud owner", email: "owner@example.com", providers: ["apple"])
+        CalorieAccount(userID: userID, name: "Cloud owner", email: "owner@example.com", providers: ["apple"])
     }
 
     func linkApple(_: AppleIdentityPayload) async throws -> CalorieAccount {
-        CalorieAccount(name: "Cloud owner", email: "owner@example.com", providers: ["apple", "google"])
+        CalorieAccount(userID: userID, name: "Cloud owner", email: "owner@example.com", providers: ["apple", "google"])
     }
 
     func cloudExport() async throws -> Data {
         exportRequestCount += 1
-        return exportData
+        let result = exportData
+        if shouldHoldExport {
+            shouldHoldExport = false
+            await withCheckedContinuation {
+                exportRelease = $0
+                exportWaiter?.resume()
+                exportWaiter = nil
+            }
+        }
+        return result
     }
     func setExportData(_ data: Data) { exportData = data }
-    func apply(_: SyncIntent) async throws { applyRequestCount += 1 }
+    func apply(_: SyncIntent) async throws {
+        applyRequestCount += 1
+        if shouldHoldApply {
+            shouldHoldApply = false
+            await withCheckedContinuation {
+                applyRelease = $0
+                applyWaiter?.resume()
+                applyWaiter = nil
+            }
+        }
+    }
     func signOut() async {}
     func deleteAccount() async throws {}
 }
 
 private actor UnclaimedAppleAccountClient: NativeAccountServing {
+    func journal(for userID: String) async throws -> any NativeJournalServing { self }
+
     private(set) var didSignOut = false
 
     var googleStartURL: URL { URL(string: "https://example.com/google")! }
 
     func restoreAccount() async throws -> CalorieAccount? { nil }
     func exchangeGoogleHandoff(_: String) async throws -> CalorieAccount {
-        CalorieAccount(name: "Cloud owner", email: "owner@example.com", providers: ["google"])
+        CalorieAccount(userID: "synthetic-owner", name: "Cloud owner", email: "owner@example.com", providers: ["google"])
     }
     func signInWithApple(_: AppleIdentityPayload) async throws -> CalorieAccount {
-        CalorieAccount(name: "Cloud owner", email: "owner@example.com", providers: ["apple"])
+        CalorieAccount(userID: "synthetic-owner", name: "Cloud owner", email: "owner@example.com", providers: ["apple"])
     }
     func linkApple(_: AppleIdentityPayload) async throws -> CalorieAccount {
-        CalorieAccount(name: "Cloud owner", email: "owner@example.com", providers: ["apple", "google"])
+        CalorieAccount(userID: "synthetic-owner", name: "Cloud owner", email: "owner@example.com", providers: ["apple", "google"])
     }
     func cloudExport() async throws -> Data {
         throw NativeAccountError.http(
@@ -471,21 +664,23 @@ private actor UnclaimedAppleAccountClient: NativeAccountServing {
 }
 
 private actor RestoredUnlinkedGoogleAccountClient: NativeAccountServing {
+    func journal(for userID: String) async throws -> any NativeJournalServing { self }
+
     private(set) var didSignOut = false
 
     var googleStartURL: URL { URL(string: "https://example.com/google")! }
 
     func restoreAccount() async throws -> CalorieAccount? {
-        CalorieAccount(name: "Cloud owner", email: "owner@example.com", providers: ["google"])
+        CalorieAccount(userID: "synthetic-owner", name: "Cloud owner", email: "owner@example.com", providers: ["google"])
     }
     func exchangeGoogleHandoff(_: String) async throws -> CalorieAccount {
-        CalorieAccount(name: "Cloud owner", email: "owner@example.com", providers: ["google"])
+        CalorieAccount(userID: "synthetic-owner", name: "Cloud owner", email: "owner@example.com", providers: ["google"])
     }
     func signInWithApple(_: AppleIdentityPayload) async throws -> CalorieAccount {
-        CalorieAccount(name: "Cloud owner", email: "owner@example.com", providers: ["apple"])
+        CalorieAccount(userID: "synthetic-owner", name: "Cloud owner", email: "owner@example.com", providers: ["apple"])
     }
     func linkApple(_: AppleIdentityPayload) async throws -> CalorieAccount {
-        CalorieAccount(name: "Cloud owner", email: "owner@example.com", providers: ["apple", "google"])
+        CalorieAccount(userID: "synthetic-owner", name: "Cloud owner", email: "owner@example.com", providers: ["apple", "google"])
     }
     func cloudExport() async throws -> Data {
         throw NativeAccountError.http(

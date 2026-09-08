@@ -330,6 +330,8 @@ public struct CalorieDocument: Codable, Equatable, Sendable {
     public var theme: AppTheme
     public var syncState: SyncState
     public var lastSyncedAt: Date?
+    /// Stable identity that explicitly adopted this journal; nil requires a choice.
+    public var cloudAccountID: String? = nil
 
     public init(
         schemaVersion: Int = 1,
