@@ -3,7 +3,8 @@
 Baseline: `c1ef9d4f38daa7b993a4df042c3abf6ec951a925` (exact CI
 34332653952 passed both quality jobs, 81 native tests, Release and 70.3092%
 production coverage). This follow-up is source and isolated simulator work;
-the owner phone's build 14 remains unchanged.
+the owner phone was untouched during these simulator checks. The later
+[install-only receipt](owner-install.md) records source `15c6aa1` on build 14.
 
 ## Actual defect and repair
 

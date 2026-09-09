@@ -86,8 +86,10 @@ product ideas rather than unfinished Calorie features.
 
 ## Current acceptance gates
 
-Build 14/source `6ecaf4f` passed hosted native CI (80 tests, Release and
-coverage) and is installed on the owner iPhone. Installation does not qualify
+Build 14/source `15c6aa1` passed exact hosted CI (82 native tests, Release and
+70.5574% coverage) and was installed on the owner iPhone without launching it.
+The [signed install receipt](docs/qualification/2026-09-09/owner-install.md)
+distinguishes this update from the earlier build 14 artifact. Installation does not qualify
 physical logging/relaunch or real-account isolation and sync; those remain
 open in [issue 88](https://github.com/Significant-Hobbies/calorie/issues/88).
 The [9 September browser receipt](docs/qualification/2026-09-09/receipt.json)
@@ -98,7 +100,7 @@ invitation or App Store link. No device or account data was changed in this chec
 The [isolated simulator journey](docs/qualification/2026-09-09/native-journal.md)
 checks adding food and editing, deleting, and undoing a sample entry against
 rendered daily totals. It also fixes the singular `1 entry` label. This source
-change is not installed on the owner phone. A separate
+change is included in the installed update. A separate
 [UUID-isolated persistence journey](docs/qualification/2026-09-09/native-persistence.md)
 creates food and water through the UI and checks both after process relaunch.
 It also fixes invented calorie/macro comparisons after **No targets for now**:

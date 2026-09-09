@@ -33,6 +33,13 @@ full sets/reps workout-programming system.
 
 ## Timeline
 
+- 2026-09-09 — exact source `15c6aa1` passed CI 34335890509 (82 native
+  tests, Release, 70.5574% coverage). Its signed Release artifact was installed
+  successfully on the owner iPhone as a same-bundle update, retaining version
+  1.0.0/build 14. No app launch, sync, reset or owner-record operation followed.
+  See [signed install receipt](docs/qualification/2026-09-09/owner-install.md).
+  Physical workflow, real-account and public distribution gates remain open.
+
 - 2026-09-09 — a separate one-line Today scroll clipping fix prevents food
   text colliding with status-bar icons. The same persistent UI journey passes
   with a clear status band, working Log food sheet and reachable Foods tab;
