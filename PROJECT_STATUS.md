@@ -1,6 +1,6 @@
 # Calorie — PROJECT STATUS
 
-Last updated: 2026-09-08
+Last updated: 2026-09-09
 
 ## Why / What
 
@@ -42,9 +42,11 @@ full sets/reps workout-programming system.
   Synthetic transport and old-AppModel baselines reproduced the failures; 32
   account/local-save tests pass in a temporary Mac harness. The harness replaces
   only browser UI and file-protection behavior unavailable to that host; it does
-  not qualify physical use or iOS protection. Local native qualification still
-  stops before tests because no iPhone simulator is available. Hosted iOS
-  verification and build-14 phone installation remain pending.
+  not qualify physical use or iOS protection. Local native qualification stopped
+  before tests because no iPhone simulator was then available. Hosted iOS
+  CI 34255598804 subsequently passed 80 tests, Release and 67.6728% coverage.
+  Signed build 14 is installed; launch returned CoreDeviceError 10002 / FBS
+  Locked. Physical use and real-account verification remain pending.
 
 - 2026-09-08 — prepared build 13 to preserve the sync queue after failed
   persistence. Failed compaction, acknowledgement and clear operations now

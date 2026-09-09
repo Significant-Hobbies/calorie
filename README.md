@@ -83,3 +83,22 @@ logging, water beyond the target, private daily medication check-offs, weight,
 includes the numbered D1 migrations for medication and profile-range data. Workout
 programming, sets/reps, progressive overload, and wearable sync are separate
 product ideas rather than unfinished Calorie features.
+
+## Current acceptance gates
+
+Build 14/source `6ecaf4f` passed hosted native CI (80 tests, Release and
+coverage) and is installed on the owner iPhone. Installation does not qualify
+physical logging/relaunch or real-account isolation and sync; those remain
+open in [issue 88](https://github.com/Significant-Hobbies/calorie/issues/88).
+The [9 September browser receipt](docs/qualification/2026-09-09/receipt.json)
+and [390 px screenshot](docs/qualification/2026-09-09/calorie-testflight-phone.png)
+confirm that public access remains internal TestFlight only, with no public
+invitation or App Store link. No device or account data was changed in this check.
+
+The existing `ios/scripts/archive.sh` lane creates and verifies a local archive
+on the personal signing team; it explicitly performs no upload or App Store
+Connect operation. No checked-in lane publishes an external TestFlight group
+or public invitation. Historical internal delivery does not prove build 14 is
+available in App Store Connect. Provider build processing and distribution
+configuration must be verified separately after physical/account acceptance;
+no archive, upload, group change, or release was attempted in this audit.

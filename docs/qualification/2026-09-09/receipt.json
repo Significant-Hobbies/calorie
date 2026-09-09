@@ -1,0 +1,15 @@
+{
+  "observedAt": "2026-09-09T06:27:20.009Z",
+  "viewport": {
+    "width": 390,
+    "height": 844
+  },
+  "browser": "isolated headless Chromium",
+  "credentialsEntered": false,
+  "productionConfigurationChanged": false,
+  "sourceRevision": "6ecaf4faa3df07a0c6a07e87deb6b70c76abb308",
+  "entry": "https://calorie.significanthobbies.com/testflight/",
+  "observedAvailability": "Internal TestFlight only; no public invitation or App Store link",
+  "deviceLaunched": false,
+  "accountJourneyQualified": false
+}
