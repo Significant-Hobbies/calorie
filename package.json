@@ -52,7 +52,8 @@
   },
   "pnpm": {
     "overrides": {
-      "shell-quote": "1.9.0"
+      "shell-quote": "1.9.0",
+      "miniflare>sharp": "0.35.4"
     }
   }
 }
