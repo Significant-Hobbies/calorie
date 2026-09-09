@@ -22,6 +22,7 @@ struct TodayView: View {
             .padding(.horizontal, 18)
             .padding(.bottom, 36)
         }
+        .clipped()
         .botanicalBackground()
         .navigationBarHidden(true)
         .sheet(item: $editingEntry) { entry in

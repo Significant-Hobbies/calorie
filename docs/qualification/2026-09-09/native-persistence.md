@@ -75,6 +75,22 @@ TestFlight audience, or public distribution. [Issue 88](https://github.com/Signi
 remains open. No model/provider calls, credentials, dependencies, remote
 configuration, migrations, device writes or release operations occurred.
 
-A separate visual finding remains: scrolled food text can appear behind the
-status-bar clock. This is retained as a layout follow-up; it was not mixed
-into the target-correctness repair.
+## Separate status-bar correction
+
+A follow-up to source `3739744` fixes the retained scrolled-text collision with
+the clock/status icons. The preserve design lane uses the existing botanical
+paper background and clips only Today's ScrollView to its viewport, before
+background, sheet and bottom-inset modifiers. No fixed-height header, new
+palette, dependency or redesign was introduced.
+
+Before: `.artifacts/native-persistence-20260909/final/FB333078-2E39-4BC5-8893-4A31825CA7FF.png`.
+After: `.artifacts/native-safe-area-20260909/F48B3BE6-03AD-4299-B89B-68B87CAAFF86.png`.
+The same scrolled-water journey now has a clear status band, visible 250 ml
+water, and intact bottom Log food/tab controls. The focused XCTest passed in
+71.5 seconds, including real onboarding keyboard entry, persistence/relaunch,
+opening and closing the Log food sheet, and switching to Foods from the
+scrolled view. Both UUID fixtures cleaned in teardown.
+Result: `~/Library/Developer/XcodeBuildMCP/workspaces/fleet-167b0b9d8f42/result-bundles/test_sim_2026-09-09T09-36-35-976Z_pid56279_eba6ae25.xcresult`.
+The repository `pnpm check` passed 87 tests and its existing gates. This
+bounded native clipping correction follows preserve guidance; it is not a
+new visual direction or a web responsive-layout qualification.

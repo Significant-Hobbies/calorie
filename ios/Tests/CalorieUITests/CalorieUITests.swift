@@ -202,7 +202,14 @@ final class CalorieUITests: XCTestCase {
         capture("Persistent journal — food after relaunch")
         revealWater()
         XCTAssertTrue(app.staticTexts["250 ml"].waitForExistence(timeout: 3))
+        XCTAssertTrue(app.buttons["Log food"].isHittable)
+        XCTAssertTrue(app.tabBars.buttons["Foods"].isHittable)
         capture("Persistent journal — water after relaunch")
+        app.buttons["Log food"].tap()
+        XCTAssertTrue(app.navigationBars["Log food"].waitForExistence(timeout: 3))
+        app.buttons["Close"].tap()
+        app.tabBars.buttons["Foods"].tap()
+        XCTAssertTrue(app.staticTexts["Familiar foods first. Values stay editable."].waitForExistence(timeout: 3))
         app.terminate()
 
         app.launchArguments = ["--persistent-ui-fixture", secondID]

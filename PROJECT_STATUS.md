@@ -33,6 +33,12 @@ full sets/reps workout-programming system.
 
 ## Timeline
 
+- 2026-09-09 — a separate one-line Today scroll clipping fix prevents food
+  text colliding with status-bar icons. The same persistent UI journey passes
+  with a clear status band, working Log food sheet and reachable Foods tab;
+  before/after screenshots are in the native persistence receipt. No device
+  install or release accompanies this source repair.
+
 - 2026-09-09 — follow-up #88 simulator proof uses UUID-scoped real journal,
   outbox and preferences plus a DEBUG-only no-account client. Food (210 kcal)
   and water (250 ml) survive process termination/relaunch; a second UUID has
