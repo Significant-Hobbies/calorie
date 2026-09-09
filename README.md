@@ -95,6 +95,12 @@ and [390 px screenshot](docs/qualification/2026-09-09/calorie-testflight-phone.p
 confirm that public access remains internal TestFlight only, with no public
 invitation or App Store link. No device or account data was changed in this check.
 
+The [isolated simulator journey](docs/qualification/2026-09-09/native-journal.md)
+checks adding food and editing, deleting, and undoing a sample entry against
+rendered daily totals. It also fixes the singular `1 entry` label. This source
+change is not installed on the owner phone; the fixture resets on launch and
+does not qualify relaunch persistence or signed-in sync.
+
 The existing `ios/scripts/archive.sh` lane creates and verifies a local archive
 on the personal signing team; it explicitly performs no upload or App Store
 Connect operation. No checked-in lane publishes an external TestFlight group

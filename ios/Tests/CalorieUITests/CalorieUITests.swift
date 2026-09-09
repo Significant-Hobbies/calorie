@@ -88,6 +88,62 @@ final class CalorieUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["Greek yoghurt bowl"].waitForExistence(timeout: 3))
     }
 
+    func testEntryEditDeleteUndoUpdatesVisibleDailyTotals() {
+        let app = XCUIApplication()
+        addTeardownBlock { @MainActor in app.terminate() }
+        app.launchArguments = ["--fresh-demo", "-calorie-illustrated-onboarding-seen-v1", "YES"]
+        app.launch()
+
+        func assertTotal(_ calories: String) {
+            let score = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Score so far")).firstMatch
+            XCTAssertTrue(score.waitForExistence(timeout: 3))
+            XCTAssertTrue(score.label.contains("\(calories) kcal against"), score.label)
+        }
+        func capture(_ name: String) {
+            let attachment = XCTAttachment(screenshot: app.screenshot())
+            attachment.name = name
+            attachment.lifetime = .keepAlways
+            add(attachment)
+        }
+        func openEntryActions() {
+            app.swipeUp()
+            let row = app.staticTexts["Greek yoghurt bowl"].firstMatch
+            XCTAssertTrue(row.waitForExistence(timeout: 3))
+            row.press(forDuration: 1)
+        }
+
+        assertTotal("515")
+        capture("Today before editing — 515 kcal")
+        openEntryActions()
+        XCTAssertTrue(app.buttons["Edit"].waitForExistence(timeout: 3))
+        app.buttons["Edit"].tap()
+        XCTAssertTrue(app.navigationBars["Edit food entry"].waitForExistence(timeout: 3))
+        let increment = app.steppers.buttons["Increment"].firstMatch
+        for _ in 0..<4 { increment.tap() }
+        capture("Edit food — two servings")
+        app.buttons["Save"].tap()
+        app.swipeDown()
+        assertTotal("925")
+        capture("Today after editing — 925 kcal")
+
+        openEntryActions()
+        app.buttons["Delete"].tap()
+        let okay = app.alerts.buttons["OK"]
+        if okay.waitForExistence(timeout: 2) { okay.tap() }
+        XCTAssertTrue(app.buttons["Undo"].waitForExistence(timeout: 3))
+        app.swipeDown()
+        assertTotal("105")
+        XCTAssertTrue(app.staticTexts["1 entry"].exists)
+        capture("Deleted entry — 105 kcal and Undo")
+        app.buttons["Undo"].tap()
+        XCTAssertTrue(app.alerts.buttons["OK"].waitForExistence(timeout: 3))
+        app.alerts.buttons["OK"].tap()
+        XCTAssertTrue(app.alerts.firstMatch.waitForNonExistence(timeout: 3))
+        XCTAssertTrue(app.staticTexts["2 entries"].exists)
+        assertTotal("925")
+        capture("Undo restored entry — 925 kcal")
+    }
+
     func testPrimaryTabsAreReachable() {
         let app = XCUIApplication()
         app.launchArguments = ["--fresh-demo", "-calorie-illustrated-onboarding-seen-v1", "YES"]

@@ -199,7 +199,7 @@ struct TodayView: View {
             HStack {
                 Text("Food journal").font(.title2.weight(.bold))
                 Spacer()
-                Text("\(model.selectedEntries.count) entries").font(.caption.weight(.bold)).foregroundStyle(.secondary)
+                Text("\(model.selectedEntries.count) \(model.selectedEntries.count == 1 ? "entry" : "entries")").font(.caption.weight(.bold)).foregroundStyle(.secondary)
             }
             if model.selectedEntries.isEmpty {
                 Text("Nothing recorded yet. Add what you ate; the daily score will use the complete menu.")

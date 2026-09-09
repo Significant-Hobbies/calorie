@@ -33,6 +33,15 @@ full sets/reps workout-programming system.
 
 ## Timeline
 
+- 2026-09-09 — isolated simulator journal qualification under #88: actual
+  quick logging and entry edit/delete/undo checked through XCTest with synthetic
+  data and a separate invocation-only app bundle identifier. Rendered daily
+  calories follow 515 → 925 → 105 → 925; the single-entry label now reads
+  `1 entry`. Screenshots and boundaries are recorded in
+  [the native journal receipt](docs/qualification/2026-09-09/native-journal.md).
+  Owner build 14 remains unchanged; physical use, relaunch persistence, account
+  sync and distribution remain unqualified.
+
 - 2026-09-08 — build 14 account-isolation repair prepared under issue #88.
   A queue replay now verifies a stable account ID and binds all requests to
   that session. Credential changes abort old requests and stale receipts cannot
