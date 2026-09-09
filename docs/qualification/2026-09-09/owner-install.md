@@ -34,3 +34,34 @@ This installs the verified simulator logging/edit/delete/undo, persistence,
 no-target and scroll-clipping repairs. It does not qualify physical logging,
 physical relaunch persistence, real-account isolation/sync, TestFlight public
 access or App Store distribution. Those remain in [issue 88](https://github.com/Significant-Hobbies/calorie/issues/88).
+
+## Subsequent documentation CI failure and test repair
+
+Documentation-only descendant `164b7e6` failed native CI
+[34337638142](https://github.com/Significant-Hobbies/calorie/actions/runs/34337638142):
+`testDailyAndEntryScoresExposeTheirCalculationBasis` could not find the
+“This amount” button after a globally matched food-label tap. Ten other UI
+tests passed, including persistence and edit/delete/undo. No hosted result
+artifacts were available; the failed log is retained locally as
+`.artifacts/owner-ready-15c6aa1/docs-ci-failure.log`.
+
+An isolated local run retaining the original selection/assertions passed in
+25.9 seconds. Its hierarchy showed both underlying Today and picker food
+labels, plus the score below the viewport (y 879.4 on a 874-point screen).
+Thus the old test could pass without verifying a visible score. This does
+not establish which of selection or offscreen accessibility caused the hosted
+failure; no app navigation failure was reproduced.
+
+The test now selects the actual picker button, verifies “Add entry,” scrolls
+the selection view, and requires the score to be hittable. Existing daily
+basis and tracked-score assertions remain intact. Screenshots and hierarchy
+are retained for future diagnosis. The changed focused test passed in 18.4 s;
+`pnpm check` passed all 87 tests and existing gates. No app source changed and
+no second phone install occurred.
+
+Local evidence: `.artifacts/native-score-20260909/before/` and `after/`.
+The final visible score screenshot is
+`after/A42F9DA3-7CEB-44F6-A4E4-8FEE26F0FC55.png`.
+The test terminates its isolated app; derived build data is cleaned through
+XcodeBuildMCP. The installed source's green CI and successful install remain
+separate receipts from this subsequent test-only repair.

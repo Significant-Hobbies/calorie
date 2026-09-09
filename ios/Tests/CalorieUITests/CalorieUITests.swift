@@ -265,6 +265,17 @@ final class CalorieUITests: XCTestCase {
 
     func testDailyAndEntryScoresExposeTheirCalculationBasis() {
         let app = XCUIApplication()
+        addTeardownBlock { @MainActor in app.terminate() }
+        func captureScoreState(_ name: String) {
+            let screenshot = XCTAttachment(screenshot: app.screenshot())
+            screenshot.name = name
+            screenshot.lifetime = .keepAlways
+            add(screenshot)
+            let hierarchy = XCTAttachment(string: app.debugDescription)
+            hierarchy.name = "\(name) hierarchy"
+            hierarchy.lifetime = .keepAlways
+            add(hierarchy)
+        }
         app.launchArguments = ["--fresh-demo", "-calorie-illustrated-onboarding-seen-v1", "YES"]
         app.launch()
 
@@ -279,14 +290,22 @@ final class CalorieUITests: XCTestCase {
         )
 
         app.buttons["Log food"].tap()
-        XCTAssertTrue(app.staticTexts["Greek yoghurt bowl"].waitForExistence(timeout: 3))
-        app.descendants(matching: .any)
-            .matching(NSPredicate(format: "label BEGINSWITH %@", "Greek yoghurt bowl"))
-            .firstMatch.tap()
-        XCTAssertTrue(
-            app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "This amount")).firstMatch
-                .waitForExistence(timeout: 2)
-        )
+        let foodButton = app.buttons.matching(
+            NSPredicate(format: "label BEGINSWITH %@", "Greek yoghurt bowl,")
+        ).firstMatch
+        XCTAssertTrue(foodButton.waitForExistence(timeout: 3))
+        captureScoreState("Score food picker")
+        foodButton.tap()
+        XCTAssertTrue(app.navigationBars["Add entry"].waitForExistence(timeout: 3))
+        let selection = app.scrollViews.containing(.button, identifier: "Increase amount").firstMatch
+        XCTAssertTrue(selection.waitForExistence(timeout: 3))
+        selection.swipeUp()
+        let amountScore = app.buttons.matching(
+            NSPredicate(format: "label BEGINSWITH %@", "This amount")
+        ).firstMatch
+        XCTAssertTrue(amountScore.waitForExistence(timeout: 3))
+        XCTAssertTrue(amountScore.isHittable)
+        captureScoreState("Visible selected amount score")
         XCTAssertTrue(
             app.descendants(matching: .any)
                 .matching(NSPredicate(format: "label CONTAINS %@", "/100 tracked"))
