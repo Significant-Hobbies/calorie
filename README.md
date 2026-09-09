@@ -98,8 +98,12 @@ invitation or App Store link. No device or account data was changed in this chec
 The [isolated simulator journey](docs/qualification/2026-09-09/native-journal.md)
 checks adding food and editing, deleting, and undoing a sample entry against
 rendered daily totals. It also fixes the singular `1 entry` label. This source
-change is not installed on the owner phone; the fixture resets on launch and
-does not qualify relaunch persistence or signed-in sync.
+change is not installed on the owner phone. A separate
+[UUID-isolated persistence journey](docs/qualification/2026-09-09/native-persistence.md)
+creates food and water through the UI and checks both after process relaunch.
+It also fixes invented calorie/macro comparisons after **No targets for now**:
+Today shows recorded intake when there is no profile target. This remains
+synthetic local evidence, not physical-device or signed-in sync acceptance.
 
 The existing `ios/scripts/archive.sh` lane creates and verifies a local archive
 on the personal signing team; it explicitly performs no upload or App Store

@@ -144,6 +144,82 @@ final class CalorieUITests: XCTestCase {
         capture("Undo restored entry — 925 kcal")
     }
 
+    func testFoodAndWaterPersistAcrossRelaunchInAnIsolatedJournal() {
+        let app = XCUIApplication()
+        let firstID = UUID().uuidString
+        let secondID = UUID().uuidString
+        addTeardownBlock { @MainActor in
+            app.terminate()
+            for id in [firstID, secondID] {
+                app.launchArguments = ["--persistent-ui-fixture", id, "--cleanup-persistent-ui-fixture"]
+                app.launch()
+                XCTAssertTrue(app.staticTexts["Test journal cleaned"].waitForExistence(timeout: 3))
+                app.terminate()
+            }
+        }
+        func capture(_ name: String) {
+            let attachment = XCTAttachment(screenshot: app.screenshot())
+            attachment.name = name
+            attachment.lifetime = .keepAlways
+            add(attachment)
+        }
+        func revealWater() {
+            let water = app.buttons["+ 250 ml"]
+            for _ in 0..<5 where !water.isHittable { app.swipeUp() }
+            XCTAssertTrue(water.isHittable)
+        }
+        func assertFoodAndCalories() {
+            XCTAssertTrue(app.staticTexts["Persisted lentil bowl"].waitForExistence(timeout: 3))
+            XCTAssertTrue(app.staticTexts["210 kilocalories recorded"].exists)
+            XCTAssertTrue(app.staticTexts["Energy recorded"].exists)
+            XCTAssertTrue(app.staticTexts["kcal recorded"].exists)
+            XCTAssertTrue(app.descendants(matching: .any).matching(NSPredicate(format: "label == %@", "PROTEIN, 7 grams")).firstMatch.exists)
+            XCTAssertFalse(app.staticTexts["Energy left today"].exists)
+            XCTAssertFalse(app.descendants(matching: .any).matching(NSPredicate(format: "label CONTAINS %@", "kilocalories remaining")).firstMatch.exists)
+            XCTAssertFalse(app.descendants(matching: .any).matching(NSPredicate(format: "label CONTAINS %@", "of 120 grams")).firstMatch.exists)
+        }
+
+        app.launchArguments = ["--persistent-ui-fixture", firstID]
+        app.launch()
+        XCTAssertTrue(app.buttons["Set up my first log"].waitForExistence(timeout: 3))
+        app.buttons["Set up my first log"].tap()
+        app.buttons["No targets for now"].tap()
+        fillFirstFood(in: app, name: "Persisted lentil bowl")
+        app.switches["Save this as a reusable food"].tap()
+        app.buttons["Log my first food"].tap()
+        XCTAssertTrue(app.staticTexts["Your day changed."].waitForExistence(timeout: 3))
+        app.buttons["Open Today"].tap()
+        assertFoodAndCalories()
+        capture("Persistent journal — first food saved")
+        revealWater()
+        app.buttons["+ 250 ml"].tap()
+        XCTAssertTrue(app.staticTexts["250 ml"].waitForExistence(timeout: 3))
+        capture("Persistent journal — water saved")
+        app.terminate()
+
+        app.launch()
+        assertFoodAndCalories()
+        capture("Persistent journal — food after relaunch")
+        revealWater()
+        XCTAssertTrue(app.staticTexts["250 ml"].waitForExistence(timeout: 3))
+        capture("Persistent journal — water after relaunch")
+        app.terminate()
+
+        app.launchArguments = ["--persistent-ui-fixture", secondID]
+        app.launch()
+        XCTAssertTrue(app.buttons["Set up my first log"].waitForExistence(timeout: 3))
+        capture("Independent UUID — fresh onboarding")
+        app.terminate()
+        app.launchArguments += ["-calorie-illustrated-onboarding-seen-v1", "YES"]
+        app.launch()
+        XCTAssertTrue(app.staticTexts["0 entries"].waitForExistence(timeout: 3))
+        XCTAssertFalse(app.staticTexts["Persisted lentil bowl"].exists)
+        XCTAssertTrue(app.staticTexts["kcal remaining · 0 recorded"].exists)
+        revealWater()
+        XCTAssertTrue(app.staticTexts["0 ml"].exists)
+        capture("Independent UUID — empty food and water journal")
+    }
+
     func testPrimaryTabsAreReachable() {
         let app = XCUIApplication()
         app.launchArguments = ["--fresh-demo", "-calorie-illustrated-onboarding-seen-v1", "YES"]

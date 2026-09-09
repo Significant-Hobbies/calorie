@@ -116,41 +116,42 @@ struct TodayView: View {
 
     private var dailyLedger: some View {
         let totals = model.selectedTotals
-        let targets = model.targetExplanation?.target ?? Nutrients(calories: 2_100, protein: 120, carbohydrates: 250, fat: 70, fibre: 28)
-        let remaining = max(0, targets.calories - totals.calories)
+        let targets = model.targetExplanation?.target
         return VStack(alignment: .leading, spacing: 18) {
             Group {
                 if dynamicTypeSize.isAccessibilitySize {
-                    energySummary(remaining: remaining, recorded: totals.calories)
+                    energySummary(target: targets?.calories, recorded: totals.calories)
                 } else {
                     HStack(alignment: .lastTextBaseline) {
-                        energySummary(remaining: remaining, recorded: totals.calories)
+                        energySummary(target: targets?.calories, recorded: totals.calories)
                         Spacer()
                         CherryMark()
                     }
                 }
             }
-            GeometryReader { geometry in
-                ZStack(alignment: .leading) {
-                    Capsule().fill(CaloriePalette.surfaceStrong)
-                    Capsule().fill(CaloriePalette.moss)
-                        .frame(width: geometry.size.width * min(1, totals.calories / max(1, targets.calories)))
+            if let targets {
+                GeometryReader { geometry in
+                    ZStack(alignment: .leading) {
+                        Capsule().fill(CaloriePalette.surfaceStrong)
+                        Capsule().fill(CaloriePalette.moss)
+                            .frame(width: geometry.size.width * min(1, totals.calories / max(1, targets.calories)))
+                    }
                 }
+                .frame(height: 10)
             }
-            .frame(height: 10)
             if dynamicTypeSize.isAccessibilitySize {
                 LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], alignment: .leading, spacing: 18) {
-                    nutrient("PROTEIN", totals.protein, targets.protein, CaloriePalette.moss)
-                    nutrient("CARBS", totals.carbohydrates, targets.carbohydrates, CaloriePalette.amber)
-                    nutrient("FAT", totals.fat, targets.fat, CaloriePalette.cherry)
-                    nutrient("FIBRE", totals.fibre, targets.fibre, CaloriePalette.mossStrong)
+                    nutrient("PROTEIN", totals.protein, targets?.protein, CaloriePalette.moss)
+                    nutrient("CARBS", totals.carbohydrates, targets?.carbohydrates, CaloriePalette.amber)
+                    nutrient("FAT", totals.fat, targets?.fat, CaloriePalette.cherry)
+                    nutrient("FIBRE", totals.fibre, targets?.fibre, CaloriePalette.mossStrong)
                 }
             } else {
                 HStack(spacing: 0) {
-                    nutrient("PROTEIN", totals.protein, targets.protein, CaloriePalette.moss)
-                    nutrient("CARBS", totals.carbohydrates, targets.carbohydrates, CaloriePalette.amber)
-                    nutrient("FAT", totals.fat, targets.fat, CaloriePalette.cherry)
-                    nutrient("FIBRE", totals.fibre, targets.fibre, CaloriePalette.mossStrong)
+                    nutrient("PROTEIN", totals.protein, targets?.protein, CaloriePalette.moss)
+                    nutrient("CARBS", totals.carbohydrates, targets?.carbohydrates, CaloriePalette.amber)
+                    nutrient("FAT", totals.fat, targets?.fat, CaloriePalette.cherry)
+                    nutrient("FIBRE", totals.fibre, targets?.fibre, CaloriePalette.mossStrong)
                 }
             }
             Divider()
@@ -168,30 +169,32 @@ struct TodayView: View {
         .clipShape(RoundedRectangle(cornerRadius: 16))
     }
 
-    private func energySummary(remaining: Double, recorded: Double) -> some View {
-        VStack(alignment: .leading, spacing: 3) {
-            BotanicalSectionLabel(text: "Energy left today")
-            Text(remaining.formatted(.number.precision(.fractionLength(0))))
+    private func energySummary(target: Double?, recorded: Double) -> some View {
+        let remaining = target.map { max(0, $0 - recorded) }
+        let displayed = (remaining ?? recorded).formatted(.number.precision(.fractionLength(0)))
+        return VStack(alignment: .leading, spacing: 3) {
+            BotanicalSectionLabel(text: remaining == nil ? "Energy recorded" : "Energy left today")
+            Text(displayed)
                 .font(.system(size: 52, weight: .bold, design: .rounded).monospacedDigit())
-                .accessibilityLabel("\(remaining.formatted(.number.precision(.fractionLength(0)))) kilocalories remaining")
-            Text("kcal remaining · \(recorded.formatted(.number.precision(.fractionLength(0)))) recorded")
+                .accessibilityLabel("\(displayed) kilocalories \(remaining == nil ? "recorded" : "remaining")")
+            Text(remaining == nil ? "kcal recorded" : "kcal remaining · \(recorded.formatted(.number.precision(.fractionLength(0)))) recorded")
                 .font(.caption.weight(.semibold))
                 .foregroundStyle(.secondary)
         }
     }
 
-    private func nutrient(_ label: String, _ value: Double, _ target: Double, _ color: Color) -> some View {
+    private func nutrient(_ label: String, _ value: Double, _ target: Double?, _ color: Color) -> some View {
         VStack(alignment: .leading, spacing: 3) {
             Rectangle().fill(color).frame(width: 24, height: 3)
             Text(value.formatted(.number.precision(.fractionLength(0))))
                 .font(.headline.monospacedDigit().weight(.bold))
-            Text("of \(target.formatted(.number.precision(.fractionLength(0))))g")
+            Text(target.map { "of \($0.formatted(.number.precision(.fractionLength(0))))g" } ?? "g")
                 .font(.caption2).foregroundStyle(.secondary)
             Text(label).font(.caption2.weight(.heavy))
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel("\(label), \(value.formatted()) of \(target.formatted()) grams")
+        .accessibilityLabel(target.map { "\(label), \(value.formatted()) of \($0.formatted()) grams" } ?? "\(label), \(value.formatted()) grams")
     }
 
     private var mealJournal: some View {

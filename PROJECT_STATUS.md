@@ -33,6 +33,16 @@ full sets/reps workout-programming system.
 
 ## Timeline
 
+- 2026-09-09 — follow-up #88 simulator proof uses UUID-scoped real journal,
+  outbox and preferences plus a DEBUG-only no-account client. Food (210 kcal)
+  and water (250 ml) survive process termination/relaunch; a second UUID has
+  no entries or water. This exposed and repairs Today inventing a 2,100 kcal
+  budget after **No targets for now**. The untargeted view now shows recorded
+  energy/nutrients without fabricated remaining amounts, denominators or
+  progress; configured targets retain their existing layout. See
+  [the persistence receipt](docs/qualification/2026-09-09/native-persistence.md).
+  Owner build 14 and physical/account/distribution gates remain unchanged.
+
 - 2026-09-09 — isolated simulator journal qualification under #88: actual
   quick logging and entry edit/delete/undo checked through XCTest with synthetic
   data and a separate invocation-only app bundle identifier. Rendered daily
