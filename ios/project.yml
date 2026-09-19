@@ -19,7 +19,7 @@ settings:
 packages:
   PersonalSyncKit:
     url: https://github.com/Significant-Hobbies/significanthobbies.git
-    revision: 31f6b4eaa6d748b0fddd41ea66ed098655e9a541
+    revision: ebfc2387acf643bbb63e07c7a8e41fbc586cdca2
 targets:
   CalorieCore:
     type: framework

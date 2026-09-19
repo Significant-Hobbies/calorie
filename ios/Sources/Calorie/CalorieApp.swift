@@ -94,22 +94,9 @@ private struct PersistentJournalFixture {
     func makeModel() -> AppModel {
         AppModel(
             store: CalorieStore(fileURL: directory.appending(path: "journal-v1.json")),
-            accountClient: FixtureNoAccountClient(),
-            syncStore: SyncIntentStore(fileURL: directory.appending(path: "outbox-v1.json"))
+            mirror: nil,
+            legacyJournal: nil
         )
     }
-}
-
-private actor FixtureNoAccountClient: NativeAccountServing {
-    var googleStartURL: URL { URL(string: "about:blank")! }
-    func restoreAccount() async throws -> CalorieAccount? { nil }
-    func journal(for _: String) async throws -> any NativeJournalServing { throw CancellationError() }
-    func exchangeGoogleHandoff(_: String) async throws -> CalorieAccount { throw CancellationError() }
-    func signInWithApple(_: AppleIdentityPayload) async throws -> CalorieAccount { throw CancellationError() }
-    func linkApple(_: AppleIdentityPayload) async throws -> CalorieAccount { throw CancellationError() }
-    func cloudExport() async throws -> Data { throw CancellationError() }
-    func apply(_: SyncIntent) async throws { throw CancellationError() }
-    func signOut() async {}
-    func deleteAccount() async throws { throw CancellationError() }
 }
 #endif
