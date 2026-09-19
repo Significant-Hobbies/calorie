@@ -646,7 +646,8 @@ final class CalorieSyncCommitTests: XCTestCase {
 
         XCTAssertEqual(model.document.cloudAccountID, "user-1")
         XCTAssertEqual(model.message, "Cloud account deletion is unavailable until an authoritative remote deletion is supported. Your journal and account are unchanged.")
-        XCTAssertEqual(try await store.load().cloudAccountID, "user-1")
+        let restored = try await store.load()
+        XCTAssertEqual(restored.cloudAccountID, "user-1")
     }
 
     func testCloudDeletionNeverDeletesUnknownRemoteRecords() async throws {
