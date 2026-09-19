@@ -362,8 +362,15 @@ final class AppModel {
 
     func confirmImport() async {
         guard let importPreview else { return }
+        let importedAccountIDs = Set(
+            (document.legacyImportedAccountIDs ?? [])
+                + [document.cloudAccountID, account?.userID].compactMap { $0 }
+        )
         do {
-            try await replaceLocalDocument(importPreview)
+            try await replaceLocalDocument(
+                importPreview,
+                invalidatingLegacyImportMarkersFor: importedAccountIDs
+            )
             self.importPreview = nil
             isImportConfirmationPresented = false
             message = "Calorie journal replaced."
@@ -374,8 +381,12 @@ final class AppModel {
     }
 
     func resetLocalData() async {
+        let importedAccountIDs = Set(
+            (document.legacyImportedAccountIDs ?? [])
+                + [document.cloudAccountID, account?.userID].compactMap { $0 }
+        )
         do {
-            try await replaceLocalDocument(.starter)
+            try await replaceLocalDocument(.starter, invalidatingLegacyImportMarkersFor: importedAccountIDs)
             message = "Local journal reset."
         } catch {
             saveError = error.localizedDescription
@@ -383,7 +394,10 @@ final class AppModel {
         }
     }
 
-    private func replaceLocalDocument(_ replacement: CalorieDocument) async throws {
+    private func replaceLocalDocument(
+        _ replacement: CalorieDocument,
+        invalidatingLegacyImportMarkersFor accountIDs: Set<String> = []
+    ) async throws {
         guard !isReplacingStore else { throw CalorieMirrorError.documentNotLoaded }
         isReplacingStore = true
         storeGeneration = UUID()
@@ -392,12 +406,30 @@ final class AppModel {
         defer { releaseLocalWrite() }
         // CAS invalidates old passes without waiting for an app callback.
         // The replacement flag prevents a new pass entering the reset/save gap.
+        try await invalidateLegacyImportMarkers(for: accountIDs)
         try await mirror?.runtime.forgetBookkeeping()
         try await store.save(replacement)
         document = replacement
         localMutationRevision += 1
         hasLoadedDocument = true
         saveError = nil
+    }
+
+    private func invalidateLegacyImportMarkers(for accountIDs: Set<String>) async throws {
+        for userID in accountIDs {
+            let marker = await legacyImportMarkerURL(for: userID)
+            if FileManager.default.fileExists(atPath: marker.path) {
+                try FileManager.default.removeItem(at: marker)
+            }
+            guard !userID.isEmpty,
+                  userID.allSatisfy({ $0.isLetter || $0.isNumber || $0 == "-" || $0 == "_" })
+            else { continue }
+            let legacyMarker = marker.deletingLastPathComponent()
+                .appending(path: "legacy-import-\(userID).done")
+            if FileManager.default.fileExists(atPath: legacyMarker.path) {
+                try FileManager.default.removeItem(at: legacyMarker)
+            }
+        }
     }
 
     func connectExistingAccount() async {
@@ -524,7 +556,7 @@ final class AppModel {
         var pass: MirrorPass?
         var outcome: MirrorRuntime.Outcome?
         do {
-            try await importLegacyJournalIfNeeded()
+            try await importLegacyJournalIfNeeded(generation: generation)
             let verified = try? await mirror.identity.verifiedSyncAccount()
             let activePass = makeMirrorPass(account: verified)
             pass = activePass
@@ -557,8 +589,11 @@ final class AppModel {
 
     /// Import completion is saved with the journal itself. A crash or failure
     /// writing the compatibility marker cannot replay deleted imported entries.
-    private func importLegacyJournalIfNeeded() async throws {
+    private func importLegacyJournalIfNeeded(generation: UUID) async throws {
         guard let legacyJournal, let mirror else { return }
+        guard !isReplacingStore, generation == storeGeneration else {
+            throw CalorieMirrorError.documentNotLoaded
+        }
         guard let verified = try await mirror.identity.verifiedSyncAccount(),
               document.cloudAccountID == verified.userID else { return }
         guard !(document.legacyImportedAccountIDs ?? []).contains(verified.userID) else { return }
@@ -566,7 +601,13 @@ final class AppModel {
         let alreadyImported = FileManager.default.fileExists(atPath: marker.path)
             || legacyImportCompatMarkerExists(for: verified.userID, marker: marker)
         let snapshot = alreadyImported ? nil : try CloudJournalMapper.decode(await legacyJournal.cloudExport())
+        guard !isReplacingStore, generation == storeGeneration else {
+            throw CalorieMirrorError.documentNotLoaded
+        }
         try await commitLocalChange { next in
+            guard !isReplacingStore, generation == storeGeneration else {
+                throw CalorieMirrorError.documentNotLoaded
+            }
             try await mirror.identity.requireCurrentAccount(verified)
             guard next.cloudAccountID == verified.userID else {
                 throw PersonalSyncOwnershipError.differentAccount
@@ -575,6 +616,7 @@ final class AppModel {
             if let snapshot { next = CloudJournalMapper.mergeLegacyImport(into: next, cloud: snapshot) }
             next.legacyImportedAccountIDs = (next.legacyImportedAccountIDs ?? []) + [verified.userID]
         }
+        guard !isReplacingStore, generation == storeGeneration else { return }
         // Older builds read this marker. The document receipt above is the
         // authority for this build, so failure here cannot trigger re-import.
         try? FileManager.default.createDirectory(

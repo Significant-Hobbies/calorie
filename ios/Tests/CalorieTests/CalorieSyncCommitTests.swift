@@ -543,6 +543,68 @@ final class CalorieSyncCommitTests: XCTestCase {
         XCTAssertTrue(f.model.document.foods.contains(where: { $0.name == "Legacy oats" }))
     }
 
+    func testLegacyImportCannotCommitIntoSameOwnerReplacement() async throws {
+        let gate = AsyncGate()
+        let legacy = FakeLegacyJournal()
+        legacy.exportResult = .success(LegacyExportFixture.data())
+        legacy.exportGate = gate
+        let f = try AccountFixture(legacyJournal: legacy)
+        defer { f.cleanup() }
+        try await f.store.save(boundDocument(for: "user-1"))
+        await f.model.load()
+        await f.signIn(userID: "user-1", token: "token-1")
+
+        let sync = Task { await f.model.syncNow() }
+        await gate.waitUntilWaiting()
+
+        var replacement = boundDocument(for: "user-1")
+        replacement.foods = [Food(
+            name: "Replacement oats",
+            servingName: "1 bowl",
+            nutrients: Nutrients(calories: 410)
+        )]
+        let replacementData = try await f.store.export(replacement)
+        await f.model.prepareImport(replacementData)
+        XCTAssertTrue(f.model.isImportConfirmationPresented)
+        await f.model.confirmImport()
+
+        await gate.open()
+        await sync.value
+
+        XCTAssertEqual(f.model.document.foods.map(\.name), ["Replacement oats"])
+        XCTAssertEqual(legacy.exportCalls, 1)
+    }
+
+    func testResetInvalidatesLegacyMarkerBeforeMirrorUpload() async throws {
+        let legacy = FakeLegacyJournal()
+        legacy.exportResult = .success(LegacyExportFixture.data())
+        let f = try AccountFixture(legacyJournal: legacy)
+        defer { f.cleanup() }
+        try await f.store.save(boundDocument(for: "user-1"))
+        await f.model.load()
+        await f.signIn(userID: "user-1", token: "token-1")
+        await f.transport.setAvailability(.unavailable("offline"))
+
+        await f.model.syncNow()
+
+        XCTAssertEqual(legacy.exportCalls, 1)
+        XCTAssertTrue(f.model.document.foods.contains { $0.name == "Legacy oats" })
+        XCTAssertEqual(f.markerFilenames().count, 1)
+        let remoteBeforeReset = await f.transport.remoteRecords()
+        XCTAssertTrue(remoteBeforeReset.isEmpty)
+
+        await f.model.resetLocalData()
+
+        XCTAssertTrue(f.model.document.foods.isEmpty)
+        XCTAssertEqual(f.markerFilenames().count, 0)
+
+        await f.model.approveCloudAccount()
+
+        XCTAssertEqual(legacy.exportCalls, 2)
+        XCTAssertTrue(f.model.document.foods.contains { $0.name == "Legacy oats" })
+        XCTAssertEqual(f.markerFilenames().count, 1)
+    }
+
     func testLegacyImportMarkerCannotEscapeJournalDirectory() async throws {
         let legacy = FakeLegacyJournal()
         legacy.exportResult = .success(LegacyExportFixture.data())
