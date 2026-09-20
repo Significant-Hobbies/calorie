@@ -15,7 +15,7 @@
 - [Support](https://calorie.significanthobbies.com/support/index.md): Support and feedback in Markdown.
 - [Terms](https://calorie.significanthobbies.com/terms/index.md): Current terms in Markdown.
 - [Accessibility](https://calorie.significanthobbies.com/accessibility/index.md): Accessibility support in Markdown.
-- [TestFlight](https://calorie.significanthobbies.com/testflight/index.md): Current beta availability in Markdown.
+- [Release status](https://calorie.significanthobbies.com/testflight/index.md): Current availability in Markdown.
 
 ## Developer docs
 - [OpenAPI spec](https://calorie.significanthobbies.com/openapi.json): OpenAPI 3.1 specification for the public API
