@@ -6,5 +6,24 @@
 	<array>
 		<string>Default</string>
 	</array>
+	<!--
+	  CloudKit only, and only the user's private database. Calorie mirrors one
+	  person's journal between their own devices: there is no shared or public
+	  zone, and no server-side code with access.
+
+	  Simulator builds do not validate entitlements against a provisioning
+	  profile, so the tests and the release build work without this being enabled
+	  in the developer account. A device build does validate them: CloudKit has
+	  to be turned on for the app ID and the container below created, or signing
+	  fails.
+	-->
+	<key>com.apple.developer.icloud-services</key>
+	<array>
+		<string>CloudKit</string>
+	</array>
+	<key>com.apple.developer.icloud-container-identifiers</key>
+	<array>
+		<string>iCloud.com.significanthobbies.calorie</string>
+	</array>
 </dict>
 </plist>

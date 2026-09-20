@@ -332,6 +332,8 @@ public struct CalorieDocument: Codable, Equatable, Sendable {
     public var lastSyncedAt: Date?
     /// Stable identity that explicitly adopted this journal; nil requires a choice.
     public var cloudAccountID: String? = nil
+    /// Legacy-import completion shares the atomic save with imported content.
+    public var legacyImportedAccountIDs: [String]? = nil
 
     public init(
         schemaVersion: Int = 1,

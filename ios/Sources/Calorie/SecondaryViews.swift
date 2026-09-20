@@ -5,14 +5,14 @@ import SwiftUI
 import UniformTypeIdentifiers
 
 enum CalorieAccountCopy {
-    static let unsignedOverview = "Calorie keeps working on this device without an account. Sign in with Apple to privately sync supported food, water, weight, and routine records across your devices."
+    static let unsignedOverview = "Calorie keeps working on this device without an account. Sign in with Apple to privately mirror your journal to iCloud and Significant Hobbies so every device and a fresh install stay in sync."
     static let googleRecovery = "Previously connected this journal with Google? Use Google to reopen that existing Calorie account."
-    static let connectedOverview = "Food, water, weight, and routine records privately sync with this account. Notes, meal labels, cycle context, fat values, and appearance stay on this device."
+    static let connectedOverview = "Your journal privately mirrors to iCloud and Significant Hobbies with this account. Every record — entries, notes, goals, and context — restores from either source."
     static let appleLinked = "Sign in with Apple can reopen this account. Choosing to share or hide your Apple email does not change your journal."
     static let appleLinkPrompt = "Add Sign in with Apple so you can reopen this account without the Google recovery step."
-    static let onboardingLocalFirst = "Calorie stores this entry on this device first. If you connect an account later, supported journal records can also sync privately."
-    static let existingAccountConnected = "Existing Calorie account connected. Review both journals before anything changes."
-    static let accountJournalReplacement = "Replace supported records on this device with the records already saved to your account. Appearance stays the same."
+    static let onboardingLocalFirst = "Calorie stores this entry on this device first. If you connect an account later, your journal can also sync privately."
+    static let existingAccountConnected = "Existing Calorie account connected."
+    static let accountJournalReplacement = "Connect this journal to your account so records merge privately across iCloud and Significant Hobbies."
 }
 
 struct ProgressViewScreen: View {
@@ -414,7 +414,6 @@ struct YouView: View {
     @State private var showReset = false
     @State private var showDeleteAccount = false
     @State private var isRoutineManagerPresented = false
-    @State private var appleNonce = AppleNonce.make()
 
     private var appVersion: String {
         let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "—"
@@ -544,10 +543,6 @@ struct YouView: View {
             )
             .font(.headline)
             .frame(minHeight: 44)
-            if !account.name.isEmpty, account.name != account.email {
-                Text(account.name)
-                    .font(.subheadline.weight(.semibold))
-            }
             Text(account.email)
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
@@ -555,12 +550,24 @@ struct YouView: View {
             Text(CalorieAccountCopy.connectedOverview)
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
+            if model.needsAccountApproval {
+                Button { Task { await model.approveCloudAccount() } } label: {
+                    Label("Connect this journal", systemImage: "checkmark.icloud.fill")
+                        .frame(maxWidth: .infinity, minHeight: 48)
+                }
+                .buttonStyle(.borderedProminent)
+                .disabled(model.isAccountWorking)
+            } else if model.isBoundToDifferentAccount {
+                Text("This journal is connected to a different account. Sign in to that account to sync it.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
             HStack {
                 Label(syncStatusText, systemImage: syncStatusSymbol)
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(.secondary)
                 Spacer()
-                Button(model.document.syncState == .conflict ? "Resolve journals" : "Sync now") {
+                Button("Sync now") {
                     Task { await model.syncNow() }
                 }
                 .font(.caption.weight(.bold))
@@ -620,27 +627,12 @@ struct YouView: View {
 
     private var appleButton: some View {
         SignInWithAppleButton(.continue) { request in
-            appleNonce = AppleNonce.make()
-            request.requestedScopes = [.fullName, .email]
-            request.nonce = AppleNonce.digest(appleNonce)
+            model.accountModel?.prepareApple(request)
         } onCompletion: { result in
-            guard
-                case let .success(authorization) = result,
-                let credential = authorization.credential as? ASAuthorizationAppleIDCredential,
-                let tokenData = credential.identityToken,
-                let token = String(data: tokenData, encoding: .utf8)
-            else {
-                if case let .failure(error) = result { model.message = error.localizedDescription }
-                return
+            Task {
+                await model.accountModel?.completeApple(result)
+                await model.finishAppleSignIn()
             }
-            let payload = AppleIdentityPayload(
-                identityToken: token,
-                nonce: appleNonce,
-                email: credential.email,
-                firstName: credential.fullName?.givenName,
-                lastName: credential.fullName?.familyName
-            )
-            Task { await model.completeAppleSignIn(payload) }
         }
         .signInWithAppleButtonStyle(colorScheme == .dark ? .white : .black)
         .frame(maxWidth: .infinity, minHeight: 48)
