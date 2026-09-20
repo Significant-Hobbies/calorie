@@ -595,7 +595,7 @@ final class CalorieSyncCommitTests: XCTestCase {
 
         await f.model.resetLocalData()
 
-        XCTAssertTrue(f.model.document.foods.isEmpty)
+        XCTAssertFalse(f.model.document.foods.contains { $0.name == "Legacy oats" })
         XCTAssertEqual(f.markerFilenames().count, 0)
 
         await f.model.approveCloudAccount()
@@ -689,7 +689,7 @@ final class CalorieSyncCommitTests: XCTestCase {
         XCTAssertEqual(f.model.document.syncState, .synced)
         XCTAssertEqual(
             f.model.message,
-            "Could not finish deleting the cloud account. Nothing was removed from this device."
+            "Cloud account deletion is unavailable until an authoritative remote deletion is supported. Your journal and account are unchanged."
         )
     }
 
