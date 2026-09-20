@@ -24,6 +24,11 @@ function paramId(c: AppContext) {
   return c.req.param('id') ?? '';
 }
 
+function isUniqueConstraintError(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error);
+  return /unique constraint failed/i.test(message);
+}
+
 async function getFoods(c: AppContext) {
   const search = c.req.query('q')?.trim().slice(0, 60);
   const lifecycleWhere =
@@ -51,6 +56,10 @@ async function postFoods(c: AppContext) {
   const id = body ? optionalText(body.id, 80) : null;
   if (!parsed || !id) return c.json(jsonError('Complete all four nutrient values.'), 400);
   const now = Date.now();
+  const existing = await c.env.DB.prepare('SELECT * FROM foods WHERE id = ? AND user_id = ?')
+    .bind(id, c.get('userId'))
+    .first<FoodRow>();
+  if (existing) return c.json(mapFood(existing), 201);
   try {
     await c.env.DB.prepare(
       `INSERT INTO foods (
@@ -78,11 +87,12 @@ async function postFoods(c: AppContext) {
       )
       .run();
   } catch (error) {
-    console.error(JSON.stringify({ event: 'food_create_failed', message: String(error) }));
-    return c.json(
-      jsonError('A food with that name already exists. Edit the existing food instead.'),
-      409
-    );
+    if (!isUniqueConstraintError(error)) throw error;
+    const concurrent = await c.env.DB.prepare('SELECT * FROM foods WHERE id = ? AND user_id = ?')
+      .bind(id, c.get('userId'))
+      .first<FoodRow>();
+    if (concurrent) return c.json(mapFood(concurrent), 201);
+    return c.json(jsonError('That food could not be created.'), 409);
   }
   const row = await c.env.DB.prepare('SELECT * FROM foods WHERE id = ? AND user_id = ?')
     .bind(id, c.get('userId'))
