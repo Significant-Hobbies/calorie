@@ -17,7 +17,7 @@ describe('public agent surfaces', () => {
       surfaces: Array<{ url: string; md: string }>;
     };
     expect(catalog).toMatchObject({ name: 'Calorie' });
-    expect(catalog.surfaces).toHaveLength(6);
+    expect(catalog.surfaces).toHaveLength(7);
     expect(catalog.surfaces.every((surface) => surface.url && surface.md)).toBe(true);
   });
 

@@ -12,7 +12,7 @@ import type { AppBindings, AppVariables } from './worker/types';
 const app = new Hono<{ Bindings: AppBindings; Variables: AppVariables }>();
 
 app.use('*', async (c, next) => {
-  const agentResponse = handleAgentEdge(c.req.raw);
+  const agentResponse = await handleAgentEdge(c.req.raw, c.env);
   if (agentResponse) return agentResponse;
   await next();
 });
