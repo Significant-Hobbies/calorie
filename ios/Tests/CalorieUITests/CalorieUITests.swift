@@ -63,13 +63,23 @@ final class CalorieUITests: XCTestCase {
         app.buttons["Set up my first log"].tap()
         app.buttons["No targets for now"].tap()
         let name = app.textFields["Food name"]
+        XCTAssertTrue(name.waitForExistence(timeout: 3))
         name.tap()
         name.typeText("Keep my draft")
+        // @AppStorage drafts flush to UserDefaults asynchronously; give the
+        // write a moment to commit or terminate() drops the last characters.
+        Thread.sleep(forTimeInterval: 1)
         app.terminate()
 
         app.launchArguments = ["--onboarding-demo"]
         app.launch()
-        XCTAssertEqual(app.textFields["Food name"].value as? String, "Keep my draft")
+        let restored = app.textFields["Food name"]
+        XCTAssertTrue(restored.waitForExistence(timeout: 3))
+        expectation(
+            for: NSPredicate(format: "value == %@", "Keep my draft"),
+            evaluatedWith: restored
+        )
+        waitForExpectations(timeout: 3)
     }
 
     func testQuickLogsFavoriteFood() {
