@@ -40,6 +40,7 @@ Calorie is for someone pursuing weight loss who wants practical daily context wi
 - [Privacy](${PRODUCT_ORIGIN}/privacy/): Local and cloud data handling
 - [Support](${PRODUCT_ORIGIN}/support/): Product support
 - [Beta status](${PRODUCT_ORIGIN}/testflight/): Honest distribution status
+- [Journal articles](${PRODUCT_ORIGIN}/blog/): Calorie journal articles
 
 ## Machine surfaces
 
@@ -111,6 +112,7 @@ The public website is informational only. The private journal is available to in
       surface('terms', '/terms/', 'Product terms'),
       surface('accessibility', '/accessibility/', 'Native accessibility support'),
       surface('testflight', '/testflight/', 'Distribution status'),
+      surface('blog', '/blog/', 'Calorie journal articles'),
     ],
     auth: {
       public: true,
@@ -410,7 +412,7 @@ function surface(id, path, description) {
   };
 }
 
-export function handleAgentEdge(request) {
+export async function handleAgentEdge(request, env) {
   if (request.method !== 'GET' && request.method !== 'HEAD') return null;
   const url = new URL(request.url);
   const path = url.pathname || '/';
@@ -443,6 +445,9 @@ export function handleAgentEdge(request) {
     return text(PUBLIC_MARKDOWN[directMarkdownRoute], 'text/markdown; charset=utf-8');
   }
   if (path === '/sitemap.xml') {
+    // Prefer the synced marketing sitemap (includes generated blog routes);
+    // fall back to the static catalog when assets are unavailable (tests).
+    if (env?.ASSETS) return env.ASSETS.fetch(request);
     return text(sitemapForCatalog(catalogForOrigin(url.origin)), 'application/xml; charset=utf-8');
   }
   if (path === '/robots.txt') {

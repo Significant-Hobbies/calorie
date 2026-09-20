@@ -6,4 +6,7 @@ export declare const AGENT_SURFACE: {
   indexMd: string;
   catalog: Record<string, unknown>;
 };
-export declare function handleAgentEdge(request: Request): Response | null;
+export declare function handleAgentEdge(
+  request: Request,
+  env?: { ASSETS?: Fetcher }
+): Promise<Response | null>;
