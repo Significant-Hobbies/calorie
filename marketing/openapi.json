@@ -3,7 +3,7 @@
   "info": {
     "title": "Calorie public API",
     "version": "1.0.0",
-    "description": "Calorie — A private food journal for weight loss.. The public web API exposes read-only agent surfaces: the agent catalog, sitemap, llms.txt, and per-page markdown alternates. The API is versioned via the Api-Version header; the current version is 1. Breaking changes require a new version and are announced via Sunset response headers.",
+    "description": "Calorie — A private food journal for weight loss.. Static read-only documents: the agent catalog, sitemap, llms.txt and explicit per-page Markdown alternates. The catalog version describes its document schema; requests do not negotiate API versions or Markdown via headers.",
     "contact": {
       "name": "Calorie",
       "url": "https://calorie.significanthobbies.com"
@@ -29,17 +29,6 @@
         ],
         "summary": "Agent catalog",
         "description": "JSON inventory of public agent surfaces.",
-        "parameters": [
-          {
-            "name": "Api-Version",
-            "in": "header",
-            "description": "API version. Current version is 1. Deprecated versions are announced via Sunset response headers.",
-            "schema": {
-              "type": "string",
-              "default": "1"
-            }
-          }
-        ],
         "responses": {
           "200": {
             "description": "Agent catalog",
@@ -91,6 +80,7 @@
                         "required": [
                           "id",
                           "url",
+                          "md",
                           "kind"
                         ]
                       }
@@ -101,42 +91,6 @@
                     "version",
                     "url",
                     "surfaces"
-                  ]
-                }
-              }
-            }
-          },
-          "429": {
-            "description": "Rate limit exceeded",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "error": {
-                      "type": "object",
-                      "properties": {
-                        "code": {
-                          "type": "string",
-                          "description": "Machine-readable error code"
-                        },
-                        "message": {
-                          "type": "string",
-                          "description": "Human-readable error message"
-                        },
-                        "path": {
-                          "type": "string",
-                          "description": "Request path that caused the error"
-                        }
-                      },
-                      "required": [
-                        "code",
-                        "message"
-                      ]
-                    }
-                  },
-                  "required": [
-                    "error"
                   ]
                 }
               }
@@ -153,17 +107,6 @@
         ],
         "summary": "llms.txt index",
         "description": "Markdown index of agent surfaces and product context for LLM consumption.",
-        "parameters": [
-          {
-            "name": "Api-Version",
-            "in": "header",
-            "description": "API version. Current version is 1. Deprecated versions are announced via Sunset response headers.",
-            "schema": {
-              "type": "string",
-              "default": "1"
-            }
-          }
-        ],
         "responses": {
           "200": {
             "description": "Markdown index",
@@ -187,17 +130,6 @@
         ],
         "summary": "Sitemap",
         "description": "XML sitemap listing all public pages.",
-        "parameters": [
-          {
-            "name": "Api-Version",
-            "in": "header",
-            "description": "API version. Current version is 1. Deprecated versions are announced via Sunset response headers.",
-            "schema": {
-              "type": "string",
-              "default": "1"
-            }
-          }
-        ],
         "responses": {
           "200": {
             "description": "XML sitemap",
@@ -221,17 +153,6 @@
         ],
         "summary": "OpenAPI specification",
         "description": "This document — the OpenAPI 3.1 specification for the public API.",
-        "parameters": [
-          {
-            "name": "Api-Version",
-            "in": "header",
-            "description": "API version. Current version is 1. Deprecated versions are announced via Sunset response headers.",
-            "schema": {
-              "type": "string",
-              "default": "1"
-            }
-          }
-        ],
         "responses": {
           "200": {
             "description": "OpenAPI 3.1 spec",

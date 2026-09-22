@@ -27,5 +27,6 @@ Status: Internal TestFlight only. No public invite or App Store listing..
 - terms: https://calorie.significanthobbies.com/terms/
 - accessibility: https://calorie.significanthobbies.com/accessibility/
 - testflight: https://calorie.significanthobbies.com/testflight/
+- repository: https://github.com/Significant-Hobbies/calorie
 
 Last updated: 2026-08-28

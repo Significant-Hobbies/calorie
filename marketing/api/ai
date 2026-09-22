@@ -46,6 +46,54 @@
       "url": "/testflight/",
       "md": "/testflight/index.md",
       "kind": "static"
+    },
+    {
+      "id": "blog",
+      "url": "/blog/",
+      "md": "/blog/index.md",
+      "kind": "static"
+    },
+    {
+      "id": "blog-how-to-make-nutrition-targets-transparent-instead-of-opaque",
+      "url": "/blog/how-to-make-nutrition-targets-transparent-instead-of-opaque/",
+      "md": "/blog/how-to-make-nutrition-targets-transparent-instead-of-opaque/index.md",
+      "kind": "article"
+    },
+    {
+      "id": "blog-maintenance-relative-goals-for-a-calmer-nutrition-journal",
+      "url": "/blog/maintenance-relative-goals-for-a-calmer-nutrition-journal/",
+      "md": "/blog/maintenance-relative-goals-for-a-calmer-nutrition-journal/index.md",
+      "kind": "article"
+    },
+    {
+      "id": "blog-one-handed-interaction-design-for-meal-logging",
+      "url": "/blog/one-handed-interaction-design-for-meal-logging/",
+      "md": "/blog/one-handed-interaction-design-for-meal-logging/index.md",
+      "kind": "article"
+    },
+    {
+      "id": "blog-using-familiar-meal-templates-to-reduce-food-entry-friction",
+      "url": "/blog/using-familiar-meal-templates-to-reduce-food-entry-friction/",
+      "md": "/blog/using-familiar-meal-templates-to-reduce-food-entry-friction/index.md",
+      "kind": "article"
+    },
+    {
+      "id": "blog-weight-trends-vs-daily-weight-judgments",
+      "url": "/blog/weight-trends-vs-daily-weight-judgments/",
+      "md": "/blog/weight-trends-vs-daily-weight-judgments/index.md",
+      "kind": "article"
+    },
+    {
+      "id": "blog-why-a-small-food-journal-does-not-need-an-ai-coach",
+      "url": "/blog/why-a-small-food-journal-does-not-need-an-ai-coach/",
+      "md": "/blog/why-a-small-food-journal-does-not-need-an-ai-coach/index.md",
+      "kind": "article"
+    },
+    {
+      "id": "blog-why-calories-alone-are-not-enough-for-a-useful-food-journal",
+      "url": "/blog/why-calories-alone-are-not-enough-for-a-useful-food-journal/",
+      "md": "/blog/why-calories-alone-are-not-enough-for-a-useful-food-journal/index.md",
+      "kind": "article"
     }
   ],
   "auth": {
@@ -78,7 +126,8 @@
       "support": "https://calorie.significanthobbies.com/support/",
       "terms": "https://calorie.significanthobbies.com/terms/",
       "accessibility": "https://calorie.significanthobbies.com/accessibility/",
-      "testflight": "https://calorie.significanthobbies.com/testflight/"
+      "testflight": "https://calorie.significanthobbies.com/testflight/",
+      "repository": "https://github.com/Significant-Hobbies/calorie"
     }
   }
 }

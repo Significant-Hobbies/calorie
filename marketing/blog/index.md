@@ -1,0 +1,9 @@
+# Calorie journal
+
+- [How to Make Nutrition Targets Transparent Instead of Opaque](/blog/how-to-make-nutrition-targets-transparent-instead-of-opaque/) — Learn how to build nutrition targets that show their work, replacing opaque estimates with clear calculations based on fundamental inputs.
+- [Maintenance-Relative Goals for a Calmer Nutrition Journal](/blog/maintenance-relative-goals-for-a-calmer-nutrition-journal/) — Discover how maintenance-relative goals can transform your nutrition tracking from a source of anxiety to a sustainable, calmer practice.
+- [One-handed interaction design for meal logging](/blog/one-handed-interaction-design-for-meal-logging/) — Explore practical UX patterns for one-handed meal logging, including reachable touch targets, bottom-sheet entry, and predictive quick picks.
+- [Using familiar-meal templates to reduce food-entry friction](/blog/using-familiar-meal-templates-to-reduce-food-entry-friction/) — Discover how treating routine meals as templates instead of daily calculations can significantly reduce the friction of daily nutrition logging.
+- [Weight trends vs daily weight judgments](/blog/weight-trends-vs-daily-weight-judgments/) — Learn why daily weight fluctuations are normal and how focusing on long-term weight trends provides a more accurate and healthier perspective on your progress.
+- [Why a small food journal does not need an AI coach](/blog/why-a-small-food-journal-does-not-need-an-ai-coach/) — Explore why Calorie prioritizes transparent, math-based nutrition targets and timing estimates over opaque AI coaching, focusing on speed, privacy, and progress.
+- [Why calories alone are not enough for a useful food journal](/blog/why-calories-alone-are-not-enough-for-a-useful-food-journal/) — Discover why tracking calories is just one part of the picture. Learn how a food journal that includes macros, water, and timing provides better insights.
