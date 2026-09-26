@@ -1,6 +1,7 @@
 import CalorieCore
 import Foundation
 import Observation
+import PersonalSyncKit
 import SwiftUI
 
 @MainActor
@@ -19,38 +20,46 @@ final class AppModel {
     var lastDeletedEntry: FoodEntry?
     var importPreview: CalorieDocument?
     var isImportConfirmationPresented = false
-    private(set) var account: CalorieAccount? {
-        didSet { accountRevision += 1 }
-    }
-    private var accountRevision = 0
-    private var cloudSnapshotRevision: Int?
+    var isApprovalPresented = false
     private(set) var isAccountWorking = false
     private(set) var accountNotice: String?
-    private(set) var cloudSnapshot: CloudJournalSnapshot?
-    var isReconciliationPresented = false
     private(set) var pendingSyncCount = 0
     private(set) var isSyncing = false
     private(set) var forceCalorieOnboarding = false
 
     private let store: CalorieStore
-    private let accountClient: any NativeAccountServing
-    private let syncStore: SyncIntentStore
-    private let cloudQuery: ServerStateQueryCache<CloudJournalSnapshot>
-    private let webAuthentication = WebAuthenticationCoordinator()
+    private let mirror: PersonalMirrorConnection?
+    private let legacyJournal: (any LegacyCalorieServing)?
     private var activeLocalMutations = 0
     private var localMutationRevision = 0
     private var syncRequestedAfterMutation = false
+    private var attemptedLegacyImport = false
+
+    var account: CalorieAccount? { mirror?.account.session.map(CalorieAccount.init) }
+    var accountModel: PersonalAccountModel? { mirror?.account }
+
+    /// Signed in but the journal is not bound to this account yet — either it
+    /// was never connected, or a legacy build left it in `conflict` waiting
+    /// for the retired journal-choice sheet.
+    var needsAccountApproval: Bool {
+        guard let userID = account?.userID else { return false }
+        return document.cloudAccountID == nil
+            || (document.syncState == .conflict && document.cloudAccountID == userID)
+    }
+
+    var isBoundToDifferentAccount: Bool {
+        guard let userID = account?.userID, let bound = document.cloudAccountID else { return false }
+        return bound != userID
+    }
 
     init(
         store: CalorieStore = CalorieStore(),
-        accountClient: any NativeAccountServing = NativeAccountClient(),
-        syncStore: SyncIntentStore = SyncIntentStore(),
-        cloudQuery: ServerStateQueryCache<CloudJournalSnapshot> = ServerStateQueryCache()
+        mirror: PersonalMirrorConnection? = AppModel.makeMirrorConnection(),
+        legacyJournal: (any LegacyCalorieServing)? = LegacyCalorieJournal()
     ) {
         self.store = store
-        self.accountClient = accountClient
-        self.syncStore = syncStore
-        self.cloudQuery = cloudQuery
+        self.mirror = mirror
+        self.legacyJournal = legacyJournal
         if ProcessInfo.processInfo.arguments.contains("--progress-demo") { selectedTab = 1 }
         if ProcessInfo.processInfo.arguments.contains("--foods-demo") { selectedTab = 2 }
         if ProcessInfo.processInfo.arguments.contains("--you-demo") { selectedTab = 3 }
@@ -128,14 +137,21 @@ final class AppModel {
               !ProcessInfo.processInfo.arguments.contains(where: fixtures.contains) else { return }
         isAccountWorking = true
         defer { isAccountWorking = false }
-        account = try? await accountClient.restoreAccount()
-        pendingSyncCount = (try? await syncStore.pending().count) ?? 0
+        await mirror?.account.restore()
         if account != nil {
-            if document.syncState == .localOnly {
-                await prepareCloudReconciliation()
-            } else {
-                await syncNow()
-            }
+            await finishSignIn()
+        }
+    }
+
+    /// Runs after any sign-in path completes: surface the approval prompt when
+    /// the journal is unbound, flag a foreign binding, otherwise sync.
+    private func finishSignIn() async {
+        if needsAccountApproval {
+            isApprovalPresented = true
+        } else if isBoundToDifferentAccount {
+            accountNotice = "This journal is connected to a different account. Sign in to that account to sync it, or keep using this device journal locally."
+        } else {
+            await syncNow()
         }
     }
 
@@ -148,7 +164,7 @@ final class AppModel {
         return CalorieOnboardingPolicy.shouldPresent(
             completed: completed,
             hasLocalActivity: hasLocalActivity,
-            cloudActivityCount: cloudSnapshot?.counts.activityTotal ?? 0,
+            cloudActivityCount: 0,
             forced: forceCalorieOnboarding
         )
     }
@@ -344,6 +360,10 @@ final class AppModel {
 
     func confirmImport() async {
         guard let importPreview else { return }
+        // Replacing the journal must not propagate as a mass deletion: clear
+        // sync bookkeeping first so the imported set is mirrored fresh and a
+        // following pull restores remote records rather than tombstoning them.
+        try? await mirror?.runtime.forgetBookkeeping()
         guard await mutate(allowUnread: true, { $0 = importPreview }) else { return }
         self.importPreview = nil
         isImportConfirmationPresented = false
@@ -352,6 +372,7 @@ final class AppModel {
 
     func resetLocalData() async {
         do {
+            try await mirror?.runtime.forgetBookkeeping()
             try await commitLocalChange(allowUnread: true) { $0 = .starter }
             hasLoadedDocument = true
             saveError = nil
@@ -361,83 +382,65 @@ final class AppModel {
         }
     }
 
-    private func beginAccountChange() -> Bool {
-        guard !isAccountWorking else { return false }
-        accountRevision += 1
-        cloudSnapshot = nil
-        cloudSnapshotRevision = nil
-        return true
-    }
-
     func connectExistingAccount() async {
-        guard beginAccountChange() else { return }
+        guard !isAccountWorking else { return }
         accountNotice = nil
         isAccountWorking = true
         defer { isAccountWorking = false }
-        do {
-            let startURL = await accountClient.googleStartURL
-            let callback = try await webAuthentication.authenticate(at: startURL)
-            guard
-                let components = URLComponents(url: callback, resolvingAgainstBaseURL: false),
-                let code = components.queryItems?.first(where: { $0.name == "code" })?.value
-            else { throw NativeAccountError.invalidCallback }
-            account = try await accountClient.exchangeGoogleHandoff(code)
-            await cloudQuery.clear()
+        await accountModel?.connect()
+        if account != nil {
             accountNotice = CalorieAccountCopy.existingAccountConnected
-            await prepareCloudReconciliation()
-        } catch {
-            message = accountErrorMessage(error, recovery: "Try connecting your existing journal again.")
+            await finishSignIn()
+        } else if let error = accountModel?.errorMessage {
+            message = "\(error) Try connecting your existing journal again."
         }
     }
 
-    func completeAppleSignIn(_ payload: AppleIdentityPayload) async {
-        guard beginAccountChange() else { return }
-        accountNotice = nil
-        isAccountWorking = true
-        defer { isAccountWorking = false }
-        do {
-            if let account, !account.hasApple {
-                self.account = try await accountClient.linkApple(payload)
-                await cloudQuery.clear()
-                await prepareCloudReconciliation()
-            } else {
-                account = try await accountClient.signInWithApple(payload)
-                await cloudQuery.clear()
-                await prepareCloudReconciliation()
-            }
-        } catch let error as NativeAccountError where error.requiresExistingAccountRecovery {
-            await recoverFromUnlinkedCalorieAccount()
-        } catch {
-            message = accountErrorMessage(error, recovery: "Try Apple sign-in again. Your device journal has not changed.")
-        }
-    }
-
-    private func recoverFromUnlinkedCalorieAccount() async {
-        let wasAccountWorking = isAccountWorking
-        isAccountWorking = true
-        defer { isAccountWorking = wasAccountWorking }
-        accountRevision += 1
-        await cloudQuery.clear()
-        cloudSnapshot = nil
-        _ = try? await commitLocalChange { $0.syncState = .localOnly }
-        if let account, !account.hasApple {
-            accountNotice = "Existing Calorie account connected. Add Sign in with Apple to finish linking your cloud journal."
-            message = "Add Sign in with Apple once to connect this account to the retained Calorie journal. Your journal on this device has not changed."
+    /// Called by the Sign in with Apple button after `accountModel` finished
+    /// the credential exchange (it links Apple to an existing session itself).
+    func finishAppleSignIn() async {
+        guard account != nil else {
+            if let error = accountModel?.errorMessage { message = "\(error) Try Apple sign-in again. Your device journal has not changed." }
             return
         }
-        await accountClient.signOut()
-        account = nil
-        accountNotice = "Reopen your existing Calorie account with Google first, then add Sign in with Apple."
-        message = "This Apple sign-in is not linked to your existing Calorie journal. Your journal on this device has not changed."
+        isAccountWorking = true
+        defer { isAccountWorking = false }
+        await finishSignIn()
+    }
+
+    /// Binds this journal to the signed-in account and lets the mirror run.
+    /// Records merge per-entity afterwards — the newest version of each record
+    /// wins — so unlike the retired journal-choice sheet there is nothing to
+    /// pick between.
+    func approveCloudAccount() async {
+        guard let userID = account?.userID, needsAccountApproval, !isAccountWorking else { return }
+        isAccountWorking = true
+        defer { isAccountWorking = false }
+        do {
+            try await commitLocalChange {
+                $0.cloudAccountID = userID
+                if $0.syncState == .conflict { $0.syncState = .pending }
+            }
+            try await mirror?.runtime.bindOwner(userID)
+            isApprovalPresented = false
+            accountNotice = "Journal connected. Your records now merge privately across iCloud and Significant Hobbies."
+            await syncNow()
+        } catch PersonalSyncOwnershipError.differentAccount {
+            accountNotice = "This connection is already approved under a different account. Sign in to that account to sync."
+        } catch {
+            message = "Could not connect this journal to your account. Your local journal is unchanged."
+        }
+    }
+
+    func deferApproval() {
+        isApprovalPresented = false
+        accountNotice = "Your journal is unchanged. Connect it whenever you are ready."
     }
 
     func signOut() async {
-        guard beginAccountChange() else { return }
+        guard !isAccountWorking else { return }
         isAccountWorking = true
-        await cloudQuery.clear()
-        await accountClient.signOut()
-        account = nil
-        cloudSnapshot = nil
+        await mirror?.account.signOut()
         syncRequestedAfterMutation = false
         _ = try? await commitLocalChange { $0.syncState = .localOnly }
         isAccountWorking = false
@@ -445,106 +448,42 @@ final class AppModel {
     }
 
     func deleteCloudAccount() async {
-        guard beginAccountChange() else { return }
+        guard !isAccountWorking else { return }
         isAccountWorking = true
         defer { isAccountWorking = false }
         do {
-            try await accountClient.deleteAccount()
-            try await syncStore.removeAll()
-            await cloudQuery.clear()
+            // Push tombstones for every record while the binding is still open,
+            // then clear the legacy worker copy before unbinding.
+            let tombstones = try await allTombstoneRecords()
+            _ = try? await mirror?.runtime.synchronize(records: { tombstones }, apply: { _ in })
+            try? await legacyJournal?.deleteData()
+            await mirror?.account.signOut()
+            try await mirror?.runtime.forgetBookkeeping()
             pendingSyncCount = 0
-            account = nil
-            cloudSnapshot = nil
             syncRequestedAfterMutation = false
-            try await commitLocalChange { $0.syncState = .localOnly }
+            try await commitLocalChange {
+                $0.cloudAccountID = nil
+                $0.syncState = .localOnly
+            }
             accountNotice = "Calorie cloud data deleted. This device journal was preserved."
         } catch {
-            message = accountErrorMessage(error, recovery: "Try deleting the cloud account again. Nothing was removed from this device.")
+            message = "Could not finish deleting the cloud account. Nothing was removed from this device."
         }
     }
 
-    func reconcileJournal(_ choice: JournalReconciliationChoice) async {
-        guard let cloudSnapshot, let ownerID = account?.userID,
-              cloudSnapshotRevision == accountRevision, !isAccountWorking else { return }
-        accountRevision += 1
-        let revision = accountRevision
-        isAccountWorking = true
-        defer { isAccountWorking = false }
-        guard await mutate(cloudBaseline: cloudSnapshot.document, clearPending: true, enqueueChanges: choice != .keepCloud, {
-            guard self.accountRevision == revision else { throw NativeAccountError.accountChanged }
-            $0 = CloudJournalMapper.reconcile(local: $0, cloud: cloudSnapshot, choice: choice)
-            $0.cloudAccountID = ownerID
-        }) else { return }
-        self.cloudSnapshot = nil
-        isReconciliationPresented = false
-        if document.syncState != .conflict {
-            accountNotice = switch choice {
-            case .keepCloud: "Your current cloud journal is now on this device."
-            case .keepIPhone: "This device journal is preserved and queued for cloud sync."
-            case .merge: "Cloud and device records were merged without duplicate IDs."
-            }
-        }
-    }
-
-    func deferReconciliation() {
-        isReconciliationPresented = false
-        accountNotice = "Your journals are unchanged. Resolve them whenever you are ready."
-    }
-
-    func resumeReconciliation() async {
-        if cloudSnapshot != nil {
-            isReconciliationPresented = true
-        } else {
-            await prepareCloudReconciliation()
-        }
-    }
-
-    private func prepareCloudReconciliation() async {
-        guard let ownerID = account?.userID else { return }
-        let revision = accountRevision
-        do {
-            try await commitLocalChange { $0.syncState = .conflict }
-            let journal = try await accountClient.journal(for: ownerID)
-            guard accountRevision == revision else { return }
-            let result = try await fetchCloud(policy: .always, journal: journal)
-            guard accountRevision == revision else { return }
-            cloudSnapshot = result.value
-            cloudSnapshotRevision = revision
-            isReconciliationPresented = true
-        } catch let error as NativeAccountError where error.requiresExistingAccountRecovery {
-            guard accountRevision == revision else { return }
-            await recoverFromUnlinkedCalorieAccount()
-        } catch {
-            guard accountRevision == revision else { return }
-            message = accountErrorMessage(error, recovery: "Try loading your cloud journal again. This device journal has not changed.")
-        }
-    }
-
-    func syncNow(forceRefresh: Bool = true) async {
-        guard let ownerID = account?.userID else { return }
-        let accountRevisionBeforeSync = accountRevision
-        guard !isSyncing else {
+    func syncNow(forceRefresh _: Bool = true) async {
+        guard let mirror, hasLoadedDocument else { return }
+        guard !isSyncing, activeLocalMutations == 0 else {
             syncRequestedAfterMutation = true
             return
         }
-        guard activeLocalMutations == 0 else {
-            syncRequestedAfterMutation = true
-            return
-        }
-        if await requiresJournalChoice() {
-            await resumeReconciliation()
-            return
-        }
-        guard accountRevision == accountRevisionBeforeSync else { return }
         isSyncing = true
-        do {
-            let journal = try await accountClient.journal(for: ownerID)
-            try await synchronizeJournal(journal, revision: accountRevisionBeforeSync, forceRefresh: forceRefresh)
-        } catch {
-            if accountRevision == accountRevisionBeforeSync {
-                await handleSyncFailure(error, revision: accountRevisionBeforeSync)
-            }
-        }
+        await importLegacyJournalIfNeeded()
+        let outcome = try? await mirror.runtime.synchronize(
+            records: { try await self.mirrorRecords() },
+            apply: { records in try await self.commitMirrorRecords(records) }
+        )
+        await recordSyncOutcome(outcome)
         isSyncing = false
         if account != nil, activeLocalMutations == 0, syncRequestedAfterMutation {
             syncRequestedAfterMutation = false
@@ -552,153 +491,301 @@ final class AppModel {
         }
     }
 
-    private func synchronizeJournal(
-        _ journal: any NativeJournalServing, revision: Int, forceRefresh: Bool
-    ) async throws {
-    while true {
-        try requireCurrentAccount(revision)
-        let replayedPending = try await replayPendingSyncIntents(
-            journal: journal, accountRevision: revision)
-        guard try await syncStore.pending().isEmpty else { continue }
-        let revisionBeforeFetch = localMutationRevision
-        let query = try await fetchCloud(
-            policy: cloudPolicy(forceRefresh: forceRefresh, replayedPending: replayedPending),
-            journal: journal
-        )
-        try requireCurrentAccount(revision)
-        guard activeLocalMutations == 0, revisionBeforeFetch == localMutationRevision else {
-            syncRequestedAfterMutation = true
-            break
-        }
-        guard try await syncStore.pending().isEmpty else { continue }
-        if query.source == .network {
-            let applied = try await applyCloudSnapshot(query.value, revision: revisionBeforeFetch, accountRevision: revision)
-            if !applied {
-                syncRequestedAfterMutation = true
-                break
-            }
-        }
-        guard try await syncStore.pending().isEmpty else { continue }
-        break
-    }
-    }
-
-    private func requireCurrentAccount(_ revision: Int) throws {
-        guard account != nil, accountRevision == revision else { throw NativeAccountError.accountChanged }
-    }
-
-    private func requiresJournalChoice() async -> Bool {
-        if let ownerID = account?.userID, document.cloudAccountID != ownerID {
-            _ = try? await commitLocalChange { $0.syncState = .conflict }
-            return true
-        }
-        if document.syncState == .pending, (try? await syncStore.pending().isEmpty) == true {
-            // An older build may have committed a journal without its intent.
-            // Preserve that journal for an explicit choice after a restart.
-            _ = try? await commitLocalChange { $0.syncState = .conflict }
-        }
-        return document.syncState == .conflict
-    }
-
-    private func handleSyncFailure(_ error: Error, revision: Int) async {
-        if let accountError = error as? NativeAccountError,
-           accountError.requiresExistingAccountRecovery {
-            await recoverFromUnlinkedCalorieAccount()
-            return
-        }
-        let pendingCount = (try? await syncStore.pending().count) ?? pendingSyncCount
-        guard accountRevision == revision else { return }
-        pendingSyncCount = pendingCount
-        _ = try? await commitLocalChange {
-            try self.requireCurrentAccount(revision)
-            if $0.syncState != .conflict { $0.syncState = pendingCount > 0 ? .pending : .failed }
-        }
-        guard accountRevision == revision else { return }
-        message = accountErrorMessage(error, recovery: "Your changes are saved on this device and cloud sync can be retried.")
-    }
-
-    private func replayPendingSyncIntents(
-        journal: any NativeJournalServing, accountRevision revision: Int
-    ) async throws -> Bool {
-        let pending = try await syncStore.pending()
-        try requireCurrentAccount(revision)
-        pendingSyncCount = pending.count
-        guard !pending.isEmpty else { return false }
-        await cloudQuery.invalidate()
-        for intent in pending {
-            try requireCurrentAccount(revision)
-            try await journal.apply(intent)
-            await acquireLocalWrite()
-            do {
-                try requireCurrentAccount(revision)
-                try await syncStore.complete(intent.id)
-                try requireCurrentAccount(revision)
-                pendingSyncCount -= 1
-                releaseLocalWrite()
-            } catch {
-                releaseLocalWrite()
-                throw error
-            }
-        }
-        return true
-    }
-
-    private func cloudPolicy(
-        forceRefresh: Bool,
-        replayedPending: Bool
-    ) -> ServerStateQueryPolicy {
-        forceRefresh || replayedPending ? .always : .ifStale
-    }
-
     func refreshFromCloud() async {
         guard !isLoading, account != nil else { return }
         await syncNow(forceRefresh: false)
     }
 
-    private func fetchCloud(
-        policy: ServerStateQueryPolicy,
-        journal: any NativeJournalServing
-    ) async throws -> ServerStateQueryResult<CloudJournalSnapshot> {
-        try await cloudQuery.value(policy: policy) { [journal] in
-            try CloudJournalMapper.decode(await journal.cloudExport())
+    /// One-shot import of the retired Calorie worker's journal. The legacy
+    /// export carries the same stable entity IDs, so the merge is idempotent;
+    /// a marker file keeps it from re-running on every sync.
+    private func importLegacyJournalIfNeeded() async {
+        guard let legacyJournal, !attemptedLegacyImport,
+              let userID = account?.userID, document.cloudAccountID == userID else { return }
+        attemptedLegacyImport = true
+        let marker = await legacyImportMarkerURL(for: userID)
+        guard !FileManager.default.fileExists(atPath: marker.path) else { return }
+        do {
+            let snapshot = try CloudJournalMapper.decode(await legacyJournal.cloudExport())
+            try await commitLocalChange {
+                $0 = CloudJournalMapper.mergeLegacyImport(into: $0, cloud: snapshot)
+            }
+            try FileManager.default.createDirectory(
+                at: marker.deletingLastPathComponent(),
+                withIntermediateDirectories: true
+            )
+            try Data("{}".utf8).write(to: marker, options: .atomic)
+        } catch {
+            // The import is best-effort — a missing or empty legacy journal is
+            // normal for accounts created after the mirror migration.
         }
     }
 
-    private func accountErrorMessage(_ error: Error, recovery: String) -> String {
-        let detail = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
-        return "\(detail) \(recovery)"
+    private func legacyImportMarkerURL(for userID: String) async -> URL {
+        await store.fileURL
+            .deletingLastPathComponent()
+            .appending(path: "legacy-import-\(userID).done")
     }
 
-    @discardableResult
-    private func commitLocalChange(
-        allowUnread: Bool = false,
-        _ operation: (inout CalorieDocument) throws -> Void
-    ) async throws -> CalorieDocument {
-        guard hasLoadedDocument || allowUnread else { throw CocoaError(.fileReadCorruptFile) }
+    private func recordSyncOutcome(_ outcome: MirrorRuntime.Outcome?) async {
+        pendingSyncCount = (try? await mirror?.runtime.unpushedCount(
+            transportID: "hub",
+            records: mirrorRecords()
+        )) ?? pendingSyncCount
+        let syncedAt = outcome?.completedAt
+        _ = try? await commitLocalChange {
+            if account == nil {
+                $0.syncState = .localOnly
+            } else if let outcome, !outcome.isComplete {
+                $0.syncState = .failed
+            } else {
+                $0.syncState = pendingSyncCount > 0 ? .pending : .synced
+            }
+            if let syncedAt { $0.lastSyncedAt = syncedAt }
+        }
+    }
+
+    // MARK: - Mirror records
+
+    private static let recordEncoder: JSONEncoder = {
+        let encoder = JSONEncoder()
+        encoder.dateEncodingStrategy = .iso8601
+        encoder.outputFormatting = [.sortedKeys]
+        return encoder
+    }()
+
+    private static let recordDecoder: JSONDecoder = {
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        return decoder
+    }()
+
+    /// The document's syncable set as canonical records: every entity plus a
+    /// tombstone for any stamped record that left the document. Entity payloads
+    /// are the exact local JSON with `recordType` injected — the same bytes go
+    /// to CloudKit and the Hub.
+    func mirrorRecords() async throws -> [MirrorRecord] {
+        let doc = document
+        var records: [MirrorRecord] = []
+        for food in doc.foods {
+            records.append(try await makeRecord(name: "food-\(food.id.uuidString.lowercased())", entity: food, recordType: "food"))
+        }
+        for entry in doc.foodEntries {
+            records.append(try await makeRecord(name: "entry-\(entry.id.uuidString.lowercased())", entity: entry, recordType: "foodEntry"))
+        }
+        for water in doc.waterEntries {
+            records.append(try await makeRecord(name: "water-\(water.id.uuidString.lowercased())", entity: water, recordType: "waterEntry"))
+        }
+        for weight in doc.weightEntries {
+            records.append(try await makeRecord(name: "weight-\(weight.id.uuidString.lowercased())", entity: weight, recordType: "weightEntry"))
+        }
+        for routine in doc.routines {
+            records.append(try await makeRecord(name: "routine-\(routine.id.uuidString.lowercased())", entity: routine, recordType: "routine"))
+        }
+        for checkIn in doc.routineCheckIns {
+            records.append(try await makeRecord(name: "checkin-\(checkIn.id.uuidString.lowercased())", entity: checkIn, recordType: "checkIn"))
+        }
+        for session in doc.goalCycleSessions ?? [] {
+            records.append(try await makeRecord(name: "goalcycle-\(session.id.uuidString.lowercased())", entity: session, recordType: "goalCycle"))
+        }
+        records.append(try await makeRecord(
+            name: "profile-\(CalorieMirrorNaming.profileID)",
+            entity: doc.profile,
+            recordType: "profile"
+        ))
+        records.append(try await makeRecord(
+            name: "cyclecontext-\(CalorieMirrorNaming.cycleContextID)",
+            entity: doc.cycle,
+            recordType: "cycleContext"
+        ))
+        records.append(try await makeRecord(
+            name: "theme-\(CalorieMirrorNaming.themeID)",
+            entity: MirrorThemePayload(theme: doc.theme),
+            recordType: "theme"
+        ))
+        for (key, note) in doc.dailyNotes {
+            records.append(try await makeRecord(
+                name: "note-\(key)",
+                entity: MirrorDailyNotePayload(date: key, text: note),
+                recordType: "dailyNote"
+            ))
+        }
+        let live = Set(records.map(\.name))
+        for name in try await mirror?.runtime.knownRecordNames() ?? [] where !live.contains(name) {
+            records.append(MirrorRecord(name: name, modifiedAt: .now, payload: nil, appendOnly: false))
+        }
+        return records
+    }
+
+    private func makeRecord<Entity: Encodable>(
+        name: String,
+        entity: Entity,
+        recordType: String
+    ) async throws -> MirrorRecord {
+        let object = try JSONSerialization.jsonObject(with: Self.recordEncoder.encode(entity))
+        guard var fields = object as? [String: Any] else {
+            throw CalorieMirrorError.invalidEntity(name)
+        }
+        fields["recordType"] = recordType
+        let payload = try JSONSerialization.data(withJSONObject: fields, options: [.sortedKeys])
+        let stamp = try await mirror?.runtime.stamp(for: name)
+        let modifiedAt = stamp?.fingerprint == MirrorLedger.fingerprint(of: payload)
+            ? stamp?.modifiedAt ?? .now
+            : .now
+        return MirrorRecord(name: name, modifiedAt: modifiedAt, payload: payload, appendOnly: false)
+    }
+
+    private func allTombstoneRecords() async throws -> [MirrorRecord] {
+        try await mirrorRecords().map {
+            MirrorRecord(name: $0.name, modifiedAt: .now, payload: nil, appendOnly: false)
+        }
+    }
+
+    /// Commits pulled winners into the local document. Throwing leaves the
+    /// pull token unsaved so the batch retries on the next pass.
+    func commitMirrorRecords(_ records: [MirrorRecord]) async throws {
         await acquireLocalWrite()
         defer { releaseLocalWrite() }
-        let previous = document
-        var next = previous
-        try operation(&next)
+        guard hasLoadedDocument else { throw CalorieMirrorError.documentNotLoaded }
+        var next = document
+        var changed = false
+        for record in records {
+            guard let kind = CalorieMirrorNaming.kind(of: record.name) else { continue }
+            if let payload = record.payload {
+                changed = try applyUpsert(kind: kind, payload: payload, to: &next) || changed
+            } else {
+                changed = applyTombstone(kind: kind, name: record.name, to: &next) || changed
+            }
+        }
+        guard changed else { return }
         try await store.save(next)
         document = next
         localMutationRevision += 1
-        return previous
     }
 
-    private func applyCloudSnapshot(
-        _ snapshot: CloudJournalSnapshot, revision: Int, accountRevision expectedAccountRevision: Int
-    ) async throws -> Bool {
-        await acquireLocalWrite()
-        defer { releaseLocalWrite() }
-        guard hasLoadedDocument, let account, accountRevision == expectedAccountRevision,
-              document.cloudAccountID == account.userID, document.syncState != .conflict,
-              activeLocalMutations == 0, localMutationRevision == revision else { return false }
-        var next = CloudJournalMapper.reconcile(local: document, cloud: snapshot, choice: .keepCloud)
-        next.cloudAccountID = account.userID
-        try await store.save(next)
-        document = next
-        localMutationRevision += 1
+    private func decode<Entity: Decodable>(_ type: Entity.Type, from payload: Data) throws -> Entity {
+        try Self.recordDecoder.decode(type, from: payload)
+    }
+
+    private func applyUpsert(
+        kind: CalorieMirrorNaming.Kind,
+        payload: Data,
+        to document: inout CalorieDocument
+    ) throws -> Bool {
+        switch kind {
+        case .food, .foodEntry, .waterEntry, .weightEntry, .routine, .checkIn, .goalCycle:
+            return try applyCollectionUpsert(kind: kind, payload: payload, to: &document)
+        case .profile, .cycleContext, .theme, .dailyNote:
+            return try applySingletonUpsert(kind: kind, payload: payload, to: &document)
+        }
+    }
+
+    private func applyCollectionUpsert(
+        kind: CalorieMirrorNaming.Kind,
+        payload: Data,
+        to document: inout CalorieDocument
+    ) throws -> Bool {
+        switch kind {
+        case .food:
+            return upsert(try decode(Food.self, from: payload), into: &document.foods)
+        case .foodEntry:
+            return upsert(try decode(FoodEntry.self, from: payload), into: &document.foodEntries)
+        case .waterEntry:
+            return upsert(try decode(WaterEntry.self, from: payload), into: &document.waterEntries)
+        case .weightEntry:
+            return upsert(try decode(WeightEntry.self, from: payload), into: &document.weightEntries)
+        case .routine:
+            return upsert(try decode(MedicationRoutine.self, from: payload), into: &document.routines)
+        case .checkIn:
+            return upsert(try decode(RoutineCheckIn.self, from: payload), into: &document.routineCheckIns)
+        default:
+            var sessions = document.goalCycleSessions ?? []
+            let changed = upsert(try decode(GoalCycleSession.self, from: payload), into: &sessions)
+            if changed { document.goalCycleSessions = sessions }
+            return changed
+        }
+    }
+
+    private func applySingletonUpsert(
+        kind: CalorieMirrorNaming.Kind,
+        payload: Data,
+        to document: inout CalorieDocument
+    ) throws -> Bool {
+        switch kind {
+        case .profile:
+            let profile = try decode(Profile.self, from: payload)
+            guard document.profile != profile else { return false }
+            document.profile = profile
+        case .cycleContext:
+            let cycle = try decode(CycleContext.self, from: payload)
+            guard document.cycle != cycle else { return false }
+            document.cycle = cycle
+        case .theme:
+            let theme = try decode(MirrorThemePayload.self, from: payload).theme
+            guard document.theme != theme else { return false }
+            document.theme = theme
+        default:
+            let note = try decode(MirrorDailyNotePayload.self, from: payload)
+            guard document.dailyNotes[note.date] != note.text else { return false }
+            document.dailyNotes[note.date] = note.text
+        }
+        return true
+    }
+
+    private func upsert<Value: Identifiable & Equatable>(
+        _ value: Value,
+        into collection: inout [Value]
+    ) -> Bool {
+        if let index = collection.firstIndex(where: { $0.id == value.id }) {
+            guard collection[index] != value else { return false }
+            collection[index] = value
+            return true
+        }
+        collection.append(value)
+        return true
+    }
+
+    private func applyTombstone(
+        kind: CalorieMirrorNaming.Kind,
+        name: String,
+        to document: inout CalorieDocument
+    ) -> Bool {
+        guard let id = CalorieMirrorNaming.entityID(of: name) else { return false }
+        switch kind {
+        case .food:
+            return remove(id, from: &document.foods)
+        case .foodEntry:
+            return remove(id, from: &document.foodEntries)
+        case .waterEntry:
+            return remove(id, from: &document.waterEntries)
+        case .weightEntry:
+            return remove(id, from: &document.weightEntries)
+        case .routine:
+            return remove(id, from: &document.routines)
+        case .checkIn:
+            return remove(id, from: &document.routineCheckIns)
+        case .goalCycle:
+            var sessions = document.goalCycleSessions ?? []
+            let changed = remove(id, from: &sessions)
+            if changed { document.goalCycleSessions = sessions }
+            return changed
+        case .dailyNote:
+            let key = CalorieMirrorNaming.noteKey(of: name)
+            guard let key, document.dailyNotes.removeValue(forKey: key) != nil else { return false }
+            return true
+        case .profile, .cycleContext, .theme:
+            // Singletons are never deleted — a tombstone for one is ignored so
+            // a stale remote delete cannot blank the journal's settings.
+            return false
+        }
+    }
+
+    private func remove<Value: Identifiable>(
+        _ id: UUID,
+        from collection: inout [Value]
+    ) -> Bool where Value.ID == UUID {
+        guard let index = collection.firstIndex(where: { $0.id == id }) else { return false }
+        collection.remove(at: index)
         return true
     }
 
@@ -718,43 +805,26 @@ final class AppModel {
         }
     }
 
-    private func prepareLocalCommit(_ next: CalorieDocument, stagesSync: Bool) async -> CalorieDocument {
-        var prepared = next
-        if account != nil, stagesSync {
-            // Retain the journal if the app stops before its separate outbox
-            // becomes durable, including explicit imports and choices.
-            prepared.syncState = .conflict
-            await cloudQuery.invalidate()
-        } else if account == nil {
-            prepared.syncState = .localOnly
-        }
-        return prepared
-    }
-
-    private func persistSyncOperations(
-        _ operations: [SyncOperation],
-        clearPending: Bool,
-        canAutomaticallySync: Bool,
-        stagesSync: Bool
-    ) async throws -> Bool {
-        guard let ownerID = account?.userID, document.cloudAccountID == ownerID else { return false }
-        if clearPending { try await syncStore.removeAll() }
-        for operation in operations { try await syncStore.enqueue(operation) }
-        pendingSyncCount = (try await syncStore.pending()).count
-        guard canAutomaticallySync, stagesSync else { return false }
-        var ready = document
-        ready.syncState = pendingSyncCount > 0 ? .pending : .synced
-        try await store.save(ready)
-        document = ready
-        return pendingSyncCount > 0
+    @discardableResult
+    private func commitLocalChange(
+        allowUnread: Bool = false,
+        _ operation: (inout CalorieDocument) throws -> Void
+    ) async throws -> CalorieDocument {
+        guard hasLoadedDocument || allowUnread else { throw CocoaError(.fileReadCorruptFile) }
+        await acquireLocalWrite()
+        defer { releaseLocalWrite() }
+        let previous = document
+        var next = previous
+        try operation(&next)
+        try await store.save(next)
+        document = next
+        localMutationRevision += 1
+        return previous
     }
 
     @discardableResult
     private func mutate(
         allowUnread: Bool = false,
-        cloudBaseline: CalorieDocument? = nil,
-        clearPending: Bool = false,
-        enqueueChanges: Bool = true,
         _ operation: (inout CalorieDocument) throws -> Void
     ) async -> Bool {
         guard hasLoadedDocument || allowUnread else {
@@ -766,33 +836,19 @@ final class AppModel {
         var shouldRequestSync = false
         var succeeded = false
         do {
-            let previous = document
-            var next = previous
+            var next = document
             try operation(&next)
-            let syncOperations = account == nil || !enqueueChanges || (clearPending && cloudBaseline == nil) ? []
-                : CloudJournalDiff.operations(from: cloudBaseline ?? previous, to: next)
-            let stagesSync = !syncOperations.isEmpty || clearPending || allowUnread
-            next = await prepareLocalCommit(next, stagesSync: stagesSync)
+            if account != nil { next.syncState = .pending }
             try await store.save(next)
             document = next
             localMutationRevision += 1
             hasLoadedDocument = true
             succeeded = true
             saveError = nil
-            shouldRequestSync = try await persistSyncOperations(
-                syncOperations,
-                clearPending: clearPending,
-                canAutomaticallySync: !allowUnread && (previous.syncState != .conflict || cloudBaseline != nil),
-                stagesSync: stagesSync
-            )
+            shouldRequestSync = account != nil
         } catch {
-            if succeeded {
-                syncRequestedAfterMutation = false
-                accountNotice = "Saved on this device. Review your journals before retrying cloud sync: \(error.localizedDescription)"
-            } else {
-                saveError = error.localizedDescription
-                message = error.localizedDescription
-            }
+            saveError = error.localizedDescription
+            message = error.localizedDescription
         }
         finishLocalMutation(requestSync: shouldRequestSync)
         return succeeded
@@ -807,4 +863,79 @@ final class AppModel {
             Task { await syncNow() }
         }
     }
+
+    private static func makeMirrorConnection() -> PersonalMirrorConnection? {
+        let defaults = UserDefaults.standard
+        let key = "personal-platform-device-id"
+        let deviceId = defaults.string(forKey: key) ?? UUID().uuidString.lowercased()
+        defaults.set(deviceId, forKey: key)
+        return try? PersonalMirrorConnection(
+            domain: .calorie,
+            keychainService: "com.significanthobbies.calorie.session",
+            supportDirectory: FileManager.default
+                .urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+                .appending(path: "Calorie", directoryHint: .isDirectory),
+            deviceId: deviceId,
+            callbackScheme: "calorie",
+            cloudKitContainer: "iCloud.com.significanthobbies.calorie",
+            appendOnly: { _ in false },
+            // The committed document owns the Hub binding. Until it is bound to
+            // the verified account the Hub leg stays quiet; CloudKit still syncs.
+            accountGate: { verified in
+                (try? await CalorieStore().load())?.cloudAccountID == verified.userID
+            }
+        )
+    }
+}
+
+enum CalorieMirrorError: Error {
+    case invalidEntity(String)
+    case documentNotLoaded
+}
+
+enum CalorieMirrorNaming {
+    enum Kind {
+        case food, foodEntry, waterEntry, weightEntry, routine, checkIn
+        case goalCycle, profile, cycleContext, theme, dailyNote
+    }
+
+    static let profileID = "00000000-0000-0000-0000-0000000000a1"
+    static let cycleContextID = "00000000-0000-0000-0000-0000000000a2"
+    static let themeID = "00000000-0000-0000-0000-0000000000a3"
+
+    static func kind(of recordName: String) -> Kind? {
+        switch true {
+        case recordName.hasPrefix("food-"): .food
+        case recordName.hasPrefix("entry-"): .foodEntry
+        case recordName.hasPrefix("water-"): .waterEntry
+        case recordName.hasPrefix("weight-"): .weightEntry
+        case recordName.hasPrefix("routine-"): .routine
+        case recordName.hasPrefix("checkin-"): .checkIn
+        case recordName.hasPrefix("goalcycle-"): .goalCycle
+        case recordName.hasPrefix("profile-"): .profile
+        case recordName.hasPrefix("cyclecontext-"): .cycleContext
+        case recordName.hasPrefix("theme-"): .theme
+        case recordName.hasPrefix("note-"): .dailyNote
+        default: nil
+        }
+    }
+
+    static func entityID(of recordName: String) -> UUID? {
+        guard let index = recordName.firstIndex(of: "-") else { return nil }
+        return UUID(uuidString: String(recordName[recordName.index(after: index)...]))
+    }
+
+    static func noteKey(of recordName: String) -> String? {
+        guard recordName.hasPrefix("note-") else { return nil }
+        return String(recordName.dropFirst(5))
+    }
+}
+
+struct MirrorThemePayload: Codable {
+    var theme: AppTheme
+}
+
+struct MirrorDailyNotePayload: Codable {
+    var date: String
+    var text: String
 }

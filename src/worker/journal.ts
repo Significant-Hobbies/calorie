@@ -51,39 +51,31 @@ async function postFoods(c: AppContext) {
   const id = body ? optionalText(body.id, 80) : null;
   if (!parsed || !id) return c.json(jsonError('Complete all four nutrient values.'), 400);
   const now = Date.now();
-  try {
-    await c.env.DB.prepare(
-      `INSERT INTO foods (
+  await c.env.DB.prepare(
+    `INSERT OR IGNORE INTO foods (
       id, user_id, name, serving_mode, unit_label, default_amount,
       calories, carbs_g, protein_g, fibre_g, favourite, food_kind, is_packaged, labels_json, created_at, updated_at
     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+  )
+    .bind(
+      id,
+      c.get('userId'),
+      parsed.name,
+      parsed.servingMode,
+      parsed.unitLabel,
+      parsed.defaultAmount,
+      parsed.calories,
+      parsed.carbsG,
+      parsed.proteinG,
+      parsed.fibreG,
+      parsed.favourite,
+      parsed.isPackaged ? 'packaged' : 'prepared',
+      parsed.isPackaged ? 1 : 0,
+      JSON.stringify(parsed.labels),
+      now,
+      now
     )
-      .bind(
-        id,
-        c.get('userId'),
-        parsed.name,
-        parsed.servingMode,
-        parsed.unitLabel,
-        parsed.defaultAmount,
-        parsed.calories,
-        parsed.carbsG,
-        parsed.proteinG,
-        parsed.fibreG,
-        parsed.favourite,
-        parsed.isPackaged ? 'packaged' : 'prepared',
-        parsed.isPackaged ? 1 : 0,
-        JSON.stringify(parsed.labels),
-        now,
-        now
-      )
-      .run();
-  } catch (error) {
-    console.error(JSON.stringify({ event: 'food_create_failed', message: String(error) }));
-    return c.json(
-      jsonError('A food with that name already exists. Edit the existing food instead.'),
-      409
-    );
-  }
+    .run();
   const row = await c.env.DB.prepare('SELECT * FROM foods WHERE id = ? AND user_id = ?')
     .bind(id, c.get('userId'))
     .first<FoodRow>();

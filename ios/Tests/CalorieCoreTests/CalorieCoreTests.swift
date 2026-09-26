@@ -301,7 +301,7 @@ final class CalorieCoreTests: XCTestCase {
         XCTAssertEqual(snapshot.document.syncState, .synced)
     }
 
-    func testJournalMergeKeepsUniqueCloudAndIPhoneRecords() throws {
+    func testLegacyImportMergesUniqueCloudAndIPhoneRecordsIdempotently() throws {
         let cloud = try CloudJournalMapper.decode(Data(Self.cloudExport.utf8))
         var local = CalorieDocument()
         local.foods = [Food(name: "Paneer bowl", servingName: "1 bowl", nutrients: Nutrients(calories: 500))]
@@ -316,127 +316,27 @@ final class CalorieCoreTests: XCTestCase {
             ),
         ]
 
-        let merged = CloudJournalMapper.reconcile(local: local, cloud: cloud, choice: .merge)
+        let merged = CloudJournalMapper.mergeLegacyImport(into: local, cloud: cloud)
 
         XCTAssertEqual(merged.foods.count, 2)
         XCTAssertEqual(merged.foodEntries.count, 2)
-        XCTAssertEqual(merged.syncState, .pending)
-    }
-
-    func testKeepCloudPreservesFieldsTheCloudCannotRepresent() throws {
-        let cloud = try CloudJournalMapper.decode(Data(Self.cloudExport.utf8))
-        var local = CalorieDocument()
-        local.theme = .dark
-        local.profile.weightKilograms = 71.5
-        local.profile.manualMacroTargets = Nutrients(calories: 2_100, protein: 140, carbohydrates: 230, fat: 65, fibre: 30)
-        local.dailyNotes = ["2026-08-11": "Keep this private note."]
-        local.cycle = CycleContext(enabled: true, latestPeriodStart: Date(timeIntervalSince1970: 1_700_000_000), typicalCycleDays: 29)
-        local.foods = cloud.document.foods.map { food in
-            var copy = food
-            copy.nutrients.fat = 12
-            return copy
-        }
-        local.foodEntries = cloud.document.foodEntries.map { entry in
-            var copy = entry
-            copy.meal = .snack
-            copy.nutrients.fat = 9
-            return copy
-        }
-
-        let reconciled = CloudJournalMapper.reconcile(local: local, cloud: cloud, choice: .keepCloud)
-
-        XCTAssertEqual(reconciled.theme, .dark)
-        XCTAssertEqual(reconciled.profile.weightKilograms, 72.4)
-        XCTAssertEqual(reconciled.profile.manualMacroTargets?.protein, 140)
-        XCTAssertEqual(reconciled.dailyNotes["2026-08-11"], "Keep this private note.")
-        XCTAssertEqual(reconciled.cycle.typicalCycleDays, 29)
-        XCTAssertEqual(reconciled.foods.first?.nutrients.fat, 12)
-        XCTAssertEqual(reconciled.foodEntries.first?.meal, .snack)
-        XCTAssertEqual(reconciled.foodEntries.first?.nutrients.fat, 9)
-        XCTAssertEqual(reconciled.syncState, .synced)
-    }
-
-    func testSyncIntentsSurviveRelaunchAndCompactSnapshots() async throws {
-        let fileURL = FileManager.default.temporaryDirectory
-            .appending(path: UUID().uuidString)
-            .appending(path: "sync-intents.json")
-        let deletedID = UUID()
-        let firstStore = SyncIntentStore(fileURL: fileURL)
-        try await firstStore.enqueue(.deleteFoodEntry(deletedID))
-        try await firstStore.enqueue(.snapshot(CalorieDocument.sample))
-        var newer = CalorieDocument.sample
-        newer.foodEntries = []
-        try await firstStore.enqueue(.snapshot(newer))
-
-        let restored = try await SyncIntentStore(fileURL: fileURL).pending()
-
-        XCTAssertEqual(restored.count, 2)
-        XCTAssertEqual(restored.first?.operation, .deleteFoodEntry(deletedID))
-        XCTAssertEqual(restored.last?.operation, .snapshot(newer))
-    }
-
-    func testJournalDiffQueuesOnlyChangedCloudRecords() throws {
-        let cloud = try CloudJournalMapper.decode(Data(Self.cloudExport.utf8)).document
-        var local = cloud
-        let water = WaterEntry(timestamp: Date(timeIntervalSince1970: 1_800_000_000), millilitres: 400)
-        local.waterEntries.append(water)
-        local.dailyNotes["2026-08-16"] = "Device-only note"
-        local.theme = .dark
-
-        XCTAssertEqual(CloudJournalDiff.operations(from: cloud, to: local), [.upsertWaterEntry(water)])
+        XCTAssertEqual(
+            CloudJournalMapper.mergeLegacyImport(into: merged, cloud: cloud),
+            merged,
+            "Re-importing the same legacy export must be a no-op"
+        )
     }
 
     func testLoggingUpdatesRecencyWithoutRewritingTheFoodDefinition() throws {
         var document = CalorieDocument.starter
-        let before = document
         let food = try XCTUnwrap(document.foods.first)
         let loggedAt = Date(timeIntervalSince1970: 1_800_000_000)
 
         document.log(food: food, servings: 1, meal: .breakfast, at: loggedAt)
-        let operations = CloudJournalDiff.operations(from: before, to: document)
 
         XCTAssertEqual(document.foods.first?.lastUsedAt, loggedAt)
-        XCTAssertEqual(operations.count, 1)
-        guard case .upsertFoodEntry = operations[0] else {
-            return XCTFail("Logging should queue only the new entry.")
-        }
-    }
-
-    func testGranularSyncIntentsCompactByRecord() async throws {
-        let fileURL = FileManager.default.temporaryDirectory
-            .appending(path: UUID().uuidString)
-            .appending(path: "sync-intents.json")
-        let store = SyncIntentStore(fileURL: fileURL)
-        let id = UUID()
-        try await store.enqueue(.upsertWaterEntry(WaterEntry(id: id, timestamp: .now, millilitres: 250)))
-        try await store.enqueue(.upsertWaterEntry(WaterEntry(id: id, timestamp: .now, millilitres: 500)))
-
-        let pending = try await store.pending()
-
-        XCTAssertEqual(pending.count, 1)
-        guard case let .upsertWaterEntry(entry) = pending[0].operation else {
-            return XCTFail("Expected the latest water upsert.")
-        }
-        XCTAssertEqual(entry.millilitres, 500)
-    }
-
-    func testProfileIntentCompactionKeepsTheOriginalCloudBaseline() async throws {
-        let fileURL = FileManager.default.temporaryDirectory
-            .appending(path: UUID().uuidString)
-            .appending(path: "sync-intents.json")
-        let store = SyncIntentStore(fileURL: fileURL)
-        let original = Profile(name: "Original")
-        var renamed = original
-        renamed.name = "Renamed"
-        var retargeted = renamed
-        retargeted.waterTargetMillilitres = 3_000
-        try await store.enqueue(.updateProfile(before: original, after: renamed))
-        try await store.enqueue(.updateProfile(before: renamed, after: retargeted))
-
-        let pending = try await store.pending()
-
-        XCTAssertEqual(pending.count, 1)
-        XCTAssertEqual(pending.first?.operation, .updateProfile(before: original, after: retargeted))
+        XCTAssertEqual(document.foodEntries.count, 1)
+        XCTAssertEqual(document.foodEntries.first?.foodName, food.name)
     }
 
     private static let cloudExport = #"""

@@ -19,8 +19,8 @@ final class CalorieOnboardingTests: XCTestCase {
         XCTAssertTrue(CalorieAccountCopy.unsignedOverview.contains("Sign in with Apple"))
         XCTAssertTrue(CalorieAccountCopy.googleRecovery.contains("Previously connected"))
         XCTAssertTrue(CalorieAccountCopy.googleRecovery.contains("Google"))
-        XCTAssertTrue(CalorieAccountCopy.connectedOverview.lowercased().contains("food, water, weight, and routine records"))
-        XCTAssertTrue(CalorieAccountCopy.connectedOverview.contains("stay on this device"))
+        XCTAssertTrue(CalorieAccountCopy.connectedOverview.contains("iCloud"))
+        XCTAssertTrue(CalorieAccountCopy.connectedOverview.contains("Significant Hobbies"))
 
         let customerFacingCopy = [
             CalorieAccountCopy.unsignedOverview,
@@ -88,11 +88,7 @@ final class CalorieOnboardingTests: XCTestCase {
     func testExistingJournalSeesIllustratedOnboardingUntilDismissed() async throws {
         let directory = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
         let store = CalorieStore(fileURL: directory.appending(path: "journal.json"))
-        let model = AppModel(
-            store: store,
-            accountClient: NoAccountClient(),
-            syncStore: SyncIntentStore(fileURL: directory.appending(path: "sync.json"))
-        )
+        let model = AppModel(store: store, mirror: nil, legacyJournal: nil)
         await model.load()
         XCTAssertTrue(model.shouldPresentCalorieOnboarding(completed: false))
         XCTAssertFalse(model.shouldPresentCalorieOnboarding(completed: true))
@@ -108,11 +104,7 @@ final class CalorieOnboardingTests: XCTestCase {
     func testCompletionUsesTheRealStoreAndLeavesSkippedTargetsUnset() async throws {
         let directory = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
         let store = CalorieStore(fileURL: directory.appending(path: "journal.json"))
-        let model = AppModel(
-            store: store,
-            accountClient: NoAccountClient(),
-            syncStore: SyncIntentStore(fileURL: directory.appending(path: "sync.json"))
-        )
+        let model = AppModel(store: store, mirror: nil, legacyJournal: nil)
         await model.load()
         let food = Food(
             name: "First apple",
@@ -141,11 +133,7 @@ final class CalorieOnboardingTests: XCTestCase {
     func testManualAndReusablePathPersistsBothChoices() async throws {
         let directory = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
         let store = CalorieStore(fileURL: directory.appending(path: "journal.json"))
-        let model = AppModel(
-            store: store,
-            accountClient: NoAccountClient(),
-            syncStore: SyncIntentStore(fileURL: directory.appending(path: "sync.json"))
-        )
+        let model = AppModel(store: store, mirror: nil, legacyJournal: nil)
         await model.load()
         let targets = Nutrients(calories: 2_000, protein: 110, carbohydrates: 230, fibre: 30)
         let food = Food(
@@ -169,19 +157,4 @@ final class CalorieOnboardingTests: XCTestCase {
         XCTAssertTrue(persisted.foods.contains(where: { $0.name == "Home bowl" }))
         XCTAssertEqual(persisted.totals(on: model.selectedDate).calories, 500)
     }
-}
-
-private actor NoAccountClient: NativeAccountServing {
-    func journal(for userID: String) async throws -> any NativeJournalServing { self }
-
-    var googleStartURL: URL { URL(string: "https://example.com")! }
-
-    func restoreAccount() async throws -> CalorieAccount? { nil }
-    func exchangeGoogleHandoff(_: String) async throws -> CalorieAccount { throw CancellationError() }
-    func signInWithApple(_: AppleIdentityPayload) async throws -> CalorieAccount { throw CancellationError() }
-    func linkApple(_: AppleIdentityPayload) async throws -> CalorieAccount { throw CancellationError() }
-    func cloudExport() async throws -> Data { Data() }
-    func apply(_: SyncIntent) async throws {}
-    func signOut() async {}
-    func deleteAccount() async throws {}
 }

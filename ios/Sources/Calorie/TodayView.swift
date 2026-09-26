@@ -103,7 +103,7 @@ struct TodayView: View {
             VStack(spacing: 2) {
                 Text(Calendar.current.isDateInToday(model.selectedDate) ? "Today" : model.selectedDate.formatted(.dateTime.weekday(.wide)))
                     .font(.headline.weight(.bold))
-                Text(model.selectedDate.formatted(.dateTime.day().month(.wide)))
+                Text(model.selectedDate.formatted(.dateTime.day().month(.wide).year()))
                     .font(.caption).foregroundStyle(.secondary)
             }
             Spacer()
@@ -494,7 +494,7 @@ private struct DailyContextEditorView: View {
                     Text("Cycle context stays in this local journal and is used only as optional context.")
                 }
             }
-            .navigationTitle(date.formatted(.dateTime.day().month(.wide)))
+            .navigationTitle(date.formatted(.dateTime.day().month(.wide).year()))
             .navigationBarTitleDisplayMode(.inline)
             .onAppear {
                 let calendar = Calendar.current

@@ -18,8 +18,9 @@ settings:
     ENABLE_USER_SCRIPT_SANDBOXING: YES
 packages:
   PersonalSyncKit:
-    url: https://github.com/Significant-Hobbies/significanthobbies.git
-    revision: 31f6b4eaa6d748b0fddd41ea66ed098655e9a541
+    # Local checkout carries the mirror APIs until the shared kit commit lands
+    # remotely; repin to its SHA afterwards.
+    path: ../../significanthobbies
 targets:
   CalorieCore:
     type: framework

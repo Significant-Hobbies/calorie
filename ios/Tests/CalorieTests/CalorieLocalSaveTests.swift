@@ -122,18 +122,17 @@ final class CalorieLocalSaveTests: XCTestCase {
     func testLocalLoadDoesNotCallOptionalAccountService() async throws {
         let root = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
         defer { try? FileManager.default.removeItem(at: root) }
-        let client = LocalSaveNoAccountClient()
-        let model = AppModel(store: CalorieStore(fileURL: root.appending(path: "journal.json")),
-                             accountClient: client,
-                             syncStore: SyncIntentStore(fileURL: root.appending(path: "sync.json")))
+        let model = AppModel(
+            store: CalorieStore(fileURL: root.appending(path: "journal.json")),
+            mirror: nil,
+            legacyJournal: nil
+        )
         await model.load()
-        let callsAfterLocalLoad = await client.restoreCount
         XCTAssertTrue(model.hasLoadedDocument)
         XCTAssertFalse(model.isLoading)
-        XCTAssertEqual(callsAfterLocalLoad, 0)
+        XCTAssertNil(model.account)
         await model.restoreAccountAndSync()
-        let callsAfterAccountRestore = await client.restoreCount
-        XCTAssertEqual(callsAfterAccountRestore, 1)
+        XCTAssertNil(model.account, "A local-only journal never reaches an account service")
     }
 
     func testBackdatedOneOffEditUpdatesNutrientsAndSurvivesReload() async throws {
@@ -158,27 +157,7 @@ final class CalorieLocalSaveTests: XCTestCase {
         XCTAssertEqual(reloaded.foodEntries.first?.meal, .dinner)
     }
 
-    private func makeModel(store: CalorieStore, root: URL) -> AppModel {
-        AppModel(store: store, accountClient: LocalSaveNoAccountClient(),
-                 syncStore: SyncIntentStore(fileURL: root.appending(path: "sync.json")))
+    private func makeModel(store: CalorieStore, root _: URL) -> AppModel {
+        AppModel(store: store, mirror: nil, legacyJournal: nil)
     }
-}
-
-private actor LocalSaveNoAccountClient: NativeAccountServing {
-    func journal(for userID: String) async throws -> any NativeJournalServing { self }
-
-    private(set) var restoreCount = 0
-    var googleStartURL: URL { URL(string: "https://example.com")! }
-
-    func restoreAccount() async throws -> CalorieAccount? {
-        restoreCount += 1
-        return nil
-    }
-    func exchangeGoogleHandoff(_: String) async throws -> CalorieAccount { throw CancellationError() }
-    func signInWithApple(_: AppleIdentityPayload) async throws -> CalorieAccount { throw CancellationError() }
-    func linkApple(_: AppleIdentityPayload) async throws -> CalorieAccount { throw CancellationError() }
-    func cloudExport() async throws -> Data { Data() }
-    func apply(_: SyncIntent) async throws {}
-    func signOut() async {}
-    func deleteAccount() async throws {}
 }

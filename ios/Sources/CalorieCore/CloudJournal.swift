@@ -29,12 +29,6 @@ public struct CloudJournalSnapshot: Equatable, Sendable {
     public let counts: JournalCounts
 }
 
-public enum JournalReconciliationChoice: Equatable, Sendable {
-    case keepCloud
-    case keepIPhone
-    case merge
-}
-
 public enum CloudJournalMapper {
     public static func decode(
         _ data: Data,
@@ -101,57 +95,26 @@ public enum CloudJournalMapper {
         )
     }
 
-    public static func reconcile(
-        local: CalorieDocument,
-        cloud: CloudJournalSnapshot,
-        choice: JournalReconciliationChoice,
-        now: Date = Date()
+    /// Adds the legacy worker's journal into the local document without
+    /// duplicating records. Used once during the move to the shared mirror —
+    /// legacy export entities carry the same stable IDs, so repeating the
+    /// import is a no-op rather than a rewrite.
+    public static func mergeLegacyImport(
+        into local: CalorieDocument,
+        cloud: CloudJournalSnapshot
     ) -> CalorieDocument {
-        switch choice {
-        case .keepCloud:
-            var document = cloud.document
-            document.theme = local.theme
-            if document.profile.weightKilograms == nil {
-                document.profile.weightKilograms = local.profile.weightKilograms
-            }
-            document.profile.manualMacroTargets = local.profile.manualMacroTargets
-            document.dailyNotes = local.dailyNotes
-            document.cycle = local.cycle
-            let localFoods = Dictionary(uniqueKeysWithValues: local.foods.map { ($0.id, $0) })
-            for index in document.foods.indices {
-                guard let localFood = localFoods[document.foods[index].id] else { continue }
-                document.foods[index].nutrients.fat = localFood.nutrients.fat
-            }
-            let localEntries = Dictionary(uniqueKeysWithValues: local.foodEntries.map { ($0.id, $0) })
-            for index in document.foodEntries.indices {
-                guard let localEntry = localEntries[document.foodEntries[index].id] else { continue }
-                document.foodEntries[index].meal = localEntry.meal
-                document.foodEntries[index].nutrients.fat = localEntry.nutrients.fat
-            }
-            document.syncState = .synced
-            document.lastSyncedAt = now
-            return document
-        case .keepIPhone:
-            var document = local
-            document.syncState = .pending
-            document.lastSyncedAt = nil
-            return document
-        case .merge:
-            var document = cloud.document
-            document.profile = local.profile
-            document.theme = local.theme
-            document.foods = merge(cloud.document.foods, local.foods)
-            document.foodEntries = merge(cloud.document.foodEntries, local.foodEntries)
-            document.waterEntries = merge(cloud.document.waterEntries, local.waterEntries)
-            document.weightEntries = merge(cloud.document.weightEntries, local.weightEntries)
-            document.routines = merge(cloud.document.routines, local.routines)
-            document.routineCheckIns = merge(cloud.document.routineCheckIns, local.routineCheckIns)
-            document.dailyNotes.merge(local.dailyNotes) { _, local in local }
-            document.cycle = local.cycle
-            document.syncState = .pending
-            document.lastSyncedAt = nil
-            return document
-        }
+        var document = local
+        document.foods = merge(cloud.document.foods, local.foods)
+        document.foodEntries = merge(cloud.document.foodEntries, local.foodEntries)
+        document.waterEntries = merge(cloud.document.waterEntries, local.waterEntries)
+        document.weightEntries = merge(cloud.document.weightEntries, local.weightEntries)
+        document.routines = merge(cloud.document.routines, local.routines)
+        document.routineCheckIns = merge(cloud.document.routineCheckIns, local.routineCheckIns)
+        document.goalCycleSessions = merge(
+            cloud.document.goalCycleSessions ?? [],
+            local.goalCycleSessions ?? []
+        )
+        return document
     }
 
     private static func merge<Value: Identifiable>(_ cloud: [Value], _ local: [Value]) -> [Value]
