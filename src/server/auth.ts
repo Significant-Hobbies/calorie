@@ -106,11 +106,8 @@ export function createAuth(env: AuthBindings, requestUrl: string) {
     databaseHooks: {
       user: {
         create: {
-          after: async (newUser) => {
-            await ping('signup', {
-              title: newUser.email,
-              props: { id: newUser.id, name: newUser.name },
-            });
+          after: async () => {
+            await ping('signup', { title: 'New account created' });
           },
         },
       },

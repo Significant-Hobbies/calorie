@@ -1,4 +1,5 @@
 import { Hono } from 'hono';
+import { endpointHealthMiddleware } from './worker/endpoint-health';
 import { handleAgentEdge } from './agent-edge.mjs';
 import { registerAccountRoutes } from './worker/account';
 import { registerAuthRoutes, registerSessionMiddleware } from './worker/auth';
@@ -30,6 +31,11 @@ app.use('*', async (c, next) => {
   // else stays no-store.
   if (!c.res.headers.has('Cache-Control')) c.header('Cache-Control', 'no-store');
 });
+
+// Optional aggregate service metrics only; the official adapter reads Hono's
+// matched route template and never receives concrete path or query values.
+app.use('/api/*', endpointHealthMiddleware);
+app.use('/v1/personal/*', endpointHealthMiddleware);
 
 registerAuthRoutes(app);
 registerSessionMiddleware(app);
