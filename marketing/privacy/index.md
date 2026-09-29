@@ -27,6 +27,10 @@ If you choose Sign in with Apple, Calorie can keep a private, user-scoped copy i
 
 Signed-in mode stores the account identifier and service records needed for authentication, synchronization, reliability, and abuse prevention. The static marketing pages never receive the contents of a local-only journal. Website analytics is disclosed separately and is not included in the native app.
 
+When the optional service ingestion key is configured, App Health may receive a generic account-created event with the fixed title “New account created” and no account or profile properties.
+
+The same optional key enables endpoint health measurements for API performance: the HTTP method, matched route template, response status, duration, declared response size, and timestamp. Route parameters are represented by their template placeholders. These endpoint measurements do not include account or user identifiers, food or health records, request or response bodies, headers, cookies, or query values. Without the key, endpoint monitoring is disabled. Both App Health signals are separate from the marketing site's Microsoft Clarity analytics.
+
 ## Your controls
 
 The native app includes local data export and deletion controls. Signing out does not silently delete a local journal. If you use sync, account and cloud-data deletion are handled through the app’s account controls or the support route. Exported files are your responsibility once they leave the app.

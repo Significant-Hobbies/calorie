@@ -1,0 +1,127 @@
+import { Hono } from 'hono';
+import { describe, expect, it, vi } from 'vitest';
+import type { AppHealthClient, AppHealthClientOptions, EventInput } from '@saas-maker/app-health';
+import { createEndpointHealthMiddleware } from './worker/endpoint-health';
+import type { AppBindings } from './worker/types';
+
+function clientFactory() {
+  const events: EventInput[] = [];
+  const flush = vi.fn(async () => {});
+  const client = {
+    record: (event: EventInput) => events.push(event),
+    log: vi.fn(),
+    flush,
+    close: vi.fn(async () => {}),
+    diagnostics: vi.fn(() => ({
+      queued: 0,
+      sentBatches: 0,
+      sentEvents: 0,
+      failedBatches: 0,
+      retriedBatches: 0,
+      droppedInvalid: 0,
+      droppedOverflow: 0,
+      droppedDelivery: 0,
+      lastSendError: null,
+    })),
+  } satisfies AppHealthClient;
+  const createClient = vi.fn((_options: AppHealthClientOptions) => client);
+  return { client, createClient, events, flush };
+}
+
+function testApp(middleware: ReturnType<typeof createEndpointHealthMiddleware>) {
+  const app = new Hono<{ Bindings: AppBindings }>();
+  app.use('/api/*', middleware);
+  app.use('/v1/personal/*', middleware);
+  app.get('/api/app/foods/:id', (context) => context.json({ ok: true }, 201));
+  app.post('/v1/personal/actions/log_food', (context) => context.json({ ok: true }, 202));
+  app.get('/privacy', (context) => context.text('privacy'));
+  return app;
+}
+
+describe('optional privacy-bounded endpoint health', () => {
+  it('does not initialize a client without the optional ingestion key', async () => {
+    const { createClient, events } = clientFactory();
+    const app = testApp(createEndpointHealthMiddleware(createClient));
+
+    const response = await app.request('/api/app/foods/private-id?food=personal', undefined, {});
+
+    expect(response.status).toBe(201);
+    expect(createClient).not.toHaveBeenCalled();
+    expect(events).toEqual([]);
+  });
+
+  it('records normalized service route templates without concrete values', async () => {
+    const { createClient, events } = clientFactory();
+    const app = testApp(createEndpointHealthMiddleware(createClient));
+    const env = {
+      APP_HEALTH_INGEST_KEY: 'synthetic-test-key',
+      APP_HEALTH_ENVIRONMENT: 'staging',
+    } as AppBindings;
+
+    const response = await app.request(
+      'https://calorie.example/api/app/foods/private-food-id?food=private-name&token=private-token',
+      { headers: { cookie: 'session=private', authorization: 'Bearer private' } },
+      env
+    );
+
+    expect(response.status).toBe(201);
+    expect(events).toHaveLength(1);
+    expect(events[0]).toMatchObject({
+      method: 'GET',
+      route: '/api/app/foods/:id',
+      status_code: 201,
+    });
+    expect(JSON.stringify(events)).not.toContain('private-food-id');
+    expect(JSON.stringify(events)).not.toContain('private-name');
+    expect(JSON.stringify(events)).not.toContain('private-token');
+    expect(JSON.stringify(events)).not.toContain('Bearer');
+    expect(createClient).toHaveBeenCalledWith({
+      key: 'synthetic-test-key',
+      environment: 'staging',
+      endpoint: 'https://ingest.sassmaker.com/v1/ingest',
+      runtime: 'worker',
+      maxQueueSize: 100,
+      maxBatchSize: 20,
+      requestTimeoutMs: 1_000,
+      maxRetries: 1,
+      disableTimer: true,
+    });
+  });
+
+  it('monitors personal service routes but skips marketing routes', async () => {
+    const { createClient, events } = clientFactory();
+    const app = testApp(createEndpointHealthMiddleware(createClient));
+    const env = { APP_HEALTH_INGEST_KEY: 'synthetic-test-key' } as AppBindings;
+
+    await app.request('/v1/personal/actions/log_food?title=private', { method: 'POST' }, env);
+    const countAfterApi = events.length;
+    const marketingResponse = await app.request('/privacy', undefined, env);
+
+    expect(countAfterApi).toBe(1);
+    expect(events[0]).toMatchObject({
+      method: 'POST',
+      route: '/v1/personal/actions/log_food',
+      status_code: 202,
+    });
+    expect(marketingResponse.status).toBe(200);
+    expect(events).toHaveLength(1);
+    expect(createClient).toHaveBeenCalledOnce();
+  });
+
+  it('preserves the application response when the SDK is unavailable', async () => {
+    const { client, createClient } = clientFactory();
+    const middleware = createEndpointHealthMiddleware(() => {
+      throw new Error('synthetic initialization failure');
+    });
+    const app = testApp(middleware);
+
+    const response = await app.request('/api/app/foods/123', undefined, {
+      APP_HEALTH_INGEST_KEY: 'synthetic-test-key',
+    } as AppBindings);
+
+    expect(response.status).toBe(201);
+    expect(await response.json()).toEqual({ ok: true });
+    expect(createClient).not.toHaveBeenCalled();
+    expect(client.flush).not.toHaveBeenCalled();
+  });
+});
