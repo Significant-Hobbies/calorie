@@ -360,11 +360,17 @@ private struct CustomFoodView: View {
             Form {
                 LocalSaveErrorView()
                 Section("Food") {
-                    TextField("Name", text: $name)
-                    TextField("Serving", text: $serving)
+                    LabeledContent("Name") {
+                        TextField("Name", text: $name)
+                            .accessibilityLabel("Name")
+                    }
+                    LabeledContent("Serving") {
+                        TextField("Serving", text: $serving)
+                            .accessibilityLabel("Serving")
+                    }
                 }
                 Section("Per serving") {
-                    numeric("Calories", $calories)
+                    numeric("Calories (kcal)", $calories)
                     numeric("Protein (g)", $protein)
                     numeric("Carbohydrates (g)", $carbs)
                     numeric("Fat (g)", $fat)
@@ -401,7 +407,11 @@ private struct CustomFoodView: View {
     }
 
     private func numeric(_ label: String, _ value: Binding<String>) -> some View {
-        TextField(label, text: value).keyboardType(.decimalPad)
+        LabeledContent(label) {
+            TextField(label, text: value)
+                .keyboardType(.decimalPad)
+                .accessibilityLabel(label)
+        }
     }
 }
 
