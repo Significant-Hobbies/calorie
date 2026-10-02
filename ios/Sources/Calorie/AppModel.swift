@@ -176,6 +176,20 @@ final class AppModel {
     }
 
     @discardableResult
+    func completeExploringFirst() async -> Bool {
+        let succeeded = await mutate { document in
+            document.profile.manualCalorieTarget = nil
+            document.profile.manualMacroTargets = nil
+            document.profile.onboardingComplete = true
+        }
+        if succeeded {
+            selectedTab = 0
+            message = nil
+        }
+        return succeeded
+    }
+
+    @discardableResult
     func completeOnboarding(
         configuration: CalorieOnboardingConfiguration,
         food: Food,

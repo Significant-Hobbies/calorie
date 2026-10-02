@@ -101,6 +101,26 @@ final class CalorieOnboardingTests: XCTestCase {
     }
 
     @MainActor
+    func testExploreFirstPersistsUnsetTargetsWithoutLoggingFood() async throws {
+        let directory = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+        let store = CalorieStore(fileURL: directory.appending(path: "journal.json"))
+        let model = AppModel(store: store, mirror: nil, legacyJournal: nil)
+        await model.load()
+
+        XCTAssertEqual(model.document.profile.manualCalorieTarget, 2_100)
+        XCTAssertEqual(model.document.profile.manualMacroTargets?.protein, 120)
+
+        let saved = await model.completeExploringFirst()
+        let persisted = try await store.load()
+
+        XCTAssertTrue(saved)
+        XCTAssertTrue(persisted.foodEntries.isEmpty)
+        XCTAssertNil(persisted.profile.manualCalorieTarget)
+        XCTAssertNil(persisted.profile.manualMacroTargets)
+        XCTAssertTrue(persisted.profile.onboardingComplete == true)
+    }
+
+    @MainActor
     func testCompletionUsesTheRealStoreAndLeavesSkippedTargetsUnset() async throws {
         let directory = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
         let store = CalorieStore(fileURL: directory.appending(path: "journal.json"))

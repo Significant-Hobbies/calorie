@@ -41,6 +41,33 @@ final class CalorieUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["Apple and peanut butter"].waitForExistence(timeout: 3))
     }
 
+    func testExploreFirstKeepsTargetsUnsetAndCanStillLogFood() {
+        let app = XCUIApplication()
+        app.launchArguments = ["--onboarding-demo", "--reset-onboarding", "--reduce-motion-demo"]
+        app.launch()
+
+        XCTAssertTrue(app.staticTexts["Log food, see what changed."].waitForExistence(timeout: 3))
+        app.buttons["Explore Calorie first"].tap()
+        XCTAssertTrue(app.staticTexts["0 entries"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["Energy recorded"].exists)
+        XCTAssertFalse(app.staticTexts["Energy left today"].exists)
+        XCTAssertFalse(app.staticTexts["kcal remaining · 0 recorded"].exists)
+        for target in ["120 grams", "250 grams", "70 grams", "28 grams"] {
+            XCTAssertFalse(app.descendants(matching: .any).matching(
+                NSPredicate(format: "label CONTAINS %@", "of \(target)")
+            ).firstMatch.exists)
+        }
+
+        app.buttons["Log food"].tap()
+        XCTAssertTrue(app.staticTexts["Greek yoghurt bowl"].waitForExistence(timeout: 3))
+        app.descendants(matching: .any)
+            .matching(NSPredicate(format: "label BEGINSWITH %@", "Greek yoghurt bowl"))
+            .firstMatch.tap()
+        app.buttons["Snack"].tap()
+        app.buttons["Add to snack"].tap()
+        XCTAssertTrue(app.staticTexts["Greek yoghurt bowl"].waitForExistence(timeout: 3))
+    }
+
     func testReusableFoodPathAddsTheFoodToTheLibrary() {
         let app = XCUIApplication()
         app.launchArguments = ["--onboarding-demo", "--reset-onboarding", "--reduce-motion-demo"]
