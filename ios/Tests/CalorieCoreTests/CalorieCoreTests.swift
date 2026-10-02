@@ -148,6 +148,9 @@ final class CalorieCoreTests: XCTestCase {
         XCTAssertTrue(CalorieDocument.starter.waterEntries.isEmpty)
         XCTAssertTrue(CalorieDocument.starter.weightEntries.isEmpty)
         XCTAssertTrue(CalorieDocument.starter.routines.isEmpty)
+        XCTAssertNil(CalorieDocument.starter.profile.manualCalorieTarget)
+        XCTAssertNil(CalorieDocument.starter.profile.manualMacroTargets)
+        XCTAssertNil(TargetCalculator.targets(for: CalorieDocument.starter.profile))
     }
 
     func testManualTargetsRemainManual() throws {
