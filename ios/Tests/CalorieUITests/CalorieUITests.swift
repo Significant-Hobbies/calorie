@@ -258,7 +258,12 @@ final class CalorieUITests: XCTestCase {
         app.launch()
         XCTAssertTrue(app.staticTexts["0 entries"].waitForExistence(timeout: 3))
         XCTAssertFalse(app.staticTexts["Persisted lentil bowl"].exists)
-        XCTAssertTrue(app.staticTexts["kcal remaining · 0 recorded"].exists)
+        XCTAssertTrue(app.staticTexts["Energy recorded"].exists)
+        XCTAssertTrue(app.staticTexts["kcal recorded"].exists)
+        XCTAssertFalse(app.staticTexts["Energy left today"].exists)
+        XCTAssertFalse(app.descendants(matching: .any).matching(
+            NSPredicate(format: "label CONTAINS %@", "kilocalories remaining")
+        ).firstMatch.exists)
         revealWater()
         XCTAssertTrue(app.staticTexts["0 ml"].exists)
         capture("Independent UUID — empty food and water journal")

@@ -400,6 +400,10 @@ public extension CalorieDocument {
         ]
         let routine = MedicationRoutine(name: "Morning routine", period: .morning)
         return CalorieDocument(
+            profile: Profile(
+                manualCalorieTarget: 2_100,
+                manualMacroTargets: Nutrients(calories: 2_100, protein: 120, carbohydrates: 250, fat: 70, fibre: 28)
+            ),
             foods: foods,
             foodEntries: entries,
             waterEntries: [WaterEntry(timestamp: today.addingTimeInterval(8 * 3_600), millilitres: 750)],
