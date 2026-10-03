@@ -91,7 +91,7 @@ struct QuickLogView: View {
                         Spacer()
                         Text("\(servings.formatted()) ×")
                             .font(.system(.largeTitle, design: .rounded, weight: .bold).monospacedDigit())
-                            .accessibilityLabel("\(servings.formatted()) servings")
+                            .accessibilityLabel("\(servings.formatted()) \(servings == 1 ? "serving" : "servings")")
                         Spacer()
                         Button { servings += 0.25 } label: {
                             Image(systemName: "plus").frame(width: 48, height: 48)

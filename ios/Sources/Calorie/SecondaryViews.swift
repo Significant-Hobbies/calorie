@@ -135,7 +135,8 @@ struct ProgressViewScreen: View {
         let recorded = days.filter { $0.nutrients.calories > 0 }
         guard !recorded.isEmpty else { return "No energy entries were recorded in the last \(rangeDays) days." }
         let average = recorded.map(\.nutrients.calories).reduce(0, +) / Double(recorded.count)
-        return "\(recorded.count) days include entries, averaging \(average.formatted(.number.precision(.fractionLength(0)))) recorded calories. Missing days are not treated as zero intake."
+        let recordedDays = recorded.count == 1 ? "1 day includes entries" : "\(recorded.count) days include entries"
+        return "\(recordedDays), averaging \(average.formatted(.number.precision(.fractionLength(0)))) recorded calories. Missing days are not treated as zero intake."
     }
 
     private func goalCycleSummary(_ cycle: GoalCycleSession) -> some View {
