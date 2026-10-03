@@ -390,9 +390,18 @@ final class CalorieUITests: XCTestCase {
             XCTAssertTrue(calories.isHittable)
             XCTAssertGreaterThanOrEqual(calories.frame.minY, screen.height * 0.25)
             XCTAssertLessThanOrEqual(calories.frame.maxY, screen.height * 0.75)
-            // At accessibility sizes LabeledContent places the value below
-            // its label; target the editable value rather than the label.
-            calories.coordinate(withNormalizedOffset: CGVector(dx: 0.75, dy: 0.85)).tap()
+            // At accessibility sizes the merged element includes its label
+            // and the left-aligned value below it. Tap the value text; the
+            // blank trailing area need not focus the field on every SDK.
+            let valueOffset = category == "UICTContentSizeCategoryAccessibilityXXXL"
+                ? CGVector(dx: 0.15, dy: 0.85)
+                : CGVector(dx: 0.75, dy: 0.5)
+            calories.coordinate(withNormalizedOffset: valueOffset).tap()
+            guard app.keyboards.firstMatch.waitForExistence(timeout: 3) else {
+                capture("Calories value did not receive keyboard focus — \(category)")
+                XCTFail("The visible calories value must be editable at \(category)")
+                return
+            }
             calories.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: expectedCalories.count))
             XCTAssertTrue(app.staticTexts["Calories (kcal)"].exists)
             capture("Empty calories retain their label — \(category)")
