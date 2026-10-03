@@ -366,8 +366,30 @@ final class CalorieUITests: XCTestCase {
                 capture("Filled food editor — \(category) — \(label)")
             }
             let calories = app.textFields["Calories (kcal)"]
-            for _ in 0..<6 where !calories.isHittable { app.swipeDown() }
+            // A partly clipped large field can report hittable while its
+            // value sits under the navigation bar. Bring the whole field
+            // into the middle of the Form before targeting its value.
+            let form = app.collectionViews.firstMatch
+            let screen = app.frame
+            for _ in 0..<16 {
+                if !calories.exists {
+                    form.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.45)).press(
+                        forDuration: 0.01,
+                        thenDragTo: form.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.65))
+                    )
+                    continue
+                }
+                let frame = calories.frame
+                if calories.exists && frame.minY >= screen.height * 0.25 && frame.maxY <= screen.height * 0.75 { break }
+                let endY = frame.minY < screen.height * 0.25 ? 0.65 : 0.25
+                form.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.45)).press(
+                    forDuration: 0.01,
+                    thenDragTo: form.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: endY))
+                )
+            }
             XCTAssertTrue(calories.isHittable)
+            XCTAssertGreaterThanOrEqual(calories.frame.minY, screen.height * 0.25)
+            XCTAssertLessThanOrEqual(calories.frame.maxY, screen.height * 0.75)
             // At accessibility sizes LabeledContent places the value below
             // its label; target the editable value rather than the label.
             calories.coordinate(withNormalizedOffset: CGVector(dx: 0.75, dy: 0.85)).tap()
