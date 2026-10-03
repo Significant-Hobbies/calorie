@@ -135,7 +135,8 @@ struct ProgressViewScreen: View {
         let recorded = days.filter { $0.nutrients.calories > 0 }
         guard !recorded.isEmpty else { return "No energy entries were recorded in the last \(rangeDays) days." }
         let average = recorded.map(\.nutrients.calories).reduce(0, +) / Double(recorded.count)
-        return "\(recorded.count) days include entries, averaging \(average.formatted(.number.precision(.fractionLength(0)))) recorded calories. Missing days are not treated as zero intake."
+        let recordedDays = recorded.count == 1 ? "1 day includes entries" : "\(recorded.count) days include entries"
+        return "\(recordedDays), averaging \(average.formatted(.number.precision(.fractionLength(0)))) recorded calories. Missing days are not treated as zero intake."
     }
 
     private func goalCycleSummary(_ cycle: GoalCycleSession) -> some View {
@@ -360,11 +361,17 @@ private struct CustomFoodView: View {
             Form {
                 LocalSaveErrorView()
                 Section("Food") {
-                    TextField("Name", text: $name)
-                    TextField("Serving", text: $serving)
+                    LabeledContent("Name") {
+                        TextField("Name", text: $name)
+                            .accessibilityLabel("Name")
+                    }
+                    LabeledContent("Serving") {
+                        TextField("Serving", text: $serving)
+                            .accessibilityLabel("Serving")
+                    }
                 }
                 Section("Per serving") {
-                    numeric("Calories", $calories)
+                    numeric("Calories (kcal)", $calories)
                     numeric("Protein (g)", $protein)
                     numeric("Carbohydrates (g)", $carbs)
                     numeric("Fat (g)", $fat)
@@ -401,7 +408,11 @@ private struct CustomFoodView: View {
     }
 
     private func numeric(_ label: String, _ value: Binding<String>) -> some View {
-        TextField(label, text: value).keyboardType(.decimalPad)
+        LabeledContent(label) {
+            TextField(label, text: value)
+                .keyboardType(.decimalPad)
+                .accessibilityLabel(label)
+        }
     }
 }
 

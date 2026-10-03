@@ -244,8 +244,8 @@ public struct Profile: Codable, Equatable, Sendable {
         goal: Goal = .maintain,
         activity: ActivityLevel = .moderate,
         equationProfile: EquationProfile? = nil,
-        manualCalorieTarget: Double? = 2_100,
-        manualMacroTargets: Nutrients? = Nutrients(calories: 2_100, protein: 120, carbohydrates: 250, fat: 70, fibre: 28),
+        manualCalorieTarget: Double? = nil,
+        manualMacroTargets: Nutrients? = nil,
         waterTargetMillilitres: Int = 2_500
     ) {
         self.name = name
@@ -383,6 +383,11 @@ public extension CalorieDocument {
         CalorieDocument(foods: seedFoods)
     }
 
+    mutating func completeExploringFirst() {
+        // Stored manual values or equation inputs remain the user's choice.
+        profile.onboardingComplete = true
+    }
+
     static var sample: CalorieDocument {
         let foods = seedFoods
         let calendar = Calendar.current
@@ -395,6 +400,10 @@ public extension CalorieDocument {
         ]
         let routine = MedicationRoutine(name: "Morning routine", period: .morning)
         return CalorieDocument(
+            profile: Profile(
+                manualCalorieTarget: 2_100,
+                manualMacroTargets: Nutrients(calories: 2_100, protein: 120, carbohydrates: 250, fat: 70, fibre: 28)
+            ),
             foods: foods,
             foodEntries: entries,
             waterEntries: [WaterEntry(timestamp: today.addingTimeInterval(8 * 3_600), millilitres: 750)],

@@ -41,6 +41,33 @@ final class CalorieUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["Apple and peanut butter"].waitForExistence(timeout: 3))
     }
 
+    func testExploreFirstKeepsTargetsUnsetAndCanStillLogFood() {
+        let app = XCUIApplication()
+        app.launchArguments = ["--onboarding-demo", "--reset-onboarding", "--reduce-motion-demo"]
+        app.launch()
+
+        XCTAssertTrue(app.staticTexts["Log food, see what changed."].waitForExistence(timeout: 3))
+        app.buttons["Explore Calorie first"].tap()
+        XCTAssertTrue(app.staticTexts["0 entries"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["Energy recorded"].exists)
+        XCTAssertFalse(app.staticTexts["Energy left today"].exists)
+        XCTAssertFalse(app.staticTexts["kcal remaining · 0 recorded"].exists)
+        for target in ["120 grams", "250 grams", "70 grams", "28 grams"] {
+            XCTAssertFalse(app.descendants(matching: .any).matching(
+                NSPredicate(format: "label CONTAINS %@", "of \(target)")
+            ).firstMatch.exists)
+        }
+
+        app.buttons["Log food"].tap()
+        XCTAssertTrue(app.staticTexts["Greek yoghurt bowl"].waitForExistence(timeout: 3))
+        app.descendants(matching: .any)
+            .matching(NSPredicate(format: "label BEGINSWITH %@", "Greek yoghurt bowl"))
+            .firstMatch.tap()
+        app.buttons["Snack"].tap()
+        app.buttons["Add to snack"].tap()
+        XCTAssertTrue(app.staticTexts["Greek yoghurt bowl"].waitForExistence(timeout: 3))
+    }
+
     func testReusableFoodPathAddsTheFoodToTheLibrary() {
         let app = XCUIApplication()
         app.launchArguments = ["--onboarding-demo", "--reset-onboarding", "--reduce-motion-demo"]
@@ -231,7 +258,12 @@ final class CalorieUITests: XCTestCase {
         app.launch()
         XCTAssertTrue(app.staticTexts["0 entries"].waitForExistence(timeout: 3))
         XCTAssertFalse(app.staticTexts["Persisted lentil bowl"].exists)
-        XCTAssertTrue(app.staticTexts["kcal remaining · 0 recorded"].exists)
+        XCTAssertTrue(app.staticTexts["Energy recorded"].exists)
+        XCTAssertTrue(app.staticTexts["kcal recorded"].exists)
+        XCTAssertFalse(app.staticTexts["Energy left today"].exists)
+        XCTAssertFalse(app.descendants(matching: .any).matching(
+            NSPredicate(format: "label CONTAINS %@", "kilocalories remaining")
+        ).firstMatch.exists)
         revealWater()
         XCTAssertTrue(app.staticTexts["0 ml"].exists)
         capture("Independent UUID — empty food and water journal")
@@ -258,6 +290,189 @@ final class CalorieUITests: XCTestCase {
         app.buttons["Actions for Greek yoghurt bowl"].tap()
         XCTAssertTrue(app.buttons["Edit"].waitForExistence(timeout: 2))
         XCTAssertTrue(app.buttons["Archive"].exists)
+    }
+
+    func testFoodEditorKeepsLabelsAndSavedValuesAtDefaultAndEnlargedText() {
+        let app = XCUIApplication()
+        let id = UUID().uuidString
+        let arguments = ["--persistent-ui-fixture", id]
+        addTeardownBlock { @MainActor in
+            app.terminate()
+            app.launchArguments = arguments + ["--cleanup-persistent-ui-fixture"]
+            app.launch()
+            XCTAssertTrue(app.staticTexts["Test journal cleaned"].waitForExistence(timeout: 3))
+            app.terminate()
+        }
+        func capture(_ name: String) {
+            let screenshot = XCTAttachment(screenshot: app.screenshot())
+            screenshot.name = name
+            screenshot.lifetime = .keepAlways
+            add(screenshot)
+            let hierarchy = XCTAttachment(string: app.debugDescription)
+            hierarchy.name = "\(name) hierarchy"
+            hierarchy.lifetime = .keepAlways
+            add(hierarchy)
+        }
+        func reveal(_ field: XCUIElement) {
+            for _ in 0..<6 where !field.isHittable { app.swipeUp() }
+            XCTAssertTrue(field.isHittable)
+        }
+        func openFoodEditor() {
+            XCTAssertTrue(app.tabBars.buttons["Foods"].waitForExistence(timeout: 3))
+            app.tabBars.buttons["Foods"].tap()
+            let search = app.textFields["Search foods"]
+            XCTAssertTrue(search.waitForExistence(timeout: 3))
+            search.tap()
+            search.typeText("Fictional label audit bowl\n")
+            let actions = app.descendants(matching: .any).matching(
+                NSPredicate(format: "label == %@", "Actions for Fictional label audit bowl")
+            ).firstMatch
+            for _ in 0..<6 where !actions.isHittable { app.swipeUp() }
+            XCTAssertTrue(actions.isHittable)
+            actions.tap()
+            app.buttons["Edit"].tap()
+            XCTAssertTrue(app.navigationBars["Edit food"].waitForExistence(timeout: 3))
+        }
+
+        app.launchArguments = arguments
+        app.launch()
+        XCTAssertTrue(app.buttons["Set up my first log"].waitForExistence(timeout: 3))
+        app.buttons["Set up my first log"].tap()
+        app.buttons["No targets for now"].tap()
+        fillFirstFood(in: app, name: "Fictional label audit bowl")
+        app.buttons["Log my first food"].tap()
+        XCTAssertTrue(app.buttons["Open Today"].waitForExistence(timeout: 3))
+        app.buttons["Open Today"].tap()
+        app.terminate()
+
+        for (category, expectedCalories, savedCalories) in [
+            ("UICTContentSizeCategoryL", "210", "220"),
+            ("UICTContentSizeCategoryAccessibilityXXXL", "220", "230")
+        ] {
+            app.launchArguments = arguments + ["-UIPreferredContentSizeCategoryName", category]
+            app.launch()
+            openFoodEditor()
+            capture("Filled food editor — \(category) — top")
+            for (label, value) in [
+                ("Name", "Fictional label audit bowl"), ("Serving", "1 serving"),
+                ("Calories (kcal)", expectedCalories), ("Protein (g)", "7"),
+                ("Carbohydrates (g)", "28"), ("Fat (g)", "0"), ("Fibre (g)", "5")
+            ] {
+                let field = app.textFields[label]
+                reveal(field)
+                XCTAssertTrue(field.waitForExistence(timeout: 3))
+                XCTAssertTrue(app.staticTexts[label].exists)
+                XCTAssertEqual(field.value as? String, value)
+                capture("Filled food editor — \(category) — \(label)")
+            }
+            let calories = app.textFields["Calories (kcal)"]
+            // A partly clipped large field can report hittable while its
+            // value sits under the navigation bar. Bring the whole field
+            // into the middle of the Form before targeting its value.
+            let form = app.collectionViews.firstMatch
+            let screen = app.frame
+            for _ in 0..<16 {
+                if !calories.exists {
+                    form.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.45)).press(
+                        forDuration: 0.01,
+                        thenDragTo: form.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.65))
+                    )
+                    continue
+                }
+                let frame = calories.frame
+                if calories.exists && frame.minY >= screen.height * 0.25 && frame.maxY <= screen.height * 0.75 { break }
+                let endY = frame.minY < screen.height * 0.25 ? 0.65 : 0.25
+                form.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.45)).press(
+                    forDuration: 0.01,
+                    thenDragTo: form.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: endY))
+                )
+            }
+            XCTAssertTrue(calories.isHittable)
+            XCTAssertGreaterThanOrEqual(calories.frame.minY, screen.height * 0.25)
+            XCTAssertLessThanOrEqual(calories.frame.maxY, screen.height * 0.75)
+            // At accessibility sizes the merged element includes its label
+            // and the left-aligned value below it. Tap the value text; the
+            // blank trailing area need not focus the field on every SDK.
+            let valueOffset = category == "UICTContentSizeCategoryAccessibilityXXXL"
+                ? CGVector(dx: 0.15, dy: 0.85)
+                : CGVector(dx: 0.75, dy: 0.5)
+            calories.coordinate(withNormalizedOffset: valueOffset).tap()
+            guard app.keyboards.firstMatch.waitForExistence(timeout: 3) else {
+                capture("Calories value did not receive keyboard focus — \(category)")
+                XCTFail("The visible calories value must be editable at \(category)")
+                return
+            }
+            calories.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: expectedCalories.count))
+            XCTAssertTrue(app.staticTexts["Calories (kcal)"].exists)
+            capture("Empty calories retain their label — \(category)")
+            calories.typeText(savedCalories)
+            capture("Edited calories retain their label — \(category)")
+            XCTAssertTrue(app.buttons["Save"].isHittable)
+            app.buttons["Save"].tap()
+            XCTAssertTrue(app.staticTexts["Fictional label audit bowl"].waitForExistence(timeout: 3))
+            app.terminate()
+        }
+
+        app.launchArguments = arguments
+        app.launch()
+        openFoodEditor()
+        XCTAssertTrue(app.textFields["Calories (kcal)"].waitForExistence(timeout: 3))
+        XCTAssertEqual(app.textFields["Calories (kcal)"].value as? String, "230")
+        capture("Food edit persisted after enlarged-text save and relaunch")
+    }
+
+    func testRecordedDayAndServingLabelsUseSingularAndPluralCounts() {
+        let app = XCUIApplication()
+        let id = UUID().uuidString
+        app.launchArguments = ["--persistent-ui-fixture", id]
+        addTeardownBlock { @MainActor in
+            app.terminate()
+            app.launchArguments = ["--persistent-ui-fixture", id, "--cleanup-persistent-ui-fixture"]
+            app.launch()
+            XCTAssertTrue(app.staticTexts["Test journal cleaned"].waitForExistence(timeout: 3))
+            app.terminate()
+        }
+        func capture(_ name: String) {
+            let screenshot = XCTAttachment(screenshot: app.screenshot())
+            screenshot.name = name
+            screenshot.lifetime = .keepAlways
+            add(screenshot)
+            let hierarchy = XCTAttachment(string: app.debugDescription)
+            hierarchy.name = "\(name) hierarchy"
+            hierarchy.lifetime = .keepAlways
+            add(hierarchy)
+        }
+        app.launch()
+        app.buttons["Set up my first log"].tap()
+        app.buttons["No targets for now"].tap()
+        fillFirstFood(in: app, name: "Fictional count audit bowl")
+        app.buttons["Log my first food"].tap()
+        app.buttons["Open Today"].tap()
+        app.tabBars.buttons["Progress"].tap()
+        XCTAssertTrue(app.staticTexts["1 day includes entries, averaging 210 recorded calories. Missing days are not treated as zero intake."].waitForExistence(timeout: 3))
+        capture("One recorded day uses singular wording")
+        app.tabBars.buttons["Today"].tap()
+        capture("Today date navigation before adding a second day")
+        let previousDay = app.buttons.matching(NSPredicate(format: "identifier == %@ OR label == %@", "chevron.left", "Back")).firstMatch
+        XCTAssertTrue(previousDay.exists)
+        previousDay.tap()
+        app.buttons["Log food"].tap()
+        let food = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Fictional count audit bowl")).firstMatch
+        XCTAssertTrue(food.waitForExistence(timeout: 3))
+        food.tap()
+        XCTAssertTrue(app.staticTexts["1 serving"].waitForExistence(timeout: 3))
+        capture("One serving uses singular accessible wording")
+        for _ in 0..<2 { app.buttons["Increase amount"].tap() }
+        XCTAssertTrue(app.staticTexts["1.5 servings"].exists)
+        capture("Fractional servings use plural accessible wording")
+        for _ in 0..<2 { app.buttons["Increase amount"].tap() }
+        XCTAssertTrue(app.staticTexts["2 servings"].exists)
+        capture("Multiple servings use plural accessible wording")
+        app.buttons["Snack"].tap()
+        app.buttons["Add to snack"].tap()
+        app.tabBars.buttons["Progress"].tap()
+        XCTAssertTrue(app.staticTexts["2 days include entries, averaging 315 recorded calories. Missing days are not treated as zero intake."].waitForExistence(timeout: 3))
+        capture("Multiple recorded days retain plural wording and missing-days explanation")
     }
 
     func testProgressSupportsThirtyDayAndDateReview() {
