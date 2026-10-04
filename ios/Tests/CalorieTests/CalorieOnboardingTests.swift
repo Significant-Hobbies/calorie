@@ -101,6 +101,69 @@ final class CalorieOnboardingTests: XCTestCase {
     }
 
     @MainActor
+    func testExploreFirstPersistsUnsetTargetsWithoutLoggingFood() async throws {
+        let directory = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+        let store = CalorieStore(fileURL: directory.appending(path: "journal.json"))
+        let model = AppModel(store: store, mirror: nil, legacyJournal: nil)
+        await model.load()
+
+        XCTAssertNil(model.document.profile.manualCalorieTarget)
+        XCTAssertNil(model.document.profile.manualMacroTargets)
+        XCTAssertNil(model.targetExplanation)
+
+        let saved = await model.completeExploringFirst()
+        let persisted = try await store.load()
+
+        XCTAssertTrue(saved)
+        XCTAssertTrue(persisted.foodEntries.isEmpty)
+        XCTAssertNil(persisted.profile.manualCalorieTarget)
+        XCTAssertNil(persisted.profile.manualMacroTargets)
+        XCTAssertTrue(persisted.profile.onboardingComplete == true)
+
+        let reloaded = AppModel(store: store, mirror: nil, legacyJournal: nil)
+        await reloaded.load()
+        XCTAssertNil(reloaded.targetExplanation)
+        let food = Food(name: "Fixture meal", servingName: "1 serving", nutrients: Nutrients(calories: 400))
+        await reloaded.log(food, servings: 1, meal: .lunch, at: reloaded.selectedDate)
+        let afterLogging = try await store.load()
+        XCTAssertEqual(afterLogging.foodEntries.map(\.foodName), ["Fixture meal"])
+        XCTAssertNil(TargetCalculator.targets(for: afterLogging.profile))
+    }
+
+    @MainActor
+    func testExplorePreservesStoredTargetChoicesAndEntries() async throws {
+        let formerDefaults = Nutrients(calories: 2_100, protein: 120, carbohydrates: 250, fat: 70, fibre: 28)
+        let profiles = [
+            Profile(manualCalorieTarget: 2_100, manualMacroTargets: formerDefaults),
+            Profile(manualCalorieTarget: 1_900),
+            Profile(age: 30, heightCentimetres: 170, weightKilograms: 70, equationProfile: EquationProfile.allCases[0]),
+        ]
+        for profile in profiles {
+            let directory = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+            let store = CalorieStore(fileURL: directory.appending(path: "journal.json"))
+            var original = CalorieDocument.starter
+            original.profile = profile
+            original.log(
+                food: Food(name: "Existing fixture meal", servingName: "1 serving", nutrients: Nutrients(calories: 400)),
+                servings: 1, meal: .lunch, at: Date(timeIntervalSince1970: 1_700_000_000)
+            )
+            try await store.save(original)
+            let model = AppModel(store: store, mirror: nil, legacyJournal: nil)
+            await model.load()
+            let expectedTargets = TargetCalculator.targets(for: original.profile)
+            let saved = await model.completeExploringFirst()
+            let persisted = try await store.load()
+            var expectedProfile = profile
+            expectedProfile.onboardingComplete = true
+
+            XCTAssertTrue(saved)
+            XCTAssertEqual(persisted.profile, expectedProfile)
+            XCTAssertEqual(persisted.foodEntries, original.foodEntries)
+            XCTAssertEqual(TargetCalculator.targets(for: persisted.profile), expectedTargets)
+        }
+    }
+
+    @MainActor
     func testCompletionUsesTheRealStoreAndLeavesSkippedTargetsUnset() async throws {
         let directory = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
         let store = CalorieStore(fileURL: directory.appending(path: "journal.json"))

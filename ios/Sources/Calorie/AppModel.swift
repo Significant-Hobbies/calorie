@@ -176,6 +176,18 @@ final class AppModel {
     }
 
     @discardableResult
+    func completeExploringFirst() async -> Bool {
+        let succeeded = await mutate { document in
+            document.completeExploringFirst()
+        }
+        if succeeded {
+            selectedTab = 0
+            message = nil
+        }
+        return succeeded
+    }
+
+    @discardableResult
     func completeOnboarding(
         configuration: CalorieOnboardingConfiguration,
         food: Food,

@@ -135,7 +135,8 @@ struct ProgressViewScreen: View {
         let recorded = days.filter { $0.nutrients.calories > 0 }
         guard !recorded.isEmpty else { return "No energy entries were recorded in the last \(rangeDays) days." }
         let average = recorded.map(\.nutrients.calories).reduce(0, +) / Double(recorded.count)
-        return "\(recorded.count) days include entries, averaging \(average.formatted(.number.precision(.fractionLength(0)))) recorded calories. Missing days are not treated as zero intake."
+        let recordedDays = recorded.count == 1 ? "1 day includes entries" : "\(recorded.count) days include entries"
+        return "\(recordedDays), averaging \(average.formatted(.number.precision(.fractionLength(0)))) recorded calories. Missing days are not treated as zero intake."
     }
 
     private func goalCycleSummary(_ cycle: GoalCycleSession) -> some View {
@@ -335,6 +336,7 @@ struct FoodsView: View {
 private struct CustomFoodView: View {
     @Environment(AppModel.self) private var model
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @State private var name = ""
     @State private var serving = "1 serving"
     @State private var calories = ""
@@ -360,11 +362,17 @@ private struct CustomFoodView: View {
             Form {
                 LocalSaveErrorView()
                 Section("Food") {
-                    TextField("Name", text: $name)
-                    TextField("Serving", text: $serving)
+                    inputRow("Name") {
+                        TextField("Name", text: $name)
+                            .accessibilityLabel("Name")
+                    }
+                    inputRow("Serving") {
+                        TextField("Serving", text: $serving)
+                            .accessibilityLabel("Serving")
+                    }
                 }
                 Section("Per serving") {
-                    numeric("Calories", $calories)
+                    numeric("Calories (kcal)", $calories)
                     numeric("Protein (g)", $protein)
                     numeric("Carbohydrates (g)", $carbs)
                     numeric("Fat (g)", $fat)
@@ -401,7 +409,28 @@ private struct CustomFoodView: View {
     }
 
     private func numeric(_ label: String, _ value: Binding<String>) -> some View {
-        TextField(label, text: value).keyboardType(.decimalPad)
+        inputRow(label) {
+            TextField(label, text: value)
+                .keyboardType(.decimalPad)
+                .accessibilityLabel(label)
+        }
+    }
+
+    @ViewBuilder
+    private func inputRow<Content: View>(_ label: String, @ViewBuilder content: () -> Content) -> some View {
+        // Keep the native Form row arrangement, with the editable control's
+        // own accessibility bounds rather than a merged label/value frame.
+        if dynamicTypeSize.isAccessibilitySize {
+            VStack(alignment: .leading, spacing: 8) {
+                Text(label).accessibilityHidden(true)
+                content()
+            }
+        } else {
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                Text(label).fixedSize().accessibilityHidden(true)
+                content()
+            }
+        }
     }
 }
 

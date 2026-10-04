@@ -151,7 +151,12 @@ struct CalorieOnboardingView: View {
             Button("Set up my first log") { advance(to: .targets) }
                 .buttonStyle(BotanicalButtonStyle())
 
-            Button("Explore Calorie first") { completion() }
+            Button("Explore Calorie first") {
+                Task {
+                    guard await model.completeExploringFirst() else { return }
+                    completion()
+                }
+            }
                 .frame(maxWidth: .infinity, minHeight: 44)
         }
     }
