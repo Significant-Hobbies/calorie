@@ -336,6 +336,7 @@ struct FoodsView: View {
 private struct CustomFoodView: View {
     @Environment(AppModel.self) private var model
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @State private var name = ""
     @State private var serving = "1 serving"
     @State private var calories = ""
@@ -361,11 +362,11 @@ private struct CustomFoodView: View {
             Form {
                 LocalSaveErrorView()
                 Section("Food") {
-                    LabeledContent("Name") {
+                    inputRow("Name") {
                         TextField("Name", text: $name)
                             .accessibilityLabel("Name")
                     }
-                    LabeledContent("Serving") {
+                    inputRow("Serving") {
                         TextField("Serving", text: $serving)
                             .accessibilityLabel("Serving")
                     }
@@ -408,10 +409,27 @@ private struct CustomFoodView: View {
     }
 
     private func numeric(_ label: String, _ value: Binding<String>) -> some View {
-        LabeledContent(label) {
+        inputRow(label) {
             TextField(label, text: value)
                 .keyboardType(.decimalPad)
                 .accessibilityLabel(label)
+        }
+    }
+
+    @ViewBuilder
+    private func inputRow<Content: View>(_ label: String, @ViewBuilder content: () -> Content) -> some View {
+        // Keep the native Form row arrangement, with the editable control's
+        // own accessibility bounds rather than a merged label/value frame.
+        if dynamicTypeSize.isAccessibilitySize {
+            VStack(alignment: .leading, spacing: 8) {
+                Text(label).accessibilityHidden(true)
+                content()
+            }
+        } else {
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                Text(label).fixedSize().accessibilityHidden(true)
+                content()
+            }
         }
     }
 }

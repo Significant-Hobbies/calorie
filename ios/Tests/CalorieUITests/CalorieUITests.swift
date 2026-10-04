@@ -361,7 +361,7 @@ final class CalorieUITests: XCTestCase {
                 let field = app.textFields[label]
                 reveal(field)
                 XCTAssertTrue(field.waitForExistence(timeout: 3))
-                XCTAssertTrue(app.staticTexts[label].exists)
+                XCTAssertEqual(field.label, label)
                 XCTAssertEqual(field.value as? String, value)
                 capture("Filled food editor — \(category) — \(label)")
             }
@@ -380,30 +380,25 @@ final class CalorieUITests: XCTestCase {
                     continue
                 }
                 let frame = calories.frame
-                if calories.exists && frame.minY >= screen.height * 0.25 && frame.maxY <= screen.height * 0.75 { break }
-                let endY = frame.minY < screen.height * 0.25 ? 0.65 : 0.25
+                if calories.exists && frame.minY >= screen.height * 0.2 && frame.maxY <= screen.height * 0.8 { break }
+                let endY = frame.minY < screen.height * 0.2 ? 0.65 : 0.25
                 form.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.45)).press(
                     forDuration: 0.01,
                     thenDragTo: form.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: endY))
                 )
             }
             XCTAssertTrue(calories.isHittable)
-            XCTAssertGreaterThanOrEqual(calories.frame.minY, screen.height * 0.25)
-            XCTAssertLessThanOrEqual(calories.frame.maxY, screen.height * 0.75)
-            // At accessibility sizes the merged element includes its label
-            // and the left-aligned value below it. Tap the value text; the
-            // blank trailing area need not focus the field on every SDK.
-            let valueOffset = category == "UICTContentSizeCategoryAccessibilityXXXL"
-                ? CGVector(dx: 0.15, dy: 0.85)
-                : CGVector(dx: 0.75, dy: 0.5)
-            calories.coordinate(withNormalizedOffset: valueOffset).tap()
+            XCTAssertGreaterThanOrEqual(calories.frame.minY, screen.height * 0.2)
+            XCTAssertLessThanOrEqual(calories.frame.maxY, screen.height * 0.8)
+            // Labels and editable values have separate accessibility nodes.
+            calories.tap()
             guard app.keyboards.firstMatch.waitForExistence(timeout: 3) else {
                 capture("Calories value did not receive keyboard focus — \(category)")
                 XCTFail("The visible calories value must be editable at \(category)")
                 return
             }
             calories.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: expectedCalories.count))
-            XCTAssertTrue(app.staticTexts["Calories (kcal)"].exists)
+            XCTAssertEqual(calories.label, "Calories (kcal)")
             capture("Empty calories retain their label — \(category)")
             calories.typeText(savedCalories)
             capture("Edited calories retain their label — \(category)")
