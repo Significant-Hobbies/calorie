@@ -28,6 +28,7 @@
 		78E4CFBE00AEC0B522208260 /* CalorieCoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5B7DFC8284B00F4651697FFE /* CalorieCoreTests.swift */; };
 		7F58834AB88065537A609AC6 /* LegacyCalorieJournal.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4BF7A9ADCAC206743C61A76F /* LegacyCalorieJournal.swift */; };
 		8356EFC6244193FC06E9CDE7 /* CalorieOnboardingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 72D5C2AB785FC4AB4B577760 /* CalorieOnboardingView.swift */; };
+		8667222AA1E04E369B69D39D /* CaseInsensitiveQuery.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA33D6CE98D7DDD6AD59DD95 /* CaseInsensitiveQuery.swift */; };
 		8A4FF16B70883E3694F2D8F0 /* QuickLogView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 82843A6E095B0D695BE975A9 /* QuickLogView.swift */; };
 		909325DDD59D256FDE585104 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 582EBD53FE4DBDD1F1280E47 /* Assets.xcassets */; };
 		986CAE0FE6FF868ADADE80A3 /* Calculations.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB27B9879B2822A834344B04 /* Calculations.swift */; };
@@ -115,6 +116,7 @@
 		999A9A642DBE09F3AF3DFEC7 /* CalorieTests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = CalorieTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		9F7F06E256D2C0050248110B /* CloudJournal.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CloudJournal.swift; sourceTree = "<group>"; };
 		A3EA5591F28D4301F4708BD9 /* CalorieCoreTests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = CalorieCoreTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		AA33D6CE98D7DDD6AD59DD95 /* CaseInsensitiveQuery.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaseInsensitiveQuery.swift; sourceTree = "<group>"; };
 		AB27B9879B2822A834344B04 /* Calculations.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Calculations.swift; sourceTree = "<group>"; };
 		B02FB98A0C748A0D823CFF0E /* CalorieUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CalorieUITests.swift; sourceTree = "<group>"; };
 		B2A77FA6E63313F1DF330D08 /* CalorieLocalSaveTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CalorieLocalSaveTests.swift; sourceTree = "<group>"; };
@@ -190,6 +192,7 @@
 			isa = PBXGroup;
 			children = (
 				B02FB98A0C748A0D823CFF0E /* CalorieUITests.swift */,
+				AA33D6CE98D7DDD6AD59DD95 /* CaseInsensitiveQuery.swift */,
 			);
 			name = CalorieUITests;
 			path = Tests/CalorieUITests;
@@ -448,6 +451,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				A8224A20DD29245A504AD39D /* CalorieUITests.swift in Sources */,
+				8667222AA1E04E369B69D39D /* CaseInsensitiveQuery.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
