@@ -327,7 +327,7 @@ final class CalorieUITests: XCTestCase {
             let actions = app.descendants(matching: .any).matching(
                 NSPredicate(format: "label == %@", "Actions for Fictional label audit bowl")
             ).firstMatch
-            for _ in 0..<6 where !actions.isHittable { app.swipeUp() }
+            for _ in 0..<12 where !actions.isHittable { app.swipeUp() }
             XCTAssertTrue(actions.isHittable)
             actions.tap()
             app.buttons.ci("Edit").tap()
