@@ -15,7 +15,7 @@
 		37D7DADD1C3D65DA3304BD4C /* CalorieLocalSaveTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2A77FA6E63313F1DF330D08 /* CalorieLocalSaveTests.swift */; };
 		38F5C42E9B74740668D007AD /* TodayView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E37CD42D2D735AEC0AD67FA /* TodayView.swift */; };
 		462401D7CA97CDEF449C6228 /* CalorieSyncCommitTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 283CED5CC6AD389C8271B2CD /* CalorieSyncCommitTests.swift */; };
-		464855F6AC15A91E41201874 /* PersonalSyncKit in Frameworks */ = {isa = PBXBuildFile; productRef = 002ECA2451C6B565726001E3 /* PersonalSyncKit */; };
+		464855F6AC15A91E41201874 /* SaaSMakerUI in Frameworks */ = {isa = PBXBuildFile; productRef = D6A81A1C41ACEC60C22C3CEF /* SaaSMakerUI */; };
 		46F7A58C2594B5E28EC62189 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 0784046F52F660D200F04976 /* PrivacyInfo.xcprivacy */; };
 		54C2F07D0E083738B1A1151E /* RootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2536F3912B308A351D1EC58A /* RootView.swift */; };
 		55C2A062AE890CBD5C2EEED3 /* CalorieCore.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = DC17149D5C06CBF45F708679 /* CalorieCore.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
@@ -28,6 +28,7 @@
 		78E4CFBE00AEC0B522208260 /* CalorieCoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5B7DFC8284B00F4651697FFE /* CalorieCoreTests.swift */; };
 		7F58834AB88065537A609AC6 /* LegacyCalorieJournal.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4BF7A9ADCAC206743C61A76F /* LegacyCalorieJournal.swift */; };
 		8356EFC6244193FC06E9CDE7 /* CalorieOnboardingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 72D5C2AB785FC4AB4B577760 /* CalorieOnboardingView.swift */; };
+		8667222AA1E04E369B69D39D /* CaseInsensitiveQuery.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA33D6CE98D7DDD6AD59DD95 /* CaseInsensitiveQuery.swift */; };
 		8A4FF16B70883E3694F2D8F0 /* QuickLogView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 82843A6E095B0D695BE975A9 /* QuickLogView.swift */; };
 		909325DDD59D256FDE585104 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 582EBD53FE4DBDD1F1280E47 /* Assets.xcassets */; };
 		986CAE0FE6FF868ADADE80A3 /* Calculations.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB27B9879B2822A834344B04 /* Calculations.swift */; };
@@ -35,6 +36,7 @@
 		A8224A20DD29245A504AD39D /* CalorieUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B02FB98A0C748A0D823CFF0E /* CalorieUITests.swift */; };
 		AD3C9AC8E8E54DAA43140F1E /* AppModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 038969CDF1B5BC7ACD39E9BA /* AppModel.swift */; };
 		B3B258069F32F20F9DB3C832 /* CalorieCore.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = DC17149D5C06CBF45F708679 /* CalorieCore.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
+		F7CB72C8736F6065249E7BF9 /* PersonalSyncKit in Frameworks */ = {isa = PBXBuildFile; productRef = 002ECA2451C6B565726001E3 /* PersonalSyncKit */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -114,6 +116,7 @@
 		999A9A642DBE09F3AF3DFEC7 /* CalorieTests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = CalorieTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		9F7F06E256D2C0050248110B /* CloudJournal.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CloudJournal.swift; sourceTree = "<group>"; };
 		A3EA5591F28D4301F4708BD9 /* CalorieCoreTests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = CalorieCoreTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		AA33D6CE98D7DDD6AD59DD95 /* CaseInsensitiveQuery.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaseInsensitiveQuery.swift; sourceTree = "<group>"; };
 		AB27B9879B2822A834344B04 /* Calculations.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Calculations.swift; sourceTree = "<group>"; };
 		B02FB98A0C748A0D823CFF0E /* CalorieUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CalorieUITests.swift; sourceTree = "<group>"; };
 		B2A77FA6E63313F1DF330D08 /* CalorieLocalSaveTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CalorieLocalSaveTests.swift; sourceTree = "<group>"; };
@@ -139,7 +142,8 @@
 			buildActionMask = 2147483647;
 			files = (
 				9A3D45CEDC31C27CC3147C08 /* CalorieCore.framework in Frameworks */,
-				464855F6AC15A91E41201874 /* PersonalSyncKit in Frameworks */,
+				464855F6AC15A91E41201874 /* SaaSMakerUI in Frameworks */,
+				F7CB72C8736F6065249E7BF9 /* PersonalSyncKit in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -188,6 +192,7 @@
 			isa = PBXGroup;
 			children = (
 				B02FB98A0C748A0D823CFF0E /* CalorieUITests.swift */,
+				AA33D6CE98D7DDD6AD59DD95 /* CaseInsensitiveQuery.swift */,
 			);
 			name = CalorieUITests;
 			path = Tests/CalorieUITests;
@@ -269,6 +274,7 @@
 			);
 			name = Calorie;
 			packageProductDependencies = (
+				D6A81A1C41ACEC60C22C3CEF /* SaaSMakerUI */,
 				002ECA2451C6B565726001E3 /* PersonalSyncKit */,
 			);
 			productName = Calorie;
@@ -393,6 +399,7 @@
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
 				F2DD6E0A7AB8EF96FAD5B576 /* XCRemoteSwiftPackageReference "significanthobbies" */,
+				062A7286ED4B8B7A160B61CB /* XCRemoteSwiftPackageReference "ui-library" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 6A0CF6897D28F1D82B728A85 /* Products */;
@@ -444,6 +451,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				A8224A20DD29245A504AD39D /* CalorieUITests.swift in Sources */,
+				8667222AA1E04E369B69D39D /* CaseInsensitiveQuery.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -877,6 +885,14 @@
 /* End XCConfigurationList section */
 
 /* Begin XCRemoteSwiftPackageReference section */
+		062A7286ED4B8B7A160B61CB /* XCRemoteSwiftPackageReference "ui-library" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/sass-maker/ui-library";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 0.1.14;
+			};
+		};
 		F2DD6E0A7AB8EF96FAD5B576 /* XCRemoteSwiftPackageReference "significanthobbies" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/Significant-Hobbies/significanthobbies.git";
@@ -897,6 +913,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = F2DD6E0A7AB8EF96FAD5B576 /* XCRemoteSwiftPackageReference "significanthobbies" */;
 			productName = PersonalSyncKit;
+		};
+		D6A81A1C41ACEC60C22C3CEF /* SaaSMakerUI */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 062A7286ED4B8B7A160B61CB /* XCRemoteSwiftPackageReference "ui-library" */;
+			productName = SaaSMakerUI;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

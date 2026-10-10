@@ -1,4 +1,5 @@
 import CalorieCore
+import SaaSMakerUI
 import SwiftUI
 
 struct RootView: View {
@@ -32,7 +33,8 @@ struct RootView: View {
                 HStack {
                     Text("Entry removed")
                     Spacer()
-                    Button("Undo") { Task { await model.undoDelete() } }.fontWeight(.bold)
+                    Button("Undo") { Task { await model.undoDelete() } }
+                        .textCase(.lowercase).accessibilityLabel("Undo").fontWeight(.bold)
                 }
                 .padding(14)
                 .background(.regularMaterial)
@@ -46,6 +48,7 @@ struct RootView: View {
             set: { if !$0 { model.message = nil } }
         )) {
             Button("OK", role: .cancel) { model.message = nil }
+                .textCase(.lowercase).accessibilityLabel("OK")
         } message: {
             Text(model.message ?? "")
         }
@@ -54,16 +57,16 @@ struct RootView: View {
     private func mainTabs(selection: Binding<Int>) -> some View {
         TabView(selection: selection) {
             NavigationStack { TodayView() }
-                .tabItem { Label("Today", systemImage: "sun.max.fill") }
+                .tabItem { Label("today", systemImage: "sun.max.fill").accessibilityLabel("Today") }
                 .tag(0)
             NavigationStack { ProgressViewScreen() }
-                .tabItem { Label("Progress", systemImage: "chart.line.uptrend.xyaxis") }
+                .tabItem { Label("progress", systemImage: "chart.line.uptrend.xyaxis").accessibilityLabel("Progress") }
                 .tag(1)
             NavigationStack { FoodsView() }
-                .tabItem { Label("Foods", systemImage: "leaf.fill") }
+                .tabItem { Label("foods", systemImage: "leaf.fill").accessibilityLabel("Foods") }
                 .tag(2)
             NavigationStack { YouView() }
-                .tabItem { Label("You", systemImage: "person.crop.circle.fill") }
+                .tabItem { Label("you", systemImage: "person.crop.circle.fill").accessibilityLabel("You") }
                 .tag(3)
         }
     }
@@ -78,23 +81,24 @@ private struct ApprovalView: View {
                 VStack(alignment: .leading, spacing: 18) {
                     botanicalHeader("Connect your journal", subtitle: "Nothing changes until you approve.")
                     Text("This journal can sync privately to \(model.account?.email ?? "your account"). Records merge automatically — the newest version of each record wins — and a fresh install can restore from either iCloud or Significant Hobbies.")
-                        .font(.subheadline)
+                        .font(CalorieType.subheadline)
                         .foregroundStyle(.secondary)
                     Button { Task { await model.approveCloudAccount() } } label: {
-                        Label("Connect this journal", systemImage: "checkmark.icloud.fill")
+                        Label("connect this journal", systemImage: "checkmark.icloud.fill").accessibilityLabel("Connect this journal")
                             .frame(maxWidth: .infinity, minHeight: 48)
                     }
-                    .buttonStyle(.borderedProminent)
+                    .buttonStyle(SMButtonStyle(.brand))
                     .disabled(model.isAccountWorking)
                 }
                 .padding(18)
             }
             .botanicalBackground()
-            .navigationTitle("Journal connection")
+            .botanicalNavigationTitle("Journal connection")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Decide later") { model.deferApproval() }
+                        .textCase(.lowercase).accessibilityLabel("Decide later")
                         .disabled(model.isAccountWorking)
                 }
             }
@@ -121,7 +125,7 @@ struct LocalSaveErrorView: View {
     var body: some View {
         if let error = model.saveError {
             Text("Could not save. Your input is still here. \(error)")
-                .font(.callout)
+                .font(CalorieType.callout)
                 .foregroundStyle(.red)
                 .accessibilityIdentifier("local-save-error")
         }

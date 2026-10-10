@@ -1,4 +1,5 @@
 import CalorieCore
+import SaaSMakerUI
 import SwiftUI
 
 struct TodayView: View {
@@ -35,7 +36,8 @@ struct TodayView: View {
             Button {
                 model.isQuickLogPresented = true
             } label: {
-                Label("Log food", systemImage: "plus")
+                Label("log food", systemImage: "plus").accessibilityLabel("Log food")
+                    .frame(maxWidth: .infinity)
             }
             .buttonStyle(BotanicalButtonStyle())
             .padding(.horizontal, 18)
@@ -66,25 +68,22 @@ struct TodayView: View {
         HStack(alignment: .center, spacing: 12) {
             LeafMark(size: 42)
             VStack(alignment: .leading, spacing: 2) {
-                Text("CALORIE")
-                    .font(.caption.weight(.heavy))
+                Text("calorie")
+                    .font(CalorieType.caption.weight(.heavy))
                     .tracking(1.4)
-                Text(greeting)
-                    .font(.system(.title2, design: .rounded, weight: .bold))
+                Text(greeting.lowercased()).accessibilityLabel(greeting)
+                    .font(CalorieType.title2.bold())
             }
         }
     }
 
     private var syncLabel: some View {
-        Label(
-            CalorieSyncStatusCopy.text(
-                for: model.document.syncState,
-                pendingCount: model.pendingSyncCount
-            ),
-            systemImage: CalorieSyncStatusCopy.symbol(for: model.document.syncState)
+        let text = CalorieSyncStatusCopy.text(
+            for: model.document.syncState,
+            pendingCount: model.pendingSyncCount
         )
-            .font(.caption.weight(.bold))
-            .foregroundStyle(.secondary)
+        return SMStatusPill(text.lowercased())
+            .accessibilityLabel(text)
     }
 
     private var greeting: String {
@@ -102,9 +101,9 @@ struct TodayView: View {
             Spacer()
             VStack(spacing: 2) {
                 Text(Calendar.current.isDateInToday(model.selectedDate) ? "Today" : model.selectedDate.formatted(.dateTime.weekday(.wide)))
-                    .font(.headline.weight(.bold))
+                    .font(CalorieType.headline.weight(.bold))
                 Text(model.selectedDate.formatted(.dateTime.day().month(.wide)))
-                    .font(.caption).foregroundStyle(.secondary)
+                    .font(CalorieType.caption).foregroundStyle(.secondary)
             }
             Spacer()
             Button { model.selectedDate = Calendar.current.date(byAdding: .day, value: 1, to: model.selectedDate) ?? model.selectedDate } label: {
@@ -141,7 +140,7 @@ struct TodayView: View {
                 .frame(height: 10)
             }
             if dynamicTypeSize.isAccessibilitySize {
-                LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], alignment: .leading, spacing: 18) {
+                LazyVGrid(columns: [GridItem(.flexible())], alignment: .leading, spacing: 18) {
                     nutrient("PROTEIN", totals.protein, targets?.protein, CaloriePalette.moss)
                     nutrient("CARBS", totals.carbohydrates, targets?.carbohydrates, CaloriePalette.amber)
                     nutrient("FAT", totals.fat, targets?.fat, CaloriePalette.cherry)
@@ -165,9 +164,7 @@ struct TodayView: View {
                 )
             )
         }
-        .padding(18)
-        .background(CaloriePalette.surface)
-        .clipShape(RoundedRectangle(cornerRadius: 16))
+        .botanicalCard(padding: 18)
     }
 
     private func energySummary(target: Double?, recorded: Double) -> some View {
@@ -176,10 +173,10 @@ struct TodayView: View {
         return VStack(alignment: .leading, spacing: 3) {
             BotanicalSectionLabel(text: remaining == nil ? "Energy recorded" : "Energy left today")
             Text(displayed)
-                .font(.system(size: 52, weight: .bold, design: .rounded).monospacedDigit())
+                .font(CalorieType.energy.bold().monospacedDigit())
                 .accessibilityLabel("\(displayed) kilocalories \(remaining == nil ? "recorded" : "remaining")")
             Text(remaining == nil ? "kcal recorded" : "kcal remaining · \(recorded.formatted(.number.precision(.fractionLength(0)))) recorded")
-                .font(.caption.weight(.semibold))
+                .font(CalorieType.caption.weight(.semibold))
                 .foregroundStyle(.secondary)
         }
     }
@@ -188,10 +185,10 @@ struct TodayView: View {
         VStack(alignment: .leading, spacing: 3) {
             Rectangle().fill(color).frame(width: 24, height: 3)
             Text(value.formatted(.number.precision(.fractionLength(0))))
-                .font(.headline.monospacedDigit().weight(.bold))
+                .font(CalorieType.headline.monospacedDigit().weight(.bold))
             Text(target.map { "of \($0.formatted(.number.precision(.fractionLength(0))))g" } ?? "g")
-                .font(.caption2).foregroundStyle(.secondary)
-            Text(label).font(.caption2.weight(.heavy))
+                .font(CalorieType.caption2).foregroundStyle(.secondary)
+            Text(label.lowercased()).font(CalorieType.caption2.weight(.heavy))
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .accessibilityElement(children: .ignore)
@@ -201,9 +198,9 @@ struct TodayView: View {
     private var mealJournal: some View {
         VStack(alignment: .leading, spacing: 14) {
             HStack {
-                Text("Food journal").font(.title2.weight(.bold))
+                SMSectionHeader("Food journal", size: 22).accessibilityLabel("Food journal")
                 Spacer()
-                Text("\(model.selectedEntries.count) \(model.selectedEntries.count == 1 ? "entry" : "entries")").font(.caption.weight(.bold)).foregroundStyle(.secondary)
+                Text("\(model.selectedEntries.count) \(model.selectedEntries.count == 1 ? "entry" : "entries")").font(CalorieType.caption.weight(.bold)).foregroundStyle(.secondary)
             }
             if model.selectedEntries.isEmpty {
                 Text("Nothing recorded yet. Add what you ate; the daily score will use the complete menu.")
@@ -227,7 +224,7 @@ struct TodayView: View {
 
     private var dailyCare: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("Daily care").font(.title2.weight(.bold))
+            SMSectionHeader("Daily care", size: 22).accessibilityLabel("Daily care")
             Group {
                 if dynamicTypeSize.isAccessibilitySize {
                     VStack(spacing: 10) {
@@ -244,24 +241,25 @@ struct TodayView: View {
             Button {
                 isDailyContextPresented = true
             } label: {
-                Label("Edit weight, cycle & note", systemImage: "slider.horizontal.3")
+                Label("edit weight, cycle & note", systemImage: "slider.horizontal.3").accessibilityLabel("Edit weight, cycle & note")
                     .frame(maxWidth: .infinity, minHeight: 48)
             }
-            .buttonStyle(.bordered)
+            .buttonStyle(SMButtonStyle(.outline))
         }
     }
 
     private var waterCard: some View {
         VStack(alignment: .leading, spacing: 10) {
             Image(systemName: "drop.fill").foregroundStyle(.blue)
-            Text("Water").font(.headline)
+            Text("water").accessibilityLabel("Water").font(CalorieType.headline)
             Text("\(model.document.waterTotal(on: model.selectedDate)) ml")
-                .font(.title3.monospacedDigit().weight(.bold))
+                .font(CalorieType.title3.monospacedDigit().weight(.bold))
             Button("+ 250 ml") { Task { await model.addWater(250) } }
-                .font(.subheadline.weight(.bold)).frame(minHeight: 44)
+                .textCase(.lowercase).accessibilityLabel("+ 250 ml")
+                .font(CalorieType.subheadline.weight(.bold)).frame(minHeight: 44)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(15).background(CaloriePalette.sky).clipShape(RoundedRectangle(cornerRadius: 14))
+        .botanicalCard(padding: 15, color: CaloriePalette.sky)
     }
 
     @ViewBuilder
@@ -269,22 +267,23 @@ struct TodayView: View {
         if let routine = model.document.routines.first(where: { !$0.isArchived }) {
             VStack(alignment: .leading, spacing: 10) {
                 Image(systemName: "checkmark.circle.fill").foregroundStyle(.purple)
-                Text(routine.name).font(.headline)
-                Text(routine.period.rawValue).font(.subheadline).foregroundStyle(.secondary)
+                Text(routine.name).font(CalorieType.headline)
+                Text(routine.period.rawValue).font(CalorieType.subheadline).foregroundStyle(.secondary)
                 Button(model.document.isRoutineComplete(routine.id, on: model.selectedDate) ? "Completed" : "Mark done") {
                     Task { await model.toggleRoutine(routine) }
                 }
-                .font(.subheadline.weight(.bold)).frame(minHeight: 44)
+                .textCase(.lowercase)
+                .font(CalorieType.subheadline.weight(.bold)).frame(minHeight: 44)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(15).background(CaloriePalette.plum).clipShape(RoundedRectangle(cornerRadius: 14))
+            .botanicalCard(padding: 15, color: CaloriePalette.plum)
         }
     }
 
     private var guidance: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("Useful timing").font(.title2.weight(.bold))
-            Text("Every estimate shows its working.").font(.subheadline).foregroundStyle(.secondary)
+            SMSectionHeader("Useful timing", size: 22).accessibilityLabel("Useful timing")
+            Text("Every estimate shows its working.").font(CalorieType.subheadline).foregroundStyle(.secondary)
             ForEach(model.guidance) { item in
                 Button {
                     expandedGuidance = expandedGuidance == item.id ? nil : item.id
@@ -292,15 +291,15 @@ struct TodayView: View {
                     VStack(alignment: .leading, spacing: 8) {
                         HStack {
                             VStack(alignment: .leading, spacing: 3) {
-                                Text(item.title).font(.headline)
-                                Text(item.timing).font(.subheadline).foregroundStyle(.secondary)
+                                Text(item.title.lowercased()).accessibilityLabel(item.title).font(CalorieType.headline)
+                                Text(item.timing).font(CalorieType.subheadline).foregroundStyle(.secondary)
                             }
                             Spacer()
                             Image(systemName: expandedGuidance == item.id ? "chevron.up" : "chevron.down")
                         }
                         if expandedGuidance == item.id {
                             Text(item.explanation)
-                                .font(.subheadline)
+                                .font(CalorieType.subheadline)
                                 .foregroundStyle(.secondary)
                                 .transition(.opacity)
                         }
@@ -317,7 +316,7 @@ struct TodayView: View {
         VStack(alignment: .leading, spacing: 8) {
             BotanicalSectionLabel(text: "A note from today")
             Text(model.document.dailyNotes[DateKey.string(model.selectedDate)] ?? "Add context to remember how the day actually felt.")
-                .font(.body)
+                .font(CalorieType.body)
                 .foregroundStyle(.secondary)
                 .padding(15)
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -350,6 +349,7 @@ enum CalorieSyncStatusCopy {
 }
 
 private struct FoodEntryRow: View {
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Environment(AppModel.self) private var model
     let entry: FoodEntry
     let onEdit: () -> Void
@@ -359,31 +359,35 @@ private struct FoodEntryRow: View {
     }
 
     var body: some View {
-        HStack(spacing: 12) {
+        let layout = dynamicTypeSize.isAccessibilitySize
+            ? AnyLayout(VStackLayout(alignment: .leading, spacing: 8))
+            : AnyLayout(HStackLayout(spacing: 12))
+        return layout {
             Text(entry.timestamp.formatted(.dateTime.hour().minute()))
-                .font(.caption.monospacedDigit().weight(.bold))
-                .lineLimit(1)
-                .minimumScaleFactor(0.78)
-                .frame(width: 62, alignment: .leading)
+                .font(CalorieType.caption.monospacedDigit().weight(.bold))
+                .fixedSize(horizontal: false, vertical: true)
             VStack(alignment: .leading, spacing: 3) {
-                Text(entry.foodName).font(.headline)
+                Text(entry.foodName).font(CalorieType.headline)
                 Text("\(entry.servings.formatted()) serving · protein \(entry.nutrients.protein.formatted(.number.precision(.fractionLength(0))))g · carbs \(entry.nutrients.carbohydrates.formatted(.number.precision(.fractionLength(0))))g · fibre \(entry.nutrients.fibre.formatted(.number.precision(.fractionLength(0))))g")
-                    .font(.caption).foregroundStyle(.secondary)
+                    .font(CalorieType.caption).foregroundStyle(.secondary)
                 TrackedQualityScoreView(
                     quality: TrackedQualityEvaluator.evaluate(scoreBasis.nutrients),
                     contextLabel: "Entry score",
                     basisLabel: scoreBasis.source == .currentFood ? "Latest active food" : "Logged values fallback"
                 )
             }
-            Spacer()
+            if !dynamicTypeSize.isAccessibilitySize { Spacer() }
             Text(entry.nutrients.calories.formatted(.number.precision(.fractionLength(0))))
-                .font(.headline.monospacedDigit().weight(.bold))
+                .font(CalorieType.headline.monospacedDigit().weight(.bold))
         }
         .padding(.vertical, 9)
         .contextMenu {
             Button("Edit") { onEdit() }
+                .textCase(.lowercase).accessibilityLabel("Edit")
             Button("Duplicate") { Task { await model.duplicate(entry) } }
+                .textCase(.lowercase).accessibilityLabel("Duplicate")
             Button("Delete", role: .destructive) { Task { await model.delete(entry) } }
+                .textCase(.lowercase).accessibilityLabel("Delete")
         }
         .accessibilityElement(children: .combine)
         .accessibilityAction(named: "Edit") { onEdit() }
@@ -436,11 +440,12 @@ private struct EntryEditorView: View {
                     )
                 }
             }
-            .navigationTitle("Edit food entry")
+            .botanicalNavigationTitle("Edit food entry")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }
+                        .textCase(.lowercase).accessibilityLabel("Cancel")
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Save") {
@@ -450,6 +455,7 @@ private struct EntryEditorView: View {
                             }
                         }
                     }
+                    .textCase(.lowercase).accessibilityLabel("Save")
                 }
             }
         }
@@ -494,7 +500,7 @@ private struct DailyContextEditorView: View {
                     Text("Cycle context stays in this local journal and is used only as optional context.")
                 }
             }
-            .navigationTitle(date.formatted(.dateTime.day().month(.wide)))
+            .botanicalNavigationTitle(date.formatted(.dateTime.day().month(.wide)))
             .navigationBarTitleDisplayMode(.inline)
             .onAppear {
                 let calendar = Calendar.current
@@ -509,6 +515,7 @@ private struct DailyContextEditorView: View {
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }
+                        .textCase(.lowercase).accessibilityLabel("Cancel")
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Save") {
@@ -526,6 +533,7 @@ private struct DailyContextEditorView: View {
                             if saved { dismiss() }
                         }
                     }
+                    .textCase(.lowercase).accessibilityLabel("Save")
                     .disabled(!weight.isEmpty && Double(weight) == nil)
                 }
             }

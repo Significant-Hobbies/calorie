@@ -1,4 +1,5 @@
 import CalorieCore
+import SaaSMakerUI
 import SwiftUI
 
 enum CalorieOnboardingStep: Int {
@@ -96,8 +97,8 @@ struct CalorieOnboardingView: View {
                 HStack(spacing: 12) {
                     LeafMark()
                     VStack(alignment: .leading, spacing: 2) {
-                        Text("CALORIE").font(.caption.weight(.bold)).tracking(1.2)
-                        Text("Your first useful log").font(.subheadline).foregroundStyle(.secondary)
+                        Text("calorie").font(CalorieType.caption.weight(.bold)).tracking(1.2)
+                        Text("your first useful log").accessibilityLabel("Your first useful log").font(CalorieType.subheadline).foregroundStyle(.secondary)
                     }
                 }
 
@@ -139,16 +140,15 @@ struct CalorieOnboardingView: View {
             )
 
             VStack(alignment: .leading, spacing: 10) {
-                Label("The journal works offline", systemImage: "iphone.gen3")
-                    .font(.headline)
+                Label("the journal works offline", systemImage: "iphone.gen3").accessibilityLabel("The journal works offline")
+                    .font(CalorieType.headline)
                 Text("Nutrition uses kcal and grams. Optional profile measurements use kilograms, and water uses millilitres throughout Calorie.")
                     .foregroundStyle(.secondary)
             }
-            .padding(16)
-            .background(CaloriePalette.surface)
-            .clipShape(RoundedRectangle(cornerRadius: 15, style: .continuous))
+            .botanicalCard(padding: 16)
 
             Button("Set up my first log") { advance(to: .targets) }
+                .textCase(.lowercase).accessibilityLabel("Set up my first log")
                 .buttonStyle(BotanicalButtonStyle())
 
             Button("Explore Calorie first") {
@@ -157,6 +157,7 @@ struct CalorieOnboardingView: View {
                     completion()
                 }
             }
+            .textCase(.lowercase).accessibilityLabel("Explore Calorie first")
                 .frame(maxWidth: .infinity, minHeight: 44)
         }
     }
@@ -203,12 +204,14 @@ struct CalorieOnboardingView: View {
             nutrientField("Carbohydrates", value: $manualCarbs, unit: "g")
             nutrientField("Fibre", value: $manualFibre, unit: "g")
             Button("Use these targets") { advance(to: .food) }
+                .textCase(.lowercase).accessibilityLabel("Use these targets")
                 .buttonStyle(BotanicalButtonStyle())
                 .disabled(manualTargets == nil)
             Button("Continue without targets") {
                 targetPlan = "later"
                 advance(to: .food)
             }
+            .textCase(.lowercase).accessibilityLabel("Continue without targets")
             .frame(minHeight: 44)
             backButton(to: .targets)
         }
@@ -232,7 +235,7 @@ struct CalorieOnboardingView: View {
             mealPicker
 
             Toggle("Save this as a reusable food", isOn: $saveFood)
-                .font(.headline)
+                .font(CalorieType.headline)
 
             Button {
                 Task { await saveFirstFood() }
@@ -247,7 +250,7 @@ struct CalorieOnboardingView: View {
             .disabled(firstFood == nil || isSaving)
 
             Text(CalorieAccountCopy.onboardingLocalFirst)
-                .font(.caption)
+                .font(CalorieType.caption)
                 .foregroundStyle(.secondary)
             backButton(to: targetPlan == "manual" ? .manualTargets : .targets)
         }
@@ -270,15 +273,16 @@ struct CalorieOnboardingView: View {
 
             if targetPlan == "estimate-later" {
                 Text("When you are ready, You → Set up targets explains every estimate input and formula.")
-                    .font(.subheadline)
+                    .font(CalorieType.subheadline)
                     .foregroundStyle(.secondary)
             } else if targetPlan == "later" {
                 Text("Targets are unset. Today's totals still work, and nothing is graded as good or bad.")
-                    .font(.subheadline)
+                    .font(CalorieType.subheadline)
                     .foregroundStyle(.secondary)
             }
 
             Button("Open Today") { completion() }
+                .textCase(.lowercase).accessibilityLabel("Open Today")
                 .buttonStyle(BotanicalButtonStyle())
         }
     }
@@ -365,10 +369,7 @@ struct CalorieOnboardingView: View {
     }
 
     private func title(_ heading: String, detail: String) -> some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text(heading).font(.largeTitle.bold())
-            Text(detail).font(.title3).foregroundStyle(.secondary)
-        }
+        SMSectionHeader(heading, lede: detail, size: 34)
     }
 
     private func choice(_ label: String, detail: String, symbol: String, action: @escaping () -> Void) -> some View {
@@ -376,15 +377,15 @@ struct CalorieOnboardingView: View {
             Label {
                 HStack(alignment: .top, spacing: 8) {
                     VStack(alignment: .leading, spacing: 4) {
-                        Text(label).font(.headline)
-                        Text(detail).font(.subheadline).foregroundStyle(.secondary)
+                        Text(label.lowercased()).font(CalorieType.headline)
+                        Text(detail).font(CalorieType.subheadline).foregroundStyle(.secondary)
                     }
                     Spacer(minLength: 0)
                     Image(systemName: "chevron.right").foregroundStyle(.tertiary)
                 }
             } icon: {
                 Image(systemName: symbol)
-                    .font(.title3)
+                    .font(CalorieType.title3)
                     .foregroundStyle(CaloriePalette.moss)
                     .frame(width: 30)
             }
@@ -400,7 +401,7 @@ struct CalorieOnboardingView: View {
 
     private func field(_ label: String, text: Binding<String>, keyboard: UIKeyboardType) -> some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text(label).font(.caption.weight(.bold)).foregroundStyle(.secondary)
+            Text(label).font(CalorieType.caption.weight(.bold)).foregroundStyle(.secondary)
             TextField(label, text: text)
                 .keyboardType(keyboard)
                 .textFieldStyle(.roundedBorder)
@@ -411,7 +412,7 @@ struct CalorieOnboardingView: View {
 
     private func nutrientField(_ label: String, value: Binding<String>, unit: String) -> some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text(label).font(.caption.weight(.bold)).foregroundStyle(.secondary)
+            Text(label).font(CalorieType.caption.weight(.bold)).foregroundStyle(.secondary)
             HStack {
                 TextField("0", text: value)
                     .keyboardType(.decimalPad)
@@ -428,10 +429,10 @@ struct CalorieOnboardingView: View {
 
     private func resultMetric(_ label: String, _ value: Double, _ unit: String, _ color: Color) -> some View {
         VStack(alignment: .leading, spacing: 5) {
-            Text(label).font(.caption2.bold()).foregroundStyle(color)
+            Text(label).font(CalorieType.caption2.bold()).foregroundStyle(color)
             Text(value.formatted(.number.precision(.fractionLength(0))))
-                .font(.title3.bold().monospacedDigit())
-            Text(unit).font(.caption).foregroundStyle(.secondary)
+                .font(CalorieType.title3.bold().monospacedDigit())
+            Text(unit).font(CalorieType.caption).foregroundStyle(.secondary)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .accessibilityElement(children: .combine)
@@ -440,9 +441,9 @@ struct CalorieOnboardingView: View {
 
     private func backButton(to destination: CalorieOnboardingStep) -> some View {
         Button { advance(to: destination) } label: {
-            Label("Back", systemImage: "arrow.left").frame(minHeight: 44)
+            Label("back", systemImage: "arrow.left").accessibilityLabel("Back").frame(minHeight: 44)
         }
-        .font(.subheadline.weight(.semibold))
+        .font(CalorieType.subheadline.weight(.semibold))
     }
 
     private func advance(to destination: CalorieOnboardingStep) {

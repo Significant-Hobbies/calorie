@@ -1,7 +1,9 @@
 import CalorieCore
+import SaaSMakerUI
 import SwiftUI
 
 struct QuickLogView: View {
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Environment(AppModel.self) private var model
     @Environment(\.dismiss) private var dismiss
     @State private var search = ""
@@ -45,9 +47,9 @@ struct QuickLogView: View {
                                     .background(CaloriePalette.surface)
                                     .clipShape(Circle())
                                 VStack(alignment: .leading, spacing: 3) {
-                                    Text(food.name).font(.headline)
+                                    Text(food.name).font(CalorieType.headline)
                                     Text("\(food.servingName) · \(food.nutrients.calories.formatted(.number.precision(.fractionLength(0)))) kcal")
-                                        .font(.subheadline).foregroundStyle(.secondary)
+                                        .font(CalorieType.subheadline).foregroundStyle(.secondary)
                                 }
                                 Spacer()
                                 Image(systemName: "chevron.right").foregroundStyle(.tertiary)
@@ -60,12 +62,13 @@ struct QuickLogView: View {
                     .searchable(text: $search, prompt: "Search foods")
                 }
             }
-            .navigationTitle(selectedFood == nil ? "Log food" : "Add entry")
+            .botanicalNavigationTitle(selectedFood == nil ? "Log food" : "Add entry")
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button(selectedFood == nil ? "Close" : "Back") {
+                    Button(selectedFood == nil ? "close" : "back") {
                         if selectedFood == nil { dismiss() } else { self.selectedFood = nil }
                     }
+                    .accessibilityLabel(selectedFood == nil ? "Close" : "Back")
                 }
             }
         }
@@ -78,7 +81,7 @@ struct QuickLogView: View {
             VStack(alignment: .leading, spacing: 24) {
                 VStack(alignment: .leading, spacing: 6) {
                     BotanicalSectionLabel(text: "Selected food")
-                    Text(food.name).font(.system(.title, design: .rounded, weight: .bold))
+                    Text(food.name).font(CalorieType.title.bold())
                     Text(food.servingName).foregroundStyle(.secondary)
                 }
                 VStack(alignment: .leading, spacing: 8) {
@@ -90,7 +93,7 @@ struct QuickLogView: View {
                         .accessibilityLabel("Decrease amount")
                         Spacer()
                         Text("\(servings.formatted()) ×")
-                            .font(.system(.largeTitle, design: .rounded, weight: .bold).monospacedDigit())
+                            .font(CalorieType.largeTitle.bold().monospacedDigit())
                             .accessibilityLabel("\(servings.formatted()) \(servings == 1 ? "serving" : "servings")")
                         Spacer()
                         Button { servings += 0.25 } label: {
@@ -102,11 +105,11 @@ struct QuickLogView: View {
                     .clipShape(RoundedRectangle(cornerRadius: 13))
                 }
                 Picker("Meal", selection: $meal) {
-                    ForEach(Meal.allCases, id: \.self) { Text($0.rawValue).tag($0) }
+                    ForEach(Meal.allCases, id: \.self) { Text($0.rawValue.lowercased()).accessibilityLabel($0.rawValue).tag($0) }
                 }
-                .pickerStyle(.segmented)
+                .modifier(AdaptiveMealPickerStyle())
                 let scaled = food.nutrients.scaled(by: servings)
-                HStack(spacing: 0) {
+                LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: dynamicTypeSize.isAccessibilitySize ? 1 : 4), spacing: 12) {
                     quickMetric("KCAL", scaled.calories)
                     quickMetric("PROTEIN", scaled.protein)
                     quickMetric("CARBS", scaled.carbohydrates)
@@ -136,8 +139,8 @@ struct QuickLogView: View {
     private func quickMetric(_ label: String, _ value: Double) -> some View {
         VStack(spacing: 4) {
             Text(value.formatted(.number.precision(.fractionLength(0))))
-                .font(.headline.monospacedDigit().weight(.bold))
-            Text(label).font(.caption2.weight(.bold)).foregroundStyle(.secondary)
+                .font(CalorieType.headline.monospacedDigit().weight(.bold))
+            Text(label.lowercased()).accessibilityLabel(label).font(CalorieType.caption2.weight(.bold)).foregroundStyle(.secondary)
         }
         .frame(maxWidth: .infinity)
     }
@@ -148,6 +151,19 @@ struct QuickLogView: View {
         case 11..<16: .lunch
         case 17..<23: .dinner
         default: .snack
+        }
+    }
+}
+
+private struct AdaptiveMealPickerStyle: ViewModifier {
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+
+    @ViewBuilder
+    func body(content: Content) -> some View {
+        if dynamicTypeSize.isAccessibilitySize {
+            content.pickerStyle(.menu)
+        } else {
+            content.pickerStyle(.segmented)
         }
     }
 }

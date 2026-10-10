@@ -8,14 +8,14 @@ final class CalorieUITests: XCTestCase {
         let app = XCUIApplication()
         app.launchArguments = ["--recovery-demo"]
         app.launch()
-        let okay = app.alerts.buttons["OK"]
+        let okay = app.alerts.buttons.ci("OK")
         if okay.waitForExistence(timeout: 3) { okay.tap() }
         XCTAssertTrue(app.alerts.firstMatch.waitForNonExistence(timeout: 3), "The read-error alert must dismiss so recovery controls can be used")
-        XCTAssertTrue(app.staticTexts["Your journal needs attention"].waitForExistence(timeout: 3))
-        XCTAssertTrue(app.buttons["Retry opening journal"].exists)
-        XCTAssertTrue(app.buttons["Preview an import"].exists)
-        XCTAssertFalse(app.buttons["Export journal"].exists)
-        XCTAssertFalse(app.tabBars.buttons["Today"].exists)
+        XCTAssertTrue(app.staticTexts.ci("Your journal needs attention").waitForExistence(timeout: 3))
+        XCTAssertTrue(app.buttons.ci("Retry opening journal").exists)
+        XCTAssertTrue(app.buttons.ci("Preview an import").exists)
+        XCTAssertFalse(app.buttons.ci("Export journal").exists)
+        XCTAssertFalse(app.tabBars.buttons.ci("Today").exists)
         let attachment = XCTAttachment(screenshot: app.screenshot())
         attachment.name = "Unread journal recovery"
         attachment.lifetime = .keepAlways
@@ -27,18 +27,18 @@ final class CalorieUITests: XCTestCase {
         app.launchArguments = ["--onboarding-demo", "--reset-onboarding"]
         app.launch()
 
-        XCTAssertTrue(app.staticTexts["Log food, see what changed."].waitForExistence(timeout: 3))
-        app.buttons["Set up my first log"].tap()
-        app.buttons["No targets for now"].tap()
+        XCTAssertTrue(app.staticTexts.ci("Log food, see what changed.").waitForExistence(timeout: 3))
+        app.buttons.ci("Set up my first log").tap()
+        app.buttons.ci("No targets for now").tap()
 
         fillFirstFood(in: app, name: "Apple and peanut butter")
-        app.switches["Save this as a reusable food"].tap()
-        app.buttons["Log my first food"].tap()
+        app.switches.ci("Save this as a reusable food").tap()
+        app.buttons.ci("Log my first food").tap()
 
-        XCTAssertTrue(app.staticTexts["Your day changed."].waitForExistence(timeout: 3))
-        XCTAssertTrue(app.staticTexts["210"].exists)
-        app.buttons["Open Today"].tap()
-        XCTAssertTrue(app.staticTexts["Apple and peanut butter"].waitForExistence(timeout: 3))
+        XCTAssertTrue(app.staticTexts.ci("Your day changed.").waitForExistence(timeout: 3))
+        XCTAssertTrue(app.staticTexts.ci("210").exists)
+        app.buttons.ci("Open Today").tap()
+        XCTAssertTrue(app.staticTexts.ci("Apple and peanut butter").waitForExistence(timeout: 3))
     }
 
     func testExploreFirstKeepsTargetsUnsetAndCanStillLogFood() {
@@ -46,26 +46,26 @@ final class CalorieUITests: XCTestCase {
         app.launchArguments = ["--onboarding-demo", "--reset-onboarding", "--reduce-motion-demo"]
         app.launch()
 
-        XCTAssertTrue(app.staticTexts["Log food, see what changed."].waitForExistence(timeout: 3))
-        app.buttons["Explore Calorie first"].tap()
-        XCTAssertTrue(app.staticTexts["0 entries"].waitForExistence(timeout: 5))
-        XCTAssertTrue(app.staticTexts["Energy recorded"].exists)
-        XCTAssertFalse(app.staticTexts["Energy left today"].exists)
-        XCTAssertFalse(app.staticTexts["kcal remaining · 0 recorded"].exists)
+        XCTAssertTrue(app.staticTexts.ci("Log food, see what changed.").waitForExistence(timeout: 3))
+        app.buttons.ci("Explore Calorie first").tap()
+        XCTAssertTrue(app.staticTexts.ci("0 entries").waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts.ci("Energy recorded").exists)
+        XCTAssertFalse(app.staticTexts.ci("Energy left today").exists)
+        XCTAssertFalse(app.staticTexts.ci("kcal remaining · 0 recorded").exists)
         for target in ["120 grams", "250 grams", "70 grams", "28 grams"] {
             XCTAssertFalse(app.descendants(matching: .any).matching(
                 NSPredicate(format: "label CONTAINS %@", "of \(target)")
             ).firstMatch.exists)
         }
 
-        app.buttons["Log food"].tap()
-        XCTAssertTrue(app.staticTexts["Greek yoghurt bowl"].waitForExistence(timeout: 3))
+        app.buttons.ci("Log food").tap()
+        XCTAssertTrue(app.staticTexts.ci("Greek yoghurt bowl").waitForExistence(timeout: 3))
         app.descendants(matching: .any)
             .matching(NSPredicate(format: "label BEGINSWITH %@", "Greek yoghurt bowl"))
             .firstMatch.tap()
-        app.buttons["Snack"].tap()
-        app.buttons["Add to snack"].tap()
-        XCTAssertTrue(app.staticTexts["Greek yoghurt bowl"].waitForExistence(timeout: 3))
+        app.buttons.ci("Snack").tap()
+        app.buttons.ci("Add to snack").tap()
+        XCTAssertTrue(app.staticTexts.ci("Greek yoghurt bowl").waitForExistence(timeout: 3))
     }
 
     func testReusableFoodPathAddsTheFoodToTheLibrary() {
@@ -73,23 +73,23 @@ final class CalorieUITests: XCTestCase {
         app.launchArguments = ["--onboarding-demo", "--reset-onboarding", "--reduce-motion-demo"]
         app.launch()
 
-        app.buttons["Set up my first log"].tap()
-        app.buttons["Explore an estimate later"].tap()
+        app.buttons.ci("Set up my first log").tap()
+        app.buttons.ci("Explore an estimate later").tap()
         fillFirstFood(in: app, name: "Home lentil bowl")
-        app.buttons["Log my first food"].tap()
-        XCTAssertTrue(app.staticTexts["Your day changed."].waitForExistence(timeout: 3))
-        app.buttons["Open Today"].tap()
-        app.tabBars.buttons["Foods"].tap()
-        XCTAssertTrue(app.staticTexts["Home lentil bowl"].waitForExistence(timeout: 3))
+        app.buttons.ci("Log my first food").tap()
+        XCTAssertTrue(app.staticTexts.ci("Your day changed.").waitForExistence(timeout: 3))
+        app.buttons.ci("Open Today").tap()
+        app.tabBars.buttons.ci("Foods").tap()
+        XCTAssertTrue(app.staticTexts.ci("Home lentil bowl").waitForExistence(timeout: 3))
     }
 
     func testOnboardingRestoresFoodDraftAcrossRelaunch() {
         let app = XCUIApplication()
         app.launchArguments = ["--onboarding-demo", "--reset-onboarding"]
         app.launch()
-        app.buttons["Set up my first log"].tap()
-        app.buttons["No targets for now"].tap()
-        let name = app.textFields["Food name"]
+        app.buttons.ci("Set up my first log").tap()
+        app.buttons.ci("No targets for now").tap()
+        let name = app.textFields.ci("Food name")
         XCTAssertTrue(name.waitForExistence(timeout: 3))
         name.tap()
         name.typeText("Keep my draft")
@@ -100,7 +100,7 @@ final class CalorieUITests: XCTestCase {
 
         app.launchArguments = ["--onboarding-demo"]
         app.launch()
-        let restored = app.textFields["Food name"]
+        let restored = app.textFields.ci("Food name")
         XCTAssertTrue(restored.waitForExistence(timeout: 3))
         expectation(
             for: NSPredicate(format: "value == %@", "Keep my draft"),
@@ -114,15 +114,15 @@ final class CalorieUITests: XCTestCase {
         app.launchArguments = ["--fresh-demo", "-calorie-illustrated-onboarding-seen-v1", "YES"]
         app.launch()
 
-        XCTAssertTrue(app.staticTexts["Energy left today"].waitForExistence(timeout: 3))
-        app.buttons["Log food"].tap()
-        XCTAssertTrue(app.staticTexts["Greek yoghurt bowl"].waitForExistence(timeout: 3))
+        XCTAssertTrue(app.staticTexts.ci("Energy left today").waitForExistence(timeout: 3))
+        app.buttons.ci("Log food").tap()
+        XCTAssertTrue(app.staticTexts.ci("Greek yoghurt bowl").waitForExistence(timeout: 3))
         app.descendants(matching: .any)
             .matching(NSPredicate(format: "label BEGINSWITH %@", "Greek yoghurt bowl"))
             .firstMatch.tap()
-        app.buttons["Snack"].tap()
-        app.buttons["Add to snack"].tap()
-        XCTAssertTrue(app.staticTexts["Greek yoghurt bowl"].waitForExistence(timeout: 3))
+        app.buttons.ci("Snack").tap()
+        app.buttons.ci("Add to snack").tap()
+        XCTAssertTrue(app.staticTexts.ci("Greek yoghurt bowl").waitForExistence(timeout: 3))
     }
 
     func testEntryEditDeleteUndoUpdatesVisibleDailyTotals() {
@@ -144,7 +144,7 @@ final class CalorieUITests: XCTestCase {
         }
         func openEntryActions() {
             app.swipeUp()
-            let row = app.staticTexts["Greek yoghurt bowl"].firstMatch
+            let row = app.staticTexts.ci("Greek yoghurt bowl").firstMatch
             XCTAssertTrue(row.waitForExistence(timeout: 3))
             row.press(forDuration: 1)
         }
@@ -152,31 +152,31 @@ final class CalorieUITests: XCTestCase {
         assertTotal("515")
         capture("Today before editing — 515 kcal")
         openEntryActions()
-        XCTAssertTrue(app.buttons["Edit"].waitForExistence(timeout: 3))
-        app.buttons["Edit"].tap()
-        XCTAssertTrue(app.navigationBars["Edit food entry"].waitForExistence(timeout: 3))
-        let increment = app.steppers.buttons["Increment"].firstMatch
+        XCTAssertTrue(app.buttons.ci("Edit").waitForExistence(timeout: 3))
+        app.buttons.ci("Edit").tap()
+        XCTAssertTrue(app.navigationBars.ci("Edit food entry").waitForExistence(timeout: 3))
+        let increment = app.steppers.buttons.ci("Increment").firstMatch
         for _ in 0..<4 { increment.tap() }
         capture("Edit food — two servings")
-        app.buttons["Save"].tap()
+        app.buttons.ci("Save").tap()
         app.swipeDown()
         assertTotal("925")
         capture("Today after editing — 925 kcal")
 
         openEntryActions()
-        app.buttons["Delete"].tap()
-        let okay = app.alerts.buttons["OK"]
+        app.buttons.ci("Delete").tap()
+        let okay = app.alerts.buttons.ci("OK")
         if okay.waitForExistence(timeout: 2) { okay.tap() }
-        XCTAssertTrue(app.buttons["Undo"].waitForExistence(timeout: 3))
+        XCTAssertTrue(app.buttons.ci("Undo").waitForExistence(timeout: 3))
         app.swipeDown()
         assertTotal("105")
-        XCTAssertTrue(app.staticTexts["1 entry"].exists)
+        XCTAssertTrue(app.staticTexts.ci("1 entry").exists)
         capture("Deleted entry — 105 kcal and Undo")
-        app.buttons["Undo"].tap()
-        XCTAssertTrue(app.alerts.buttons["OK"].waitForExistence(timeout: 3))
-        app.alerts.buttons["OK"].tap()
+        app.buttons.ci("Undo").tap()
+        XCTAssertTrue(app.alerts.buttons.ci("OK").waitForExistence(timeout: 3))
+        app.alerts.buttons.ci("OK").tap()
         XCTAssertTrue(app.alerts.firstMatch.waitForNonExistence(timeout: 3))
-        XCTAssertTrue(app.staticTexts["2 entries"].exists)
+        XCTAssertTrue(app.staticTexts.ci("2 entries").exists)
         assertTotal("925")
         capture("Undo restored entry — 925 kcal")
     }
@@ -190,7 +190,7 @@ final class CalorieUITests: XCTestCase {
             for id in [firstID, secondID] {
                 app.launchArguments = ["--persistent-ui-fixture", id, "--cleanup-persistent-ui-fixture"]
                 app.launch()
-                XCTAssertTrue(app.staticTexts["Test journal cleaned"].waitForExistence(timeout: 3))
+                XCTAssertTrue(app.staticTexts.ci("Test journal cleaned").waitForExistence(timeout: 3))
                 app.terminate()
             }
         }
@@ -201,36 +201,36 @@ final class CalorieUITests: XCTestCase {
             add(attachment)
         }
         func revealWater() {
-            let water = app.buttons["+ 250 ml"]
+            let water = app.buttons.ci("+ 250 ml")
             for _ in 0..<5 where !water.isHittable { app.swipeUp() }
             XCTAssertTrue(water.isHittable)
         }
         func assertFoodAndCalories() {
-            XCTAssertTrue(app.staticTexts["Persisted lentil bowl"].waitForExistence(timeout: 3))
-            XCTAssertTrue(app.staticTexts["210 kilocalories recorded"].exists)
-            XCTAssertTrue(app.staticTexts["Energy recorded"].exists)
-            XCTAssertTrue(app.staticTexts["kcal recorded"].exists)
+            XCTAssertTrue(app.staticTexts.ci("Persisted lentil bowl").waitForExistence(timeout: 3))
+            XCTAssertTrue(app.staticTexts.ci("210 kilocalories recorded").exists)
+            XCTAssertTrue(app.staticTexts.ci("Energy recorded").exists)
+            XCTAssertTrue(app.staticTexts.ci("kcal recorded").exists)
             XCTAssertTrue(app.descendants(matching: .any).matching(NSPredicate(format: "label == %@", "PROTEIN, 7 grams")).firstMatch.exists)
-            XCTAssertFalse(app.staticTexts["Energy left today"].exists)
+            XCTAssertFalse(app.staticTexts.ci("Energy left today").exists)
             XCTAssertFalse(app.descendants(matching: .any).matching(NSPredicate(format: "label CONTAINS %@", "kilocalories remaining")).firstMatch.exists)
             XCTAssertFalse(app.descendants(matching: .any).matching(NSPredicate(format: "label CONTAINS %@", "of 120 grams")).firstMatch.exists)
         }
 
         app.launchArguments = ["--persistent-ui-fixture", firstID]
         app.launch()
-        XCTAssertTrue(app.buttons["Set up my first log"].waitForExistence(timeout: 3))
-        app.buttons["Set up my first log"].tap()
-        app.buttons["No targets for now"].tap()
+        XCTAssertTrue(app.buttons.ci("Set up my first log").waitForExistence(timeout: 3))
+        app.buttons.ci("Set up my first log").tap()
+        app.buttons.ci("No targets for now").tap()
         fillFirstFood(in: app, name: "Persisted lentil bowl")
-        app.switches["Save this as a reusable food"].tap()
-        app.buttons["Log my first food"].tap()
-        XCTAssertTrue(app.staticTexts["Your day changed."].waitForExistence(timeout: 3))
-        app.buttons["Open Today"].tap()
+        app.switches.ci("Save this as a reusable food").tap()
+        app.buttons.ci("Log my first food").tap()
+        XCTAssertTrue(app.staticTexts.ci("Your day changed.").waitForExistence(timeout: 3))
+        app.buttons.ci("Open Today").tap()
         assertFoodAndCalories()
         capture("Persistent journal — first food saved")
         revealWater()
-        app.buttons["+ 250 ml"].tap()
-        XCTAssertTrue(app.staticTexts["250 ml"].waitForExistence(timeout: 3))
+        app.buttons.ci("+ 250 ml").tap()
+        XCTAssertTrue(app.staticTexts.ci("250 ml").waitForExistence(timeout: 3))
         capture("Persistent journal — water saved")
         app.terminate()
 
@@ -238,34 +238,34 @@ final class CalorieUITests: XCTestCase {
         assertFoodAndCalories()
         capture("Persistent journal — food after relaunch")
         revealWater()
-        XCTAssertTrue(app.staticTexts["250 ml"].waitForExistence(timeout: 3))
-        XCTAssertTrue(app.buttons["Log food"].isHittable)
-        XCTAssertTrue(app.tabBars.buttons["Foods"].isHittable)
+        XCTAssertTrue(app.staticTexts.ci("250 ml").waitForExistence(timeout: 3))
+        XCTAssertTrue(app.buttons.ci("Log food").isHittable)
+        XCTAssertTrue(app.tabBars.buttons.ci("Foods").isHittable)
         capture("Persistent journal — water after relaunch")
-        app.buttons["Log food"].tap()
-        XCTAssertTrue(app.navigationBars["Log food"].waitForExistence(timeout: 3))
-        app.buttons["Close"].tap()
-        app.tabBars.buttons["Foods"].tap()
-        XCTAssertTrue(app.staticTexts["Familiar foods first. Values stay editable."].waitForExistence(timeout: 3))
+        app.buttons.ci("Log food").tap()
+        XCTAssertTrue(app.navigationBars.ci("Log food").waitForExistence(timeout: 3))
+        app.buttons.ci("Close").tap()
+        app.tabBars.buttons.ci("Foods").tap()
+        XCTAssertTrue(app.staticTexts.ci("Familiar foods first. Values stay editable.").waitForExistence(timeout: 3))
         app.terminate()
 
         app.launchArguments = ["--persistent-ui-fixture", secondID]
         app.launch()
-        XCTAssertTrue(app.buttons["Set up my first log"].waitForExistence(timeout: 3))
+        XCTAssertTrue(app.buttons.ci("Set up my first log").waitForExistence(timeout: 3))
         capture("Independent UUID — fresh onboarding")
         app.terminate()
         app.launchArguments += ["-calorie-illustrated-onboarding-seen-v1", "YES"]
         app.launch()
-        XCTAssertTrue(app.staticTexts["0 entries"].waitForExistence(timeout: 3))
-        XCTAssertFalse(app.staticTexts["Persisted lentil bowl"].exists)
-        XCTAssertTrue(app.staticTexts["Energy recorded"].exists)
-        XCTAssertTrue(app.staticTexts["kcal recorded"].exists)
-        XCTAssertFalse(app.staticTexts["Energy left today"].exists)
+        XCTAssertTrue(app.staticTexts.ci("0 entries").waitForExistence(timeout: 3))
+        XCTAssertFalse(app.staticTexts.ci("Persisted lentil bowl").exists)
+        XCTAssertTrue(app.staticTexts.ci("Energy recorded").exists)
+        XCTAssertTrue(app.staticTexts.ci("kcal recorded").exists)
+        XCTAssertFalse(app.staticTexts.ci("Energy left today").exists)
         XCTAssertFalse(app.descendants(matching: .any).matching(
             NSPredicate(format: "label CONTAINS %@", "kilocalories remaining")
         ).firstMatch.exists)
         revealWater()
-        XCTAssertTrue(app.staticTexts["0 ml"].exists)
+        XCTAssertTrue(app.staticTexts.ci("0 ml").exists)
         capture("Independent UUID — empty food and water journal")
     }
 
@@ -275,8 +275,8 @@ final class CalorieUITests: XCTestCase {
         app.launch()
 
         for tab in ["Progress", "Foods", "You"] {
-            app.tabBars.buttons[tab].tap()
-            XCTAssertTrue(app.staticTexts[tab].waitForExistence(timeout: 2))
+            app.tabBars.buttons.ci(tab).tap()
+            XCTAssertTrue(app.staticTexts.ci(tab).waitForExistence(timeout: 2))
         }
     }
 
@@ -285,11 +285,11 @@ final class CalorieUITests: XCTestCase {
         app.launchArguments = ["--fresh-demo", "-calorie-illustrated-onboarding-seen-v1", "YES"]
         app.launch()
 
-        app.tabBars.buttons["Foods"].tap()
-        XCTAssertTrue(app.staticTexts["Familiar foods first. Values stay editable."].waitForExistence(timeout: 3))
-        app.buttons["Actions for Greek yoghurt bowl"].tap()
-        XCTAssertTrue(app.buttons["Edit"].waitForExistence(timeout: 2))
-        XCTAssertTrue(app.buttons["Archive"].exists)
+        app.tabBars.buttons.ci("Foods").tap()
+        XCTAssertTrue(app.staticTexts.ci("Familiar foods first. Values stay editable.").waitForExistence(timeout: 3))
+        app.buttons.ci("Actions for Greek yoghurt bowl").tap()
+        XCTAssertTrue(app.buttons.ci("Edit").waitForExistence(timeout: 2))
+        XCTAssertTrue(app.buttons.ci("Archive").exists)
     }
 
     func testFoodEditorKeepsLabelsAndSavedValuesAtDefaultAndEnlargedText() {
@@ -300,7 +300,7 @@ final class CalorieUITests: XCTestCase {
             app.terminate()
             app.launchArguments = arguments + ["--cleanup-persistent-ui-fixture"]
             app.launch()
-            XCTAssertTrue(app.staticTexts["Test journal cleaned"].waitForExistence(timeout: 3))
+            XCTAssertTrue(app.staticTexts.ci("Test journal cleaned").waitForExistence(timeout: 3))
             app.terminate()
         }
         func capture(_ name: String) {
@@ -318,31 +318,31 @@ final class CalorieUITests: XCTestCase {
             XCTAssertTrue(field.isHittable)
         }
         func openFoodEditor() {
-            XCTAssertTrue(app.tabBars.buttons["Foods"].waitForExistence(timeout: 3))
-            app.tabBars.buttons["Foods"].tap()
-            let search = app.textFields["Search foods"]
+            XCTAssertTrue(app.tabBars.buttons.ci("Foods").waitForExistence(timeout: 3))
+            app.tabBars.buttons.ci("Foods").tap()
+            let search = app.textFields.ci("Search foods")
             XCTAssertTrue(search.waitForExistence(timeout: 3))
             search.tap()
             search.typeText("Fictional label audit bowl\n")
             let actions = app.descendants(matching: .any).matching(
                 NSPredicate(format: "label == %@", "Actions for Fictional label audit bowl")
             ).firstMatch
-            for _ in 0..<6 where !actions.isHittable { app.swipeUp() }
+            for _ in 0..<12 where !actions.isHittable { app.swipeUp() }
             XCTAssertTrue(actions.isHittable)
             actions.tap()
-            app.buttons["Edit"].tap()
-            XCTAssertTrue(app.navigationBars["Edit food"].waitForExistence(timeout: 3))
+            app.buttons.ci("Edit").tap()
+            XCTAssertTrue(app.navigationBars.ci("Edit food").waitForExistence(timeout: 3))
         }
 
         app.launchArguments = arguments
         app.launch()
-        XCTAssertTrue(app.buttons["Set up my first log"].waitForExistence(timeout: 3))
-        app.buttons["Set up my first log"].tap()
-        app.buttons["No targets for now"].tap()
+        XCTAssertTrue(app.buttons.ci("Set up my first log").waitForExistence(timeout: 3))
+        app.buttons.ci("Set up my first log").tap()
+        app.buttons.ci("No targets for now").tap()
         fillFirstFood(in: app, name: "Fictional label audit bowl")
-        app.buttons["Log my first food"].tap()
-        XCTAssertTrue(app.buttons["Open Today"].waitForExistence(timeout: 3))
-        app.buttons["Open Today"].tap()
+        app.buttons.ci("Log my first food").tap()
+        XCTAssertTrue(app.buttons.ci("Open Today").waitForExistence(timeout: 3))
+        app.buttons.ci("Open Today").tap()
         app.terminate()
 
         for (category, expectedCalories, savedCalories) in [
@@ -358,14 +358,14 @@ final class CalorieUITests: XCTestCase {
                 ("Calories (kcal)", expectedCalories), ("Protein (g)", "7"),
                 ("Carbohydrates (g)", "28"), ("Fat (g)", "0"), ("Fibre (g)", "5")
             ] {
-                let field = app.textFields[label]
+                let field = app.textFields.ci(label)
                 reveal(field)
                 XCTAssertTrue(field.waitForExistence(timeout: 3))
                 XCTAssertEqual(field.label, label)
                 XCTAssertEqual(field.value as? String, value)
                 capture("Filled food editor — \(category) — \(label)")
             }
-            let calories = app.textFields["Calories (kcal)"]
+            let calories = app.textFields.ci("Calories (kcal)")
             // A partly clipped large field can report hittable while its
             // value sits under the navigation bar. Bring the whole field
             // into the middle of the Form before targeting its value.
@@ -402,17 +402,17 @@ final class CalorieUITests: XCTestCase {
             capture("Empty calories retain their label — \(category)")
             calories.typeText(savedCalories)
             capture("Edited calories retain their label — \(category)")
-            XCTAssertTrue(app.buttons["Save"].isHittable)
-            app.buttons["Save"].tap()
-            XCTAssertTrue(app.staticTexts["Fictional label audit bowl"].waitForExistence(timeout: 3))
+            XCTAssertTrue(app.buttons.ci("Save").isHittable)
+            app.buttons.ci("Save").tap()
+            XCTAssertTrue(app.staticTexts.ci("Fictional label audit bowl").waitForExistence(timeout: 3))
             app.terminate()
         }
 
         app.launchArguments = arguments
         app.launch()
         openFoodEditor()
-        XCTAssertTrue(app.textFields["Calories (kcal)"].waitForExistence(timeout: 3))
-        XCTAssertEqual(app.textFields["Calories (kcal)"].value as? String, "230")
+        XCTAssertTrue(app.textFields.ci("Calories (kcal)").waitForExistence(timeout: 3))
+        XCTAssertEqual(app.textFields.ci("Calories (kcal)").value as? String, "230")
         capture("Food edit persisted after enlarged-text save and relaunch")
     }
 
@@ -424,7 +424,7 @@ final class CalorieUITests: XCTestCase {
             app.terminate()
             app.launchArguments = ["--persistent-ui-fixture", id, "--cleanup-persistent-ui-fixture"]
             app.launch()
-            XCTAssertTrue(app.staticTexts["Test journal cleaned"].waitForExistence(timeout: 3))
+            XCTAssertTrue(app.staticTexts.ci("Test journal cleaned").waitForExistence(timeout: 3))
             app.terminate()
         }
         func capture(_ name: String) {
@@ -438,35 +438,35 @@ final class CalorieUITests: XCTestCase {
             add(hierarchy)
         }
         app.launch()
-        app.buttons["Set up my first log"].tap()
-        app.buttons["No targets for now"].tap()
+        app.buttons.ci("Set up my first log").tap()
+        app.buttons.ci("No targets for now").tap()
         fillFirstFood(in: app, name: "Fictional count audit bowl")
-        app.buttons["Log my first food"].tap()
-        app.buttons["Open Today"].tap()
-        app.tabBars.buttons["Progress"].tap()
-        XCTAssertTrue(app.staticTexts["1 day includes entries, averaging 210 recorded calories. Missing days are not treated as zero intake."].waitForExistence(timeout: 3))
+        app.buttons.ci("Log my first food").tap()
+        app.buttons.ci("Open Today").tap()
+        app.tabBars.buttons.ci("Progress").tap()
+        XCTAssertTrue(app.staticTexts.ci("1 day includes entries, averaging 210 recorded calories. Missing days are not treated as zero intake.").waitForExistence(timeout: 3))
         capture("One recorded day uses singular wording")
-        app.tabBars.buttons["Today"].tap()
+        app.tabBars.buttons.ci("Today").tap()
         capture("Today date navigation before adding a second day")
         let previousDay = app.buttons.matching(NSPredicate(format: "identifier == %@ OR label == %@", "chevron.left", "Back")).firstMatch
         XCTAssertTrue(previousDay.exists)
         previousDay.tap()
-        app.buttons["Log food"].tap()
+        app.buttons.ci("Log food").tap()
         let food = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Fictional count audit bowl")).firstMatch
         XCTAssertTrue(food.waitForExistence(timeout: 3))
         food.tap()
-        XCTAssertTrue(app.staticTexts["1 serving"].waitForExistence(timeout: 3))
+        XCTAssertTrue(app.staticTexts.ci("1 serving").waitForExistence(timeout: 3))
         capture("One serving uses singular accessible wording")
-        for _ in 0..<2 { app.buttons["Increase amount"].tap() }
-        XCTAssertTrue(app.staticTexts["1.5 servings"].exists)
+        for _ in 0..<2 { app.buttons.ci("Increase amount").tap() }
+        XCTAssertTrue(app.staticTexts.ci("1.5 servings").exists)
         capture("Fractional servings use plural accessible wording")
-        for _ in 0..<2 { app.buttons["Increase amount"].tap() }
-        XCTAssertTrue(app.staticTexts["2 servings"].exists)
+        for _ in 0..<2 { app.buttons.ci("Increase amount").tap() }
+        XCTAssertTrue(app.staticTexts.ci("2 servings").exists)
         capture("Multiple servings use plural accessible wording")
-        app.buttons["Snack"].tap()
-        app.buttons["Add to snack"].tap()
-        app.tabBars.buttons["Progress"].tap()
-        XCTAssertTrue(app.staticTexts["2 days include entries, averaging 315 recorded calories. Missing days are not treated as zero intake."].waitForExistence(timeout: 3))
+        app.buttons.ci("Snack").tap()
+        app.buttons.ci("Add to snack").tap()
+        app.tabBars.buttons.ci("Progress").tap()
+        XCTAssertTrue(app.staticTexts.ci("2 days include entries, averaging 315 recorded calories. Missing days are not treated as zero intake.").waitForExistence(timeout: 3))
         capture("Multiple recorded days retain plural wording and missing-days explanation")
     }
 
@@ -475,12 +475,12 @@ final class CalorieUITests: XCTestCase {
         app.launchArguments = ["--fresh-demo", "-calorie-illustrated-onboarding-seen-v1", "YES"]
         app.launch()
 
-        app.tabBars.buttons["Progress"].tap()
-        XCTAssertTrue(app.buttons["30 days"].waitForExistence(timeout: 3))
-        app.buttons["30 days"].tap()
-        XCTAssertTrue(app.staticTexts["30-day energy"].waitForExistence(timeout: 2))
-        XCTAssertTrue(app.staticTexts["Review a day"].exists)
-        XCTAssertTrue(app.datePickers["Journal date"].exists)
+        app.tabBars.buttons.ci("Progress").tap()
+        XCTAssertTrue(app.buttons.ci("30 days").waitForExistence(timeout: 3))
+        app.buttons.ci("30 days").tap()
+        XCTAssertTrue(app.staticTexts.ci("30-day energy").waitForExistence(timeout: 2))
+        XCTAssertTrue(app.staticTexts.ci("Review a day").exists)
+        XCTAssertTrue(app.datePickers.ci("Journal date").exists)
     }
 
     func testDailyAndEntryScoresExposeTheirCalculationBasis() {
@@ -509,14 +509,14 @@ final class CalorieUITests: XCTestCase {
                 .firstMatch.exists
         )
 
-        app.buttons["Log food"].tap()
+        app.buttons.ci("Log food").tap()
         let foodButton = app.buttons.matching(
             NSPredicate(format: "label BEGINSWITH %@", "Greek yoghurt bowl,")
         ).firstMatch
         XCTAssertTrue(foodButton.waitForExistence(timeout: 3))
         captureScoreState("Score food picker")
         foodButton.tap()
-        XCTAssertTrue(app.navigationBars["Add entry"].waitForExistence(timeout: 3))
+        XCTAssertTrue(app.navigationBars.ci("Add entry").waitForExistence(timeout: 3))
         let selection = app.scrollViews.containing(.button, identifier: "Increase amount").firstMatch
         XCTAssertTrue(selection.waitForExistence(timeout: 3))
         selection.swipeUp()
@@ -534,14 +534,14 @@ final class CalorieUITests: XCTestCase {
     }
 
     private func fillFirstFood(in app: XCUIApplication, name: String) {
-        let nameField = app.textFields["Food name"]
+        let nameField = app.textFields.ci("Food name")
         XCTAssertTrue(nameField.waitForExistence(timeout: 3))
         nameField.tap()
         nameField.typeText(name)
-        type("210", into: app.textFields["Calories"])
-        type("7", into: app.textFields["Protein"])
-        type("28", into: app.textFields["Carbohydrates"])
-        type("5", into: app.textFields["Fibre"])
+        type("210", into: app.textFields.ci("Calories"))
+        type("7", into: app.textFields.ci("Protein"))
+        type("28", into: app.textFields.ci("Carbohydrates"))
+        type("5", into: app.textFields.ci("Fibre"))
     }
 
     private func type(_ value: String, into field: XCUIElement) {

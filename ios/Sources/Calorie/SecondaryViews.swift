@@ -1,6 +1,7 @@
 import AuthenticationServices
 import CalorieCore
 import Charts
+import SaaSMakerUI
 import SwiftUI
 import UniformTypeIdentifiers
 
@@ -51,7 +52,7 @@ struct ProgressViewScreen: View {
                     goalCycleSummary(activeGoalCycle)
                 }
                 VStack(alignment: .leading, spacing: 14) {
-                    Text("\(rangeDays)-day energy").font(.title2.weight(.bold))
+                    SMSectionHeader("\(rangeDays)-day energy", size: 22).accessibilityLabel("\(rangeDays)-day energy")
                     Chart(days) { day in
                         BarMark(
                             x: .value("Day", day.date, unit: .day),
@@ -63,14 +64,12 @@ struct ProgressViewScreen: View {
                     .chartYAxis { AxisMarks(position: .leading) }
                     .frame(height: 210)
                     Text(accessibleWeekSummary)
-                        .font(.subheadline)
+                        .font(CalorieType.subheadline)
                         .foregroundStyle(.secondary)
                 }
-                .padding(17)
-                .background(CaloriePalette.surface)
-                .clipShape(RoundedRectangle(cornerRadius: 16))
+                .botanicalCard(padding: 17)
                 VStack(alignment: .leading, spacing: 14) {
-                    Text("Review a day").font(.title2.weight(.bold))
+                    SMSectionHeader("Review a day", size: 22).accessibilityLabel("Review a day")
                     DatePicker(
                         "Journal date",
                         selection: $historyDate,
@@ -81,7 +80,7 @@ struct ProgressViewScreen: View {
                     selectedDaySummary
                 }
                 VStack(alignment: .leading, spacing: 14) {
-                    Text("Meal timing").font(.title2.weight(.bold))
+                    SMSectionHeader("Meal timing", size: 22).accessibilityLabel("Meal timing")
                     if model.document.foodEntries.isEmpty {
                         ContentUnavailableView(
                             "No meal times yet",
@@ -92,7 +91,7 @@ struct ProgressViewScreen: View {
                         ForEach(model.document.foodEntries.sorted { $0.timestamp < $1.timestamp }.suffix(8)) { entry in
                             HStack {
                                 Text(entry.timestamp.formatted(.dateTime.weekday(.abbreviated)))
-                                    .font(.caption.weight(.bold)).frame(width: 36)
+                                    .font(CalorieType.caption.weight(.bold)).frame(width: 36)
                                 GeometryReader { geometry in
                                     let hour = Calendar.current.component(.hour, from: entry.timestamp)
                                     Circle().fill(CaloriePalette.amber)
@@ -101,24 +100,24 @@ struct ProgressViewScreen: View {
                                 }
                                 .frame(height: 14)
                                 Text(entry.timestamp.formatted(.dateTime.hour().minute()))
-                                    .font(.caption.monospacedDigit()).frame(width: 64)
+                                    .font(CalorieType.caption.monospacedDigit()).frame(width: 64)
                             }
                         }
                         HStack {
                             Text("00"); Spacer(); Text("06"); Spacer(); Text("12"); Spacer(); Text("18"); Spacer(); Text("24")
                         }
-                        .font(.caption2.monospacedDigit()).foregroundStyle(.secondary)
+                        .font(CalorieType.caption2.monospacedDigit()).foregroundStyle(.secondary)
                     }
                 }
                 VStack(alignment: .leading, spacing: 14) {
-                    Text("Weight check-ins").font(.title2.weight(.bold))
+                    SMSectionHeader("Weight check-ins", size: 22).accessibilityLabel("Weight check-ins")
                     if let latest = model.document.weightEntries.sorted(by: { $0.date > $1.date }).first {
                         HStack(alignment: .lastTextBaseline) {
                             Text(latest.kilograms.formatted(.number.precision(.fractionLength(1))))
-                                .font(.system(.largeTitle, design: .rounded, weight: .bold).monospacedDigit())
-                            Text("kg recorded").font(.subheadline).foregroundStyle(.secondary)
+                                .font(CalorieType.largeTitle.bold().monospacedDigit())
+                            Text("kg recorded").font(CalorieType.subheadline).foregroundStyle(.secondary)
                         }
-                        Text("A check-in is a measurement, not a grade.").font(.subheadline).foregroundStyle(.secondary)
+                        Text("A check-in is a measurement, not a grade.").font(CalorieType.subheadline).foregroundStyle(.secondary)
                     } else {
                         Text("No weight check-ins yet.").foregroundStyle(.secondary)
                     }
@@ -143,10 +142,10 @@ struct ProgressViewScreen: View {
         VStack(alignment: .leading, spacing: 7) {
             BotanicalSectionLabel(text: "Current goal period")
             Text("\(cycle.kind.rawValue.capitalized) · since \(cycle.startOn)")
-                .font(.headline)
+                .font(CalorieType.headline)
             if let calories = cycle.calorieRange, calories.count == 2 {
                 Text("Recorded target range \(calories[0].formatted(.number.precision(.fractionLength(0))))–\(calories[1].formatted(.number.precision(.fractionLength(0)))) kcal")
-                    .font(.subheadline)
+                    .font(CalorieType.subheadline)
                     .foregroundStyle(.secondary)
             }
         }
@@ -165,7 +164,7 @@ struct ProgressViewScreen: View {
             )
         } else {
             Text("\(totals.calories.formatted(.number.precision(.fractionLength(0)))) kcal · P \(totals.protein.formatted(.number.precision(.fractionLength(0))))g · C \(totals.carbohydrates.formatted(.number.precision(.fractionLength(0))))g · fibre \(totals.fibre.formatted(.number.precision(.fractionLength(0))))g · \(water) ml water")
-                .font(.subheadline)
+                .font(CalorieType.subheadline)
                 .foregroundStyle(.secondary)
             DailyScoreView(
                 result: DailyScoreEvaluator.evaluate(
@@ -179,10 +178,10 @@ struct ProgressViewScreen: View {
                 let scoreBasis = EntryScoreBasisResolver.resolve(entry, foods: model.document.foods)
                 HStack(alignment: .top, spacing: 12) {
                     Text(entry.timestamp.formatted(.dateTime.hour().minute()))
-                        .font(.caption.monospacedDigit())
+                        .font(CalorieType.caption.monospacedDigit())
                         .foregroundStyle(.secondary)
                     VStack(alignment: .leading, spacing: 4) {
-                        Text(entry.foodName).font(.body.weight(.semibold))
+                        Text(entry.foodName).font(CalorieType.body.weight(.semibold))
                         TrackedQualityScoreView(
                             quality: TrackedQualityEvaluator.evaluate(scoreBasis.nutrients),
                             contextLabel: "Entry score",
@@ -191,7 +190,7 @@ struct ProgressViewScreen: View {
                     }
                     Spacer()
                     Text("\(entry.nutrients.calories.formatted(.number.precision(.fractionLength(0)))) kcal")
-                        .font(.subheadline.monospacedDigit())
+                        .font(CalorieType.subheadline.monospacedDigit())
                 }
                 .accessibilityElement(children: .combine)
             }
@@ -213,6 +212,7 @@ private enum NativeFoodOrder: String, CaseIterable {
 }
 
 struct FoodsView: View {
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Environment(AppModel.self) private var model
     @State private var search = ""
     @State private var isAddPresented = false
@@ -259,10 +259,10 @@ struct FoodsView: View {
                 .background(CaloriePalette.surface)
                 .clipShape(RoundedRectangle(cornerRadius: 13))
                 HStack {
-                    Text("\(foods.count) available").font(.caption.weight(.bold)).foregroundStyle(.secondary)
+                    Text("\(foods.count) available").font(CalorieType.caption.weight(.bold)).foregroundStyle(.secondary)
                     Spacer()
-                    Button { isAddPresented = true } label: { Label("Custom food", systemImage: "plus") }
-                        .font(.subheadline.weight(.bold)).frame(minHeight: 44)
+                    Button { isAddPresented = true } label: { Label("custom food", systemImage: "plus").accessibilityLabel("Custom food") }
+                        .font(CalorieType.subheadline.weight(.bold)).frame(minHeight: 44)
                 }
                 Picker("Food archive", selection: $showArchived) {
                     Text("Current").tag(false)
@@ -271,7 +271,7 @@ struct FoodsView: View {
                 .pickerStyle(.segmented)
                 Picker("Sort foods", selection: $order) {
                     ForEach(NativeFoodOrder.allCases, id: \.self) { order in
-                        Text(order.rawValue).tag(order)
+                        Text(order.rawValue.lowercased()).accessibilityLabel(order.rawValue).tag(order)
                     }
                 }
                 .pickerStyle(.menu)
@@ -293,9 +293,9 @@ struct FoodsView: View {
                                 .accessibilityLabel("\(food.isFavorite ? "Remove" : "Add") \(food.name) \(food.isFavorite ? "from" : "to") favorites")
                                 .accessibilityValue(food.isFavorite ? "Favorite" : "Not favorite")
                                 VStack(alignment: .leading, spacing: 4) {
-                                    Text(food.name).font(.headline)
+                                    Text(food.name).font(CalorieType.headline)
                                     Text("\(food.servingName) · protein \(food.nutrients.protein.formatted(.number.precision(.fractionLength(0))))g · carbs \(food.nutrients.carbohydrates.formatted(.number.precision(.fractionLength(0))))g · fibre \(food.nutrients.fibre.formatted(.number.precision(.fractionLength(0))))g")
-                                        .font(.caption).foregroundStyle(.secondary)
+                                        .font(CalorieType.caption).foregroundStyle(.secondary)
                                     TrackedQualityScoreView(
                                         quality: TrackedQualityEvaluator.evaluate(food.nutrients),
                                         contextLabel: "Food score"
@@ -303,9 +303,10 @@ struct FoodsView: View {
                                 }
                                 Spacer()
                                 Text("\(food.nutrients.calories.formatted(.number.precision(.fractionLength(0)))) kcal")
-                                    .font(.headline.monospacedDigit().weight(.bold))
+                                    .font(CalorieType.headline.monospacedDigit().weight(.bold))
                                 Menu {
                                     Button("Edit") { editingFood = food }
+                                        .textCase(.lowercase).accessibilityLabel("Edit")
                                     Button(showArchived ? "Restore" : "Archive") {
                                         Task { await model.toggleArchive(food) }
                                     }
@@ -379,9 +380,10 @@ private struct CustomFoodView: View {
                     numeric("Fibre (g)", $fibre)
                 }
             }
-            .navigationTitle(existingFood == nil ? "Custom food" : "Edit food")
+            .botanicalNavigationTitle(existingFood == nil ? "Custom food" : "Edit food")
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
+                ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() }
+                    .textCase(.lowercase).accessibilityLabel("Cancel") }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Save") {
                         let food = Food(
@@ -402,6 +404,7 @@ private struct CustomFoodView: View {
                         )
                         Task { if await model.saveFood(food) { dismiss() } }
                     }
+                    .textCase(.lowercase).accessibilityLabel("Save")
                     .disabled(name.trimmingCharacters(in: .whitespaces).isEmpty || Double(calories) == nil)
                 }
             }
@@ -435,6 +438,7 @@ private struct CustomFoodView: View {
 }
 
 struct YouView: View {
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     var recoveryOnly = false
     @Environment(AppModel.self) private var model
     @Environment(\.colorScheme) private var colorScheme
@@ -457,6 +461,7 @@ struct YouView: View {
                 if recoveryOnly {
                     botanicalHeader("Your journal needs attention", subtitle: "The original file has been preserved. Retry opening it or restore a backup.")
                     Button("Retry opening journal") { Task { await model.load() } }
+                        .textCase(.lowercase).accessibilityLabel("Retry opening journal")
                         .buttonStyle(BotanicalButtonStyle())
                 } else {
                     botanicalHeader("You", subtitle: "Your inputs, your formulas, your journal.")
@@ -464,28 +469,33 @@ struct YouView: View {
                 if !recoveryOnly {
                 if let explanation = model.targetExplanation {
                     VStack(alignment: .leading, spacing: 10) {
-                        HStack {
+                        let layout = dynamicTypeSize.isAccessibilitySize
+                            ? AnyLayout(VStackLayout(alignment: .leading, spacing: 8))
+                            : AnyLayout(HStackLayout())
+                        layout {
                             Image(systemName: explanation.isEstimate ? "function" : "hand.draw.fill")
                                 .foregroundStyle(CaloriePalette.moss)
-                            Text(explanation.title).font(.headline)
+                            Text(explanation.title.lowercased()).accessibilityLabel(explanation.title).font(CalorieType.headline)
                             Spacer()
                             Text("\(explanation.target.calories.formatted(.number.precision(.fractionLength(0)))) kcal")
-                                .font(.headline.monospacedDigit())
+                                .font(CalorieType.headline.monospacedDigit())
                         }
-                        Text(explanation.detail).font(.subheadline).foregroundStyle(.secondary)
+                        Text(explanation.detail).font(CalorieType.subheadline).foregroundStyle(.secondary)
                         Button("Edit profile & targets") { isProfilePresented = true }
-                            .font(.subheadline.weight(.bold)).frame(minHeight: 44)
+                            .textCase(.lowercase).accessibilityLabel("Edit profile & targets")
+                            .font(CalorieType.subheadline.weight(.bold)).frame(minHeight: 44)
                     }
-                    .padding(16).background(CaloriePalette.surface).clipShape(RoundedRectangle(cornerRadius: 15))
+                    .botanicalCard(padding: 16)
                 } else {
-                    Button("Set up targets") { isProfilePresented = true }.buttonStyle(BotanicalButtonStyle())
+                    Button("Set up targets") { isProfilePresented = true }
+                        .textCase(.lowercase).accessibilityLabel("Set up targets").buttonStyle(BotanicalButtonStyle())
                 }
                 youSection("Appearance") {
                     Picker("Theme", selection: Binding(
                         get: { model.document.theme },
                         set: { theme in Task { await model.setTheme(theme) } }
                     )) {
-                        ForEach(AppTheme.allCases, id: \.self) { Text($0.rawValue).tag($0) }
+                        ForEach(AppTheme.allCases, id: \.self) { Text($0.rawValue.lowercased()).accessibilityLabel($0.rawValue).tag($0) }
                     }
                     .pickerStyle(.segmented)
                 }
@@ -493,11 +503,11 @@ struct YouView: View {
                     Button {
                         isRoutineManagerPresented = true
                     } label: {
-                        Label("Manage routines", systemImage: "checklist")
+                        Label("manage routines", systemImage: "checklist").accessibilityLabel("Manage routines")
                             .frame(maxWidth: .infinity, minHeight: 48, alignment: .leading)
                     }
                     Text("Routine names and preferred time only. Calorie does not store dosage instructions.")
-                        .font(.caption)
+                        .font(CalorieType.caption)
                         .foregroundStyle(.secondary)
                 }
                 youSection("Account & sync") {
@@ -507,16 +517,16 @@ struct YouView: View {
                 youSection("Your data") {
                     if !recoveryOnly {
                     ShareLink(item: CalorieExportPayload(document: model.document), preview: SharePreview("Calorie journal")) {
-                        Label("Export journal", systemImage: "square.and.arrow.up").frame(maxWidth: .infinity, alignment: .leading)
+                        Label("export journal", systemImage: "square.and.arrow.up").accessibilityLabel("Export journal").frame(maxWidth: .infinity, alignment: .leading)
                     }
                     .frame(minHeight: 48)
                     }
                     Button { isImporterPresented = true } label: {
-                        Label("Preview an import", systemImage: "doc.badge.plus").frame(maxWidth: .infinity, alignment: .leading)
+                        Label("preview an import", systemImage: "doc.badge.plus").accessibilityLabel("Preview an import").frame(maxWidth: .infinity, alignment: .leading)
                     }
                     .frame(minHeight: 48)
                     Button(role: .destructive) { showReset = true } label: {
-                        Label("Reset local journal", systemImage: "trash").frame(maxWidth: .infinity, alignment: .leading)
+                        Label("reset local journal", systemImage: "trash").accessibilityLabel("Reset local journal").frame(maxWidth: .infinity, alignment: .leading)
                     }
                     .frame(minHeight: 48)
                 }
@@ -541,13 +551,17 @@ struct YouView: View {
         }
         .alert("Replace the local journal?", isPresented: $model.isImportConfirmationPresented) {
             Button("Replace", role: .destructive) { Task { await model.confirmImport() } }
+                .textCase(.lowercase).accessibilityLabel("Replace")
             Button("Cancel", role: .cancel) { model.importPreview = nil }
+                .textCase(.lowercase).accessibilityLabel("Cancel")
         } message: {
             Text("The import contains \(model.importPreview?.foodEntries.count ?? 0) food entries and \(model.importPreview?.foods.count ?? 0) foods.")
         }
         .confirmationDialog("Reset local Calorie data?", isPresented: $showReset) {
             Button("Reset journal", role: .destructive) { Task { await model.resetLocalData() } }
+                .textCase(.lowercase).accessibilityLabel("Reset journal")
             Button("Cancel", role: .cancel) {}
+                .textCase(.lowercase).accessibilityLabel("Cancel")
         }
         .confirmationDialog(
             "Delete your Calorie cloud account?",
@@ -557,7 +571,9 @@ struct YouView: View {
             Button("Delete cloud account", role: .destructive) {
                 Task { await model.deleteCloudAccount() }
             }
+            .textCase(.lowercase).accessibilityLabel("Delete cloud account")
             Button("Cancel", role: .cancel) {}
+                .textCase(.lowercase).accessibilityLabel("Cancel")
         } message: {
             Text("Cloud data and linked sign-ins will be deleted. Your journal on this device will remain until you reset it separately.")
         }
@@ -570,75 +586,76 @@ struct YouView: View {
                 "Cloud journal connected",
                 systemImage: "checkmark.icloud.fill"
             )
-            .font(.headline)
+            .font(CalorieType.headline)
             .frame(minHeight: 44)
             Text(account.email)
-                .font(.subheadline)
+                .font(CalorieType.subheadline)
                 .foregroundStyle(.secondary)
                 .textSelection(.enabled)
             Text(CalorieAccountCopy.connectedOverview)
-                .font(.subheadline)
+                .font(CalorieType.subheadline)
                 .foregroundStyle(.secondary)
             if model.needsAccountApproval {
                 Button { Task { await model.approveCloudAccount() } } label: {
-                    Label("Connect this journal", systemImage: "checkmark.icloud.fill")
+                    Label("connect this journal", systemImage: "checkmark.icloud.fill").accessibilityLabel("Connect this journal")
                         .frame(maxWidth: .infinity, minHeight: 48)
                 }
-                .buttonStyle(.borderedProminent)
+                .buttonStyle(SMButtonStyle(.brand))
                 .disabled(model.isAccountWorking)
             } else if model.isBoundToDifferentAccount {
                 Text("This journal is connected to a different account. Sign in to that account to sync it.")
-                    .font(.caption)
+                    .font(CalorieType.caption)
                     .foregroundStyle(.secondary)
             }
             HStack {
                 Label(syncStatusText, systemImage: syncStatusSymbol)
-                    .font(.caption.weight(.semibold))
+                    .font(CalorieType.caption.weight(.semibold))
                     .foregroundStyle(.secondary)
                 Spacer()
                 Button("Sync now") {
                     Task { await model.syncNow() }
                 }
-                .font(.caption.weight(.bold))
+                .textCase(.lowercase).accessibilityLabel("Sync now")
+                .font(CalorieType.caption.weight(.bold))
                 .frame(minHeight: 44)
                 .disabled(model.isAccountWorking)
             }
             Button { Task { await model.signOut() } } label: {
-                Label("Sign out", systemImage: "rectangle.portrait.and.arrow.right")
+                Label("sign out", systemImage: "rectangle.portrait.and.arrow.right").accessibilityLabel("Sign out")
                     .frame(maxWidth: .infinity, minHeight: 48)
             }
-            .buttonStyle(.bordered)
+            .buttonStyle(SMButtonStyle(.outline))
             Button(role: .destructive) { showDeleteAccount = true } label: {
-                Label("Delete cloud account", systemImage: "person.crop.circle.badge.minus")
+                Label("delete cloud account", systemImage: "person.crop.circle.badge.minus").accessibilityLabel("Delete cloud account")
                     .frame(maxWidth: .infinity, minHeight: 48)
             }
             if account.hasApple {
                 Text(CalorieAccountCopy.appleLinked)
-                    .font(.subheadline)
+                    .font(CalorieType.subheadline)
                     .foregroundStyle(.secondary)
             } else {
                 Text(CalorieAccountCopy.appleLinkPrompt)
-                    .font(.caption)
+                    .font(CalorieType.caption)
                     .foregroundStyle(.secondary)
                 appleButton
             }
         } else {
-            Label("On this device", systemImage: "ipad.and.iphone")
-                .font(.headline)
+            Label("on this device", systemImage: "ipad.and.iphone").accessibilityLabel("On this device")
+                .font(CalorieType.headline)
                 .frame(minHeight: 44)
             Text(CalorieAccountCopy.unsignedOverview)
-                .font(.subheadline)
+                .font(CalorieType.subheadline)
                 .foregroundStyle(.secondary)
             Text(CalorieAccountCopy.googleRecovery)
-                .font(.caption)
+                .font(CalorieType.caption)
                 .foregroundStyle(.secondary)
             Button { Task { await model.connectExistingAccount() } } label: {
-                Label("Reopen existing account", systemImage: "person.crop.circle.badge.checkmark")
+                Label("reopen existing account", systemImage: "person.crop.circle.badge.checkmark").accessibilityLabel("Reopen existing account")
                     .frame(maxWidth: .infinity, minHeight: 48)
             }
-            .buttonStyle(.borderedProminent)
+            .buttonStyle(SMButtonStyle(.brand))
             Text("Starting a new cloud journal instead?")
-                .font(.caption)
+                .font(CalorieType.caption)
                 .foregroundStyle(.secondary)
             appleButton
         }
@@ -648,7 +665,7 @@ struct YouView: View {
         }
         if let notice = model.accountNotice {
             Label(notice, systemImage: "checkmark.circle.fill")
-                .font(.caption)
+                .font(CalorieType.caption)
                 .foregroundStyle(CaloriePalette.moss)
                 .accessibilityLabel("Account status: \(notice)")
         }
@@ -685,7 +702,7 @@ struct YouView: View {
         VStack(alignment: .leading, spacing: 10) {
             BotanicalSectionLabel(text: title)
             VStack(alignment: .leading, spacing: 10) { content() }
-                .padding(16).background(CaloriePalette.surface).clipShape(RoundedRectangle(cornerRadius: 15))
+                .botanicalCard(padding: 16)
         }
     }
 }
@@ -703,7 +720,7 @@ private struct RoutineManagerView: View {
                 Section("Add routine") {
                     TextField("Routine name", text: $name)
                     Picker("Preferred time", selection: $period) {
-                        ForEach(RoutinePeriod.allCases, id: \.self) { Text($0.rawValue).tag($0) }
+                        ForEach(RoutinePeriod.allCases, id: \.self) { Text($0.rawValue.lowercased()).accessibilityLabel($0.rawValue).tag($0) }
                     }
                     Button("Add routine") {
                         let routine = MedicationRoutine(
@@ -715,6 +732,7 @@ private struct RoutineManagerView: View {
                             name = ""
                         }
                     }
+                    .textCase(.lowercase).accessibilityLabel("Add routine")
                     .disabled(name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                 }
                 Section {
@@ -723,14 +741,14 @@ private struct RoutineManagerView: View {
                             VStack(alignment: .leading, spacing: 3) {
                                 Text(routine.name)
                                 Text(routine.period.rawValue)
-                                    .font(.caption)
+                                    .font(CalorieType.caption)
                                     .foregroundStyle(.secondary)
                             }
                             Spacer()
                             Button(routine.isArchived ? "Restore" : "Archive") {
                                 Task { await model.toggleArchive(routine) }
                             }
-                            .font(.subheadline.weight(.semibold))
+                            .font(CalorieType.subheadline.weight(.semibold))
                         }
                     }
                 } header: {
@@ -739,11 +757,12 @@ private struct RoutineManagerView: View {
                     Text("Names and timing are reminders only; dosage is intentionally not stored.")
                 }
             }
-            .navigationTitle("Daily care routines")
+            .botanicalNavigationTitle("Daily care routines")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Done") { dismiss() }
+                        .textCase(.lowercase).accessibilityLabel("Done")
                 }
             }
         }
@@ -762,8 +781,8 @@ private struct ProfileEditorView: View {
                 LocalSaveErrorView()
                 Section("You") {
                     TextField("Name (optional)", text: $profile.name)
-                    Picker("Goal", selection: $profile.goal) { ForEach(Goal.allCases, id: \.self) { Text($0.rawValue).tag($0) } }
-                    Picker("Activity", selection: $profile.activity) { ForEach(ActivityLevel.allCases, id: \.self) { Text($0.rawValue).tag($0) } }
+                    Picker("Goal", selection: $profile.goal) { ForEach(Goal.allCases, id: \.self) { Text($0.rawValue.lowercased()).accessibilityLabel($0.rawValue).tag($0) } }
+                    Picker("Activity", selection: $profile.activity) { ForEach(ActivityLevel.allCases, id: \.self) { Text($0.rawValue.lowercased()).accessibilityLabel($0.rawValue).tag($0) } }
                 }
                 Section {
                     Toggle("Use a published estimate", isOn: $useEstimate)
@@ -773,7 +792,7 @@ private struct ProfileEditorView: View {
                         optionalDouble("Weight (kg)", value: $profile.weightKilograms)
                         Picker("Equation profile", selection: $profile.equationProfile) {
                             Text("Choose later").tag(EquationProfile?.none)
-                            ForEach(EquationProfile.allCases, id: \.self) { Text($0.rawValue).tag(Optional($0)) }
+                            ForEach(EquationProfile.allCases, id: \.self) { Text($0.rawValue.lowercased()).accessibilityLabel($0.rawValue).tag(Optional($0)) }
                         }
                     } else {
                         optionalDouble("Manual calorie target", value: $profile.manualCalorieTarget)
@@ -785,13 +804,14 @@ private struct ProfileEditorView: View {
                     Stepper("Water target: \(profile.waterTargetMillilitres) ml", value: $profile.waterTargetMillilitres, in: 500...6_000, step: 250)
                 }
             }
-            .navigationTitle("Profile & targets")
+            .botanicalNavigationTitle("Profile & targets")
             .onAppear {
                 profile = model.document.profile
                 useEstimate = profile.equationProfile != nil && profile.manualCalorieTarget == nil && profile.manualMacroTargets == nil
             }
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
+                ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() }
+                    .textCase(.lowercase).accessibilityLabel("Cancel") }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Save") {
                         if useEstimate {
@@ -803,6 +823,7 @@ private struct ProfileEditorView: View {
                         }
                         Task { if await model.updateProfile(profile) { dismiss() } }
                     }
+                    .textCase(.lowercase).accessibilityLabel("Save")
                 }
             }
         }
@@ -817,11 +838,13 @@ private struct ProfileEditorView: View {
     }
 }
 
-func botanicalHeader(_ title: String, subtitle: String) -> some View {
+@MainActor func botanicalHeader(_ title: String, subtitle: String) -> some View {
     VStack(alignment: .leading, spacing: 9) {
-        HStack { LeafMark(size: 34); Text("CALORIE").font(.caption.weight(.heavy)).tracking(1.3) }
-        Text(title).font(.system(.largeTitle, design: .rounded, weight: .bold))
-        Text(subtitle).font(.body).foregroundStyle(.secondary)
+        HStack {
+            LeafMark(size: 34)
+            Text("calorie").font(CalorieType.caption.weight(.heavy)).tracking(1.3)
+        }
+        SMSectionHeader(title, lede: subtitle, size: 34)
     }
     .padding(.top, 16)
 }
