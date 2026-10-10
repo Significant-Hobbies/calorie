@@ -841,7 +841,7 @@ private struct ProfileEditorView: View {
     }
 }
 
-func botanicalHeader(_ title: String, subtitle: String) -> some View {
+@MainActor func botanicalHeader(_ title: String, subtitle: String) -> some View {
     VStack(alignment: .leading, spacing: 9) {
         HStack {
             LeafMark(size: 34)
