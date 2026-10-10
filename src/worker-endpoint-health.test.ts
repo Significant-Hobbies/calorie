@@ -1,8 +1,8 @@
 import { Hono } from 'hono';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { AppHealthClient, AppHealthClientOptions, EventInput } from '@saas-maker/app-health';
-import { createEndpointHealthMiddleware } from './worker/endpoint-health';
-import type { AppBindings } from './worker/types';
+import { createEndpointHealthMiddleware, createHealthMiddlewares } from './worker/endpoint-health';
+import type { AppBindings, AppVariables } from './worker/types';
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -34,7 +34,7 @@ function clientFactory() {
 }
 
 function testApp(middleware: ReturnType<typeof createEndpointHealthMiddleware>) {
-  const app = new Hono<{ Bindings: AppBindings }>();
+  const app = new Hono<{ Bindings: AppBindings; Variables: AppVariables }>();
   app.use('/api/*', middleware);
   app.use('/v1/personal/*', middleware);
   app.get('/api/app/foods/:id', (context) => context.json({ ok: true }, 201));
@@ -287,4 +287,135 @@ describe('optional privacy-bounded endpoint health', () => {
     expect(createClient).not.toHaveBeenCalled();
     expect(client.flush).not.toHaveBeenCalled();
   });
+});
+
+describe('optional server stage timing', () => {
+  function stageApp(factory = clientFactory()) {
+    const middleware = createHealthMiddlewares(factory.createClient);
+
+    // Register timing before handlers, using the same resolver as endpoint health.
+    const timed = new Hono<{ Bindings: AppBindings; Variables: AppVariables }>();
+    timed.use('*', middleware.isolateColdMiddleware);
+    timed.use('/api/*', middleware.endpointHealthMiddleware);
+    timed.use('/api/*', middleware.stageTimingMiddleware);
+    timed.use('/v1/personal/*', middleware.endpointHealthMiddleware);
+    timed.use('/v1/personal/*', middleware.stageTimingMiddleware);
+    timed.get('/api/app/foods/:id', (context) => context.json({ ok: true }, 201));
+    timed.post('/v1/personal/actions/log_food', (context) => context.json({ ok: true }, 202));
+    timed.get('/privacy', (context) => context.text('privacy'));
+    return { app: timed, ...factory };
+  }
+  const env = {
+    APP_HEALTH_INGEST_KEY: 'synthetic-test-key',
+    APP_HEALTH_STAGE_SAMPLE_RATE: '1',
+  } as AppBindings;
+
+  it('logs a bounded template event and shares the cached client and background flush', async () => {
+    const { app, client, createClient, flush } = stageApp();
+    const request = new Request(
+      'https://calorie.example/api/app/foods/private-food-id?food=private'
+    );
+    Object.defineProperty(request, 'cf', { value: { colo: 'BOM' } });
+    const waitUntil = vi.fn();
+    const response = await app.fetch(request, env, { waitUntil, passThroughOnException: vi.fn() });
+    expect(response.status).toBe(201);
+    expect(client.log).toHaveBeenCalledExactlyOnceWith('api.stage_timing', {
+      level: 'debug',
+      props: {
+        route: '/api/app/foods/:id',
+        status: 201,
+        total_ms: expect.any(Number),
+        edge_cache: 'NONE',
+        inner_cache: 'NONE',
+        colo: 'BOM',
+        cold: 1,
+      },
+    });
+    const total = client.log.mock.calls[0]?.[1]?.props?.total_ms as number;
+    expect(Number.isInteger(total)).toBe(true);
+    expect(total).toBeGreaterThanOrEqual(0);
+    expect(total).toBeLessThanOrEqual(600000);
+    expect(JSON.stringify(client.log.mock.calls)).not.toContain('private');
+    expect(createClient).toHaveBeenCalledOnce();
+    expect(flush).toHaveBeenCalled();
+    expect(waitUntil).toHaveBeenCalledWith(expect.any(Promise));
+
+    await app.request('/v1/personal/actions/log_food', { method: 'POST' }, env);
+    expect(client.log.mock.calls[1]?.[1]?.props).toMatchObject({
+      route: '/v1/personal/actions/log_food',
+      cold: 0,
+      colo: 'unknown',
+      status: 202,
+    });
+  });
+
+  it.each([
+    { APP_HEALTH_INGEST_KEY: 'synthetic-test-key', APP_HEALTH_STAGE_SAMPLE_RATE: '0' },
+    { APP_HEALTH_STAGE_SAMPLE_RATE: '1' },
+  ])('does not log when disabled: %j', async (bindings) => {
+    const { app, client, createClient } = stageApp();
+    expect((await app.request('/api/app/foods/private', undefined, bindings)).status).toBe(201);
+    expect(client.log).not.toHaveBeenCalled();
+    if (!bindings.APP_HEALTH_INGEST_KEY) expect(createClient).not.toHaveBeenCalled();
+  });
+
+  it('counts a prior marketing request as warming the isolate', async () => {
+    const { app, client } = stageApp();
+    await app.request('/privacy', undefined, {});
+    await app.request('/api/app/foods/private', undefined, env);
+    expect(client.log.mock.calls[0]?.[1]?.props?.cold).toBe(0);
+  });
+
+  it.each([undefined, '', 'bad', '-1', '2', 'Infinity'])(
+    'defaults invalid sampling (%s) to 0.1',
+    async (rate) => {
+      const { app, client } = stageApp();
+      vi.spyOn(Math, 'random').mockReturnValue(0.09);
+      await app.request('/api/app/foods/private', undefined, {
+        ...env,
+        APP_HEALTH_STAGE_SAMPLE_RATE: rate,
+      });
+      expect(client.log).toHaveBeenCalledOnce();
+      vi.spyOn(Math, 'random').mockReturnValue(0.1);
+      await app.request('/api/app/foods/private', undefined, {
+        ...env,
+        APP_HEALTH_STAGE_SAMPLE_RATE: rate,
+      });
+      expect(client.log).toHaveBeenCalledOnce();
+    }
+  );
+
+  it.each(['123', 'abcdef1234567890', '12345678-1234-1234-1234-123456789abc', 'a'.repeat(121)])(
+    'skips unsafe route templates (%s)',
+    async (segment) => {
+      const { app, client } = stageApp();
+      app.get(`/api/${segment}`, (context) => context.text('ok'));
+      expect((await app.request(`/api/${segment}`, undefined, env)).status).toBe(200);
+      expect(client.log).not.toHaveBeenCalled();
+    }
+  );
+
+  it.each(['initialize', 'log', 'flush', 'reject'])(
+    'preserves responses when client %s fails',
+    async (failure) => {
+      const factory = clientFactory();
+      if (failure === 'initialize')
+        factory.createClient.mockImplementation(() => {
+          throw new Error('failed');
+        });
+      if (failure === 'log')
+        factory.client.log.mockImplementation(() => {
+          throw new Error('failed');
+        });
+      if (failure === 'flush')
+        factory.flush.mockImplementation(() => {
+          throw new Error('failed');
+        });
+      if (failure === 'reject') factory.flush.mockRejectedValue(new Error('failed'));
+      const { app } = stageApp(factory);
+      const response = await app.request('/api/app/foods/private', undefined, env);
+      expect(response.status).toBe(201);
+      expect(await response.json()).toEqual({ ok: true });
+    }
+  );
 });

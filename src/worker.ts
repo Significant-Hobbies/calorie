@@ -1,5 +1,9 @@
 import { Hono } from 'hono';
-import { endpointHealthMiddleware } from './worker/endpoint-health';
+import {
+  endpointHealthMiddleware,
+  isolateColdMiddleware,
+  stageTimingMiddleware,
+} from './worker/endpoint-health';
 import { handleAgentEdge } from './agent-edge.mjs';
 import { registerAccountRoutes } from './worker/account';
 import { registerAuthRoutes, registerSessionMiddleware } from './worker/auth';
@@ -11,6 +15,8 @@ import { registerReadRoutes } from './worker/reads';
 import type { AppBindings, AppVariables } from './worker/types';
 
 const app = new Hono<{ Bindings: AppBindings; Variables: AppVariables }>();
+
+app.use('*', isolateColdMiddleware);
 
 app.use('*', async (c, next) => {
   const agentResponse = await handleAgentEdge(c.req.raw, c.env);
@@ -35,7 +41,9 @@ app.use('*', async (c, next) => {
 // Optional aggregate service metrics only; the official adapter reads Hono's
 // matched route template and never receives concrete path or query values.
 app.use('/api/*', endpointHealthMiddleware);
+app.use('/api/*', stageTimingMiddleware);
 app.use('/v1/personal/*', endpointHealthMiddleware);
+app.use('/v1/personal/*', stageTimingMiddleware);
 
 registerAuthRoutes(app);
 registerSessionMiddleware(app);
