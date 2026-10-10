@@ -1,0 +1,243 @@
+{
+  "template": "gallery",
+  "page": {
+    "title": "Calorie — A private food journal for weight loss.",
+    "description": "Log meals, four nutrients, water, weight, and routines in seconds. See transparent fasting, exercise, and sleep estimates from your timestamps and targets.",
+    "theme": "gallery",
+    "tokens": {
+      "--brand": "#47743a",
+      "--brand-ink": "#47743a",
+      "--brand-foreground": "#ffffff",
+      "--brand-soft": "#e7f0dc"
+    },
+    "icon": "/favicon-64.png",
+    "assetBase": "/images/home/",
+    "canonical": "https://calorie.significanthobbies.com/",
+    "robots": "index,follow",
+    "og": {
+      "image": "https://calorie.significanthobbies.com/images/brand/social.png",
+      "imageWidth": 512,
+      "imageHeight": 512,
+      "siteName": "Calorie",
+      "twitterCard": "summary_large_image"
+    },
+    "jsonLd": {
+      "@context": "https://schema.org",
+      "@graph": [
+        {
+          "@type": "Organization",
+          "name": "Significant Hobbies",
+          "url": "https://significanthobbies.com"
+        },
+        {
+          "@type": "WebSite",
+          "name": "Calorie",
+          "url": "https://calorie.significanthobbies.com",
+          "description": "A private, local-first iPhone and iPad journal for food, four core nutrients, water, weight, routines, and transparent timing guidance. Optional Apple sign-in can add private Cloudflare sync.",
+          "image": "https://calorie.significanthobbies.com/images/brand/social.png"
+        },
+        {
+          "@type": "FAQPage",
+          "mainEntity": [
+            {
+              "@type": "Question",
+              "name": "Do I need an account?",
+              "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "No. The native journal works on this device without one. Sign in with Apple is optional private sync."
+              }
+            },
+            {
+              "@type": "Question",
+              "name": "Where do I actually use it?",
+              "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "In the native iPhone or iPad app. This website is only the public product page."
+              }
+            },
+            {
+              "@type": "Question",
+              "name": "Is it medical advice?",
+              "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "No. Timing suggestions are estimates from the numbers you enter. They are not diagnosis or treatment."
+              }
+            },
+            {
+              "@type": "Question",
+              "name": "Is the iPhone app on the App Store?",
+              "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "Not yet. This site will not show Apple’s badge until a live apps.apple.com listing exists."
+              }
+            },
+            {
+              "@type": "Question",
+              "name": "Is Calorie paid?",
+              "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "There is no paid plan or checkout. Access is currently limited to invited internal TestFlight testers, and no permanent free or paid model has been announced."
+              }
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "product": "Calorie",
+  "url": "https://calorie.significanthobbies.com",
+  "mark": "/images/brand/mark.png",
+  "screenSize": {
+    "width": 1206,
+    "height": 2622
+  },
+  "nav": [
+    {
+      "label": "How it works",
+      "href": "#how"
+    },
+    {
+      "label": "Privacy",
+      "href": "#privacy"
+    },
+    {
+      "label": "Questions",
+      "href": "#questions"
+    }
+  ],
+  "headerAction": {
+    "label": "Beta status",
+    "href": "/testflight/"
+  },
+  "hero": {
+    "eyebrow": "Calorie for iPhone and iPad",
+    "title": "A private food journal for weight loss *with math you can inspect.*",
+    "lede": "Log meals, four nutrients, water, weight, and routines in seconds. See transparent fasting, exercise, and sleep estimates from your timestamps and targets.",
+    "primary": {
+      "label": "See TestFlight status",
+      "href": "/testflight/"
+    },
+    "secondary": {
+      "label": "See the real app ›",
+      "href": "#how"
+    },
+    "note": "Internal TestFlight only. No public invite or App Store listing.",
+    "backdrop": "/images/story/calorie-scene-v1.webp",
+    "screen": {
+      "src": "today.webp",
+      "alt": "Calorie Today on iPhone: energy left for the day, protein, carbs, fat and fibre, and a food journal with breakfast and a snack"
+    },
+    "status": {
+      "label": "Internal TestFlight beta",
+      "href": "/testflight/"
+    }
+  },
+  "sections": [
+    {
+      "kind": "spread",
+      "id": "how",
+      "eyebrow": "Log",
+      "title": "Log a familiar meal *in seconds.*",
+      "lede": "Reuse a saved food, add a one-off, choose an amount, and keep the real eating time. The journal is designed for one-handed logging immediately after a meal.",
+      "screen": {
+        "src": "quick-log.webp",
+        "alt": "Calorie quick log sheet for adding a saved or one-off food with an amount and eating time"
+      }
+    },
+    {
+      "kind": "statement",
+      "eyebrow": "Today",
+      "title": "Every estimate *shows its inputs.*",
+      "lede": "Calorie uses food timestamps, four nutrients, water, routines, weight, and your own targets to estimate fasting, exercise, and sleep windows. The rules stay visible, and the result is never medical advice."
+    },
+    {
+      "kind": "spread",
+      "eyebrow": "Progress",
+      "title": "Compare seven *and thirty days.*",
+      "lede": "Review intake, eating rhythm, timing, and weight with the sample size and missing days visible. Progress is context, not a streak or a moral score.",
+      "screen": {
+        "src": "progress.webp",
+        "alt": "Calorie Progress comparing intake, eating rhythm, timing and weight over seven and thirty days"
+      }
+    },
+    {
+      "kind": "statement",
+      "id": "privacy",
+      "eyebrow": "Private by default",
+      "title": "The journal *stays yours.*",
+      "lede": "The default journal lives on the device and needs no account. Optional Sign in with Apple can keep a private, user-scoped copy in Cloudflare D1.",
+      "aside": [
+        {
+          "title": "Calorie may fit if",
+          "body": "you are pursuing weight loss and want a private iPhone or iPad journal with fast logging and timing you can audit."
+        },
+        {
+          "title": "It is not",
+          "body": "medical care, a barcode scanner, or a social feed. It will not prescribe a deficit."
+        }
+      ]
+    },
+    {
+      "kind": "faq",
+      "id": "questions",
+      "title": "Questions, *answered.*",
+      "items": [
+        {
+          "q": "Do I need an account?",
+          "a": "No. The native journal works on this device without one. Sign in with Apple is optional private sync."
+        },
+        {
+          "q": "Is it medical advice?",
+          "a": "No. Timing suggestions are estimates from the numbers you enter. They are not diagnosis or treatment."
+        },
+        {
+          "q": "Is the iPhone app on the App Store?",
+          "a": "Not yet. This site will not show Apple’s badge until a live apps.apple.com listing exists."
+        },
+        {
+          "q": "Is Calorie paid?",
+          "a": "There is no paid plan or checkout. Access is currently limited to invited internal TestFlight testers, and no permanent free or paid model has been announced."
+        }
+      ]
+    }
+  ],
+  "closing": {
+    "id": "beta",
+    "title": "Log the meal.\n*See the timing.*",
+    "primary": {
+      "label": "See TestFlight status",
+      "href": "/testflight/"
+    },
+    "note": "Internal TestFlight only. No public invite or App Store listing.",
+    "image": "/images/story/calorie-scene-v1.webp",
+    "credit": "Illustrative artwork"
+  },
+  "footer": {
+    "summary": "Private iPhone and iPad journal. Internal TestFlight only; no public invite, App Store listing, paid plan, or checkout. Timing estimates are informational, not medical advice.",
+    "legal": "© 2026 Sarthak Agrawal",
+    "catalogId": "calorie",
+    "links": [
+      {
+        "label": "TestFlight status",
+        "href": "/testflight/"
+      },
+      {
+        "label": "Privacy",
+        "href": "/privacy/"
+      },
+      {
+        "label": "Terms",
+        "href": "/terms/"
+      },
+      {
+        "label": "Accessibility",
+        "href": "/accessibility/"
+      },
+      {
+        "label": "Support",
+        "href": "/support/"
+      }
+    ],
+    "privacyUrl": "/privacy/"
+  }
+}

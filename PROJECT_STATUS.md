@@ -208,7 +208,8 @@ full sets/reps workout-programming system.
 
 ## Features (shipped)
 
-- Public `/` native-product landing snapshot from ios-landings; retired `/app`
+- Public `/` Gallery home built from `landing/` with the SaaS Maker UI library
+  (`pnpm landing:build`); retired `/app`
   routes redirect permanently to `/`
 - CI-enforced mixed web/native Fleet code-health ratchets across whole-source
   coverage, dead code, complexity, duplication, cycles, dependency advisories,

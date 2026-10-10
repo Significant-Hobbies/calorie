@@ -11,6 +11,7 @@
     "dev": "pnpm build && wrangler dev --port 8787",
     "dev:api": "pnpm build && wrangler dev --port 8787",
     "build": "node scripts/assemble-site.mjs",
+    "landing:build": "node scripts/build-landing.mjs",
     "deploy": "pnpm check && wrangler deploy --tag \"$(git rev-parse HEAD)\"",
     "db:migrate:local": "wrangler d1 migrations apply calorie --local",
     "db:migrate:remote": "wrangler d1 migrations apply calorie --remote",

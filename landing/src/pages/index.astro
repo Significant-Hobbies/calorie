@@ -1,0 +1,71 @@
+---
+import Base from '@saas-maker/templates/Base.astro';
+import { GalleryPage } from '@saas-maker/templates/gallery-page';
+import { baseProps } from '@saas-maker/templates/page';
+import { galleryContent } from '@saas-maker/templates/schema';
+import { studioFromProjects, studioProjectsFeed } from '@saas-maker/ui/blocks/footer';
+import json from '../content/calorie.json';
+
+const content = galleryContent.parse(json);
+let projects = [];
+try {
+  const response = await fetch(studioProjectsFeed, { signal: AbortSignal.timeout(5000) });
+  if (response.ok) projects = await response.json();
+} catch {
+  projects = [];
+}
+if (content.footer) content.footer.studio = studioFromProjects(projects, { current: 'calorie' });
+---
+
+<Base {...baseProps(content)}>
+  <Fragment slot="head">
+    <link rel="alternate" type="text/markdown" href="https://calorie.significanthobbies.com/index.md" />
+    <link rel="alternate" type="application/rss+xml" title="Calorie journal" href="/blog/rss.xml" />
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png" />
+    <link rel="icon" type="image/png" sizes="64x64" href="/favicon-64.png" />
+    <meta name="theme-color" content="#47743a" />
+    <meta property="og:locale" content="en_US" />
+    <script is:inline>(function(){const clarityProjectId = "y6bultfwvf";
+const productId = "calorie";
+
+        (function(c, l, a, r, i, t, y) {
+          c[a] = c[a] || function() { (c[a].q = c[a].q || []).push(arguments); };
+          t = l.createElement(r);
+          t.async = 1;
+          t.src = "https://www.clarity.ms/tag/" + i;
+          y = l.getElementsByTagName(r)[0];
+          y.parentNode.insertBefore(t, y);
+        })(window, document, "clarity", "script", clarityProjectId);
+        window.clarity("set", "project_id", productId);
+      })();</script>
+    <script is:inline id="app-health-tracker" defer src="https://health.sassmaker.com/tracker.js" data-key="ahk_pub_36a9474d23773b3586e5488918b62d5acbd78150d7ce1f5971bfa560e4df404a" data-project="app-a2a82816-4bb4-4bea-b5e7-7e982172e79c" data-identity="persistent" data-endpoint="https://ingest.sassmaker.com/v1/browser"></script>
+    <script is:inline>
+      document.addEventListener('DOMContentLoaded', function () {
+        document.querySelectorAll('a[href="/testflight/"]').forEach(function (link) {
+          link.setAttribute('data-cta', 'cta_testflight');
+        });
+        var secondary = document.querySelector('main a[href="#how"]');
+        if (secondary) secondary.setAttribute('data-cta', 'cta_look_inside');
+      });
+
+// Count only actions on the public landing; the capture service records consented joins.
+(function () {
+  document.addEventListener("click", function (event) {
+    var target = event.target.closest && event.target.closest("[data-cta]");
+    var name = target && target.getAttribute("data-cta");
+    if (!name || !window.appHealth || typeof window.appHealth.track !== "function") return;
+    window.appHealth.track(name);
+
+    var link = target.closest("a[href]");
+    if (!link || event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || link.target && link.target !== "_self" || link.hasAttribute("download")) return;
+    var destination = new URL(link.href, location.href);
+    if (destination.origin === location.origin && destination.pathname === location.pathname && destination.search === location.search && destination.hash) return;
+    if (typeof window.appHealth.flush !== "function") return;
+    event.preventDefault();
+    window.appHealth.flush().finally(function () { location.assign(link.href); });
+  }, true);
+})();
+    </script>
+  </Fragment>
+  <GalleryPage content={content} />
+</Base>
