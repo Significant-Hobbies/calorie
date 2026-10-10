@@ -20,6 +20,9 @@
       "!index.html",
       "!public",
       "!marketing",
+      "!landing/node_modules",
+      "!landing/dist",
+      "!landing/.astro",
       "!**/*.css",
       "!worker-configuration.d.ts"
     ]

@@ -55,8 +55,9 @@ deployment step. `0002_personalized_daily_care.sql` adds private medication
 routines/check-offs and manual calorie-range columns. The repository
 intentionally contains no credentials.
 
-The public site is the shared native-product landing at `/`; there is no web
-journal. The retained Google callback stays at
+The public `/` home is built from `landing/` with the SaaS Maker UI library; run
+`pnpm landing:build` to update its snapshot. There is no web journal.
+The retained Google callback stays at
 `https://calorie.significanthobbies.com/api/auth/callback/google` as its
 callback. Only the standard OpenID Connect identity scopes are requested.
 Native Apple ID tokens are verified for `com.significanthobbies.calorie`.
