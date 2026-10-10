@@ -275,8 +275,8 @@ final class CalorieUITests: XCTestCase {
         app.launch()
 
         for tab in ["Progress", "Foods", "You"] {
-            app.tabBars.buttons[tab].tap()
-            XCTAssertTrue(app.staticTexts[tab].waitForExistence(timeout: 2))
+            app.tabBars.buttons.ci(tab).tap()
+            XCTAssertTrue(app.staticTexts.ci(tab).waitForExistence(timeout: 2))
         }
     }
 
@@ -358,7 +358,7 @@ final class CalorieUITests: XCTestCase {
                 ("Calories (kcal)", expectedCalories), ("Protein (g)", "7"),
                 ("Carbohydrates (g)", "28"), ("Fat (g)", "0"), ("Fibre (g)", "5")
             ] {
-                let field = app.textFields[label]
+                let field = app.textFields.ci(label)
                 reveal(field)
                 XCTAssertTrue(field.waitForExistence(timeout: 3))
                 XCTAssertEqual(field.label, label)
