@@ -284,10 +284,7 @@ struct FoodsView: View {
                 } else {
                     LazyVStack(alignment: .leading, spacing: 0) {
                         ForEach(foods) { food in
-                            let layout = dynamicTypeSize.isAccessibilitySize
-                                ? AnyLayout(VStackLayout(alignment: .leading, spacing: 8))
-                                : AnyLayout(HStackLayout(spacing: 12))
-                            layout {
+                            HStack(spacing: 12) {
                                 Button { Task { await model.toggleFavorite(food) } } label: {
                                     Image(systemName: food.isFavorite ? "heart.fill" : "heart")
                                         .foregroundStyle(food.isFavorite ? CaloriePalette.cherry : .secondary)
