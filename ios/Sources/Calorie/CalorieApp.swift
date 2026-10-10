@@ -1,8 +1,10 @@
 import CalorieCore
+import SaaSMakerUI
 import SwiftUI
 
 @main
 struct CalorieApp: App {
+    @Environment(\.colorScheme) private var colorScheme
     @Environment(\.scenePhase) private var scenePhase
     #if DEBUG
     private let fixture: PersistentJournalFixture?
@@ -20,6 +22,7 @@ struct CalorieApp: App {
     var body: some Scene {
         WindowGroup {
             journalView
+                .smTheme(CaloriePalette.theme(for: model.preferredColorScheme ?? colorScheme))
                 .environment(model)
                 .preferredColorScheme(model.preferredColorScheme)
                 .task {

@@ -1,18 +1,50 @@
 import CalorieCore
+import SaaSMakerUI
 import SwiftUI
 import UIKit
 
 enum CaloriePalette {
-    static let paper = adaptive(light: rgb(252, 253, 249), dark: rgb(18, 24, 19))
-    static let surface = adaptive(light: rgb(242, 247, 237), dark: rgb(30, 40, 31))
-    static let surfaceStrong = adaptive(light: rgb(229, 239, 222), dark: rgb(48, 64, 49))
-    static let leaf = adaptive(light: rgb(27, 55, 35), dark: rgb(236, 244, 235))
+    private static let leafColor = adaptive(light: rgb(27, 55, 35), dark: rgb(236, 244, 235))
+    private static let surfaceStrongColor = adaptive(light: rgb(229, 239, 222), dark: rgb(48, 64, 49))
+    private static let surfaceColor = adaptive(light: rgb(242, 247, 237), dark: rgb(30, 40, 31))
+    private static let paperColor = adaptive(light: rgb(252, 253, 249), dark: rgb(18, 24, 19))
+    static let paper = theme.background
+    static let surface = theme.surface
+    static let surfaceStrong = theme.secondary
+    static let leaf = theme.foreground
     static let moss = adaptive(light: rgb(71, 116, 58), dark: rgb(111, 165, 93))
     static let mossStrong = adaptive(light: rgb(44, 82, 36), dark: rgb(145, 195, 127))
     static let cherry = adaptive(light: rgb(223, 59, 50), dark: rgb(255, 112, 101))
     static let amber = adaptive(light: rgb(224, 167, 45), dark: rgb(244, 193, 76))
     static let sky = adaptive(light: rgb(204, 231, 239), dark: rgb(37, 56, 62))
     static let plum = adaptive(light: rgb(226, 211, 235), dark: rgb(58, 47, 65))
+
+    // Base has the closest sans-serif hierarchy and the app's 16pt card radius.
+    static var theme: SMPalette {
+        var palette = SMPalette.base.brand(moss, foreground: adaptive(light: .white, dark: rgb(18, 24, 19)), soft: surfaceStrongColor)
+        palette.background = paperColor
+        palette.foreground = leafColor
+        palette.surface = surfaceColor
+        palette.card = surfaceColor
+        palette.secondary = surfaceStrongColor
+        palette.success = mossStrong
+        palette.warning = amber
+        palette.destructive = cherry
+        return palette
+    }
+
+    static func theme(for scheme: ColorScheme) -> SMPalette {
+        var palette = theme
+        if scheme == .dark {
+            let dark = SMPalette.baseDark
+            palette.isDark = true
+            palette.mutedForeground = dark.mutedForeground
+            palette.border = dark.border
+            palette.hairline = dark.hairline
+            palette.input = dark.input
+        }
+        return palette
+    }
 
     private static func rgb(_ red: CGFloat, _ green: CGFloat, _ blue: CGFloat) -> UIColor {
         UIColor(red: red / 255, green: green / 255, blue: blue / 255, alpha: 1)
@@ -28,7 +60,7 @@ enum CaloriePalette {
 struct BotanicalBackground: ViewModifier {
     func body(content: Content) -> some View {
         content
-            .fontDesign(.rounded)
+            .font(CalorieType.body)
             .foregroundStyle(CaloriePalette.leaf)
             .background(CaloriePalette.paper.ignoresSafeArea())
             .tint(CaloriePalette.moss)
@@ -81,25 +113,53 @@ struct CherryMark: View {
     }
 }
 
+// Keep the public style used by onboarding and journal screens.
 struct BotanicalButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .font(.headline.weight(.bold))
-            .foregroundStyle(.white)
-            .frame(maxWidth: .infinity, minHeight: 54)
-            .background(CaloriePalette.moss)
-            .clipShape(RoundedRectangle(cornerRadius: 13, style: .continuous))
-            .scaleEffect(configuration.isPressed ? 0.985 : 1)
-            .animation(.easeOut(duration: 0.1), value: configuration.isPressed)
+        BotanicalButtonBody(configuration: configuration)
     }
+}
+
+/// A view (not a direct `SMButtonStyle.makeBody` call) so the themed palette
+/// from the environment applies; SMButtonStyle outside a view falls back to the default brand.
+private struct BotanicalButtonBody: View {
+    let configuration: ButtonStyleConfiguration
+    @Environment(\.smPalette) private var p
+
+    var body: some View {
+        configuration.label
+            .font(.custom(p.displayFont, size: 16, relativeTo: .body).weight(.semibold))
+            .textCase(p.uiLowercase ? .lowercase : nil)
+            .foregroundStyle(p.brandForeground)
+            .frame(maxWidth: .infinity, minHeight: 46)
+            .background(p.brand, in: .capsule)
+            .contentShape(.capsule)
+            .scaleEffect(configuration.isPressed ? 0.98 : 1)
+            .opacity(configuration.isPressed ? 0.9 : 1)
+    }
+}
+
+enum CalorieType {
+    static let body = Font.custom(SMPalette.base.sansFont, size: 16, relativeTo: .body)
+    static let headline = Font.custom(SMPalette.base.displayFont, size: 17, relativeTo: .headline)
+    static let title = Font.custom(SMPalette.base.displayFont, size: 28, relativeTo: .title)
+    static let title2 = Font.custom(SMPalette.base.displayFont, size: 22, relativeTo: .title2)
+    static let title3 = Font.custom(SMPalette.base.displayFont, size: 20, relativeTo: .title3)
+    static let largeTitle = Font.custom(SMPalette.base.displayFont, size: 34, relativeTo: .largeTitle)
+    static let caption = Font.custom(SMPalette.base.sansFont, size: 12, relativeTo: .caption)
+    static let caption2 = Font.custom(SMPalette.base.sansFont, size: 11, relativeTo: .caption2)
+    static let subheadline = Font.custom(SMPalette.base.sansFont, size: 15, relativeTo: .subheadline)
+    static let callout = Font.custom(SMPalette.base.sansFont, size: 16, relativeTo: .callout)
+    static let energy = Font.custom(SMPalette.base.displayFont, size: 52, relativeTo: .largeTitle)
 }
 
 struct BotanicalSectionLabel: View {
     let text: String
 
     var body: some View {
-        Text(text)
-            .font(.caption.weight(.bold))
+        Text(text.lowercased())
+            .accessibilityLabel(text)
+            .font(CalorieType.caption.weight(.bold))
             .foregroundStyle(.secondary)
     }
 }
@@ -115,19 +175,19 @@ struct TrackedQualityScoreView: View {
             DisclosureGroup {
                 VStack(alignment: .leading, spacing: 4) {
                     if let basisLabel {
-                        Text(basisLabel).font(.caption.weight(.semibold))
+                        Text(basisLabel).font(CalorieType.caption.weight(.semibold))
                     }
                     Text(quality.explanation)
                 }
-                .font(.caption)
+                .font(CalorieType.caption)
                 .foregroundStyle(.secondary)
                 .padding(.top, 5)
             } label: {
                 HStack(spacing: 10) {
                     VStack(alignment: .leading, spacing: 2) {
-                        Text(contextLabel).font(.subheadline.weight(.semibold))
+                        Text(contextLabel).font(CalorieType.subheadline.weight(.semibold))
                         if let basisLabel {
-                            Text(basisLabel).font(.caption2).foregroundStyle(.secondary)
+                            Text(basisLabel).font(CalorieType.caption2).foregroundStyle(.secondary)
                         }
                     }
                     Spacer()
@@ -140,7 +200,7 @@ struct TrackedQualityScoreView: View {
                 scoreChip
                 if let basisLabel {
                     Text(basisLabel)
-                        .font(.caption2.weight(.semibold))
+                        .font(CalorieType.caption2.weight(.semibold))
                         .foregroundStyle(.secondary)
                 }
             }
@@ -154,16 +214,10 @@ struct TrackedQualityScoreView: View {
     }
 
     private var scoreChip: some View {
-        Label(
-            quality.score.map { "\($0)/100 tracked" } ?? "Score unavailable",
-            systemImage: "leaf.fill"
+        SMStatusPill(
+            quality.score.map { "\($0)/100 tracked" } ?? "score unavailable",
+            tone: quality.score == nil ? .neutral : .brand
         )
-        .font(.caption.weight(.bold))
-        .foregroundStyle(quality.score == nil ? .secondary : CaloriePalette.mossStrong)
-        .padding(.horizontal, 8)
-        .padding(.vertical, 5)
-        .background(CaloriePalette.surfaceStrong)
-        .clipShape(Capsule())
     }
 }
 
@@ -174,26 +228,20 @@ struct DailyScoreView: View {
         DisclosureGroup {
             VStack(alignment: .leading, spacing: 4) {
                 Text("Calories \(factor(result.calorieFactor)) · Protein \(factor(result.proteinFactor)) · Fibre \(factor(result.fibreFactor))")
-                    .font(.caption.weight(.semibold))
+                    .font(CalorieType.caption.weight(.semibold))
                 Text(result.explanation)
-                    .font(.caption)
+                    .font(CalorieType.caption)
             }
             .foregroundStyle(.secondary)
             .padding(.top, 5)
         } label: {
             HStack(spacing: 10) {
-                Text(result.label).font(.subheadline.weight(.semibold))
+                Text(result.label).font(CalorieType.subheadline.weight(.semibold))
                 Spacer()
-                Label(
-                    result.score.map { "\($0)/100" } ?? "Score unavailable",
-                    systemImage: "target"
+                SMStatusPill(
+                    result.score.map { "\($0)/100" } ?? "score unavailable",
+                    tone: result.score == nil ? .neutral : .brand
                 )
-                .font(.caption.weight(.bold))
-                .foregroundStyle(result.score == nil ? .secondary : CaloriePalette.mossStrong)
-                .padding(.horizontal, 8)
-                .padding(.vertical, 5)
-                .background(CaloriePalette.surfaceStrong)
-                .clipShape(Capsule())
             }
         }
         .accessibilityLabel("\(result.label). \(result.explanation)")
@@ -204,6 +252,37 @@ struct DailyScoreView: View {
     }
 }
 
+private struct BotanicalCard: ViewModifier {
+    @Environment(\.smPalette) private var palette
+    let padding: CGFloat
+    let color: Color?
+
+    func body(content: Content) -> some View {
+        var cardPalette = palette
+        if let color { cardPalette.card = color }
+        return SMCard(padding: padding) { content }
+            // Calorie uses flat surfaces; clip the library's outer card shadow.
+            .clipShape(RoundedRectangle(cornerRadius: cardPalette.radius + 4))
+            .environment(\.smPalette, cardPalette)
+    }
+}
+
 extension View {
+    func botanicalCard(padding: CGFloat = 18, color: Color? = nil) -> some View {
+        modifier(BotanicalCard(padding: padding, color: color))
+    }
+
+    func botanicalNavigationTitle(_ title: String) -> some View {
+        navigationTitle(title)
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .principal) {
+                    Text(title.lowercased())
+                        .font(CalorieType.headline.weight(.semibold))
+                        .accessibilityLabel(title)
+                }
+            }
+    }
+
     func botanicalBackground() -> some View { modifier(BotanicalBackground()) }
 }
