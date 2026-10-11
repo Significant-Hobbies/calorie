@@ -2,6 +2,9 @@
   X-Content-Type-Options: nosniff
   Vary: Accept, Accept-Encoding
 
+/
+  Content-Type: text/html; charset=utf-8
+
 /llms.txt
   Content-Type: text/plain; charset=utf-8
 
