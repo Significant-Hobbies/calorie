@@ -122,7 +122,7 @@
       "href": "#how"
     },
     "note": "Internal TestFlight only. No public invite or App Store listing.",
-    "backdrop": "/images/story/calorie-scene-v1.webp",
+    "backdrop": "/images/story/calorie-hero-v3.webp",
     "screen": {
       "src": "today.webp",
       "alt": "Calorie Today on iPhone: energy left for the day, protein, carbs, fat and fibre, and a food journal with breakfast and a snack"
@@ -209,7 +209,7 @@
       "href": "/testflight/"
     },
     "note": "Internal TestFlight only. No public invite or App Store listing.",
-    "image": "/images/story/calorie-scene-v1.webp",
+    "image": "/images/story/calorie-closing-v3.webp",
     "credit": "Illustrative artwork"
   },
   "footer": {
