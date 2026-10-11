@@ -347,7 +347,7 @@ public struct CalorieDocument: Codable, Equatable, Sendable {
         goalCycleSessions: [GoalCycleSession]? = nil,
         cycle: CycleContext = CycleContext(),
         dailyNotes: [String: String] = [:],
-        theme: AppTheme = .system,
+        theme: AppTheme = .dark,
         syncState: SyncState = .localOnly,
         lastSyncedAt: Date? = nil
     ) {

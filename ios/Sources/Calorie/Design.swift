@@ -13,6 +13,7 @@ enum CaloriePalette {
     static let surfaceStrong = theme.secondary
     static let leaf = theme.foreground
     static let moss = adaptive(light: rgb(71, 116, 58), dark: rgb(111, 165, 93))
+    static let onMoss = adaptive(light: .white, dark: rgb(18, 24, 19))
     static let mossStrong = adaptive(light: rgb(44, 82, 36), dark: rgb(145, 195, 127))
     static let cherry = adaptive(light: rgb(223, 59, 50), dark: rgb(255, 112, 101))
     static let amber = adaptive(light: rgb(224, 167, 45), dark: rgb(244, 193, 76))
@@ -21,7 +22,7 @@ enum CaloriePalette {
 
     // Base has the closest sans-serif hierarchy and the app's 16pt card radius.
     static var theme: SMPalette {
-        var palette = SMPalette.base.brand(moss, foreground: adaptive(light: .white, dark: rgb(18, 24, 19)), soft: surfaceStrongColor)
+        var palette = SMPalette.base.brand(moss, foreground: onMoss, soft: surfaceStrongColor)
         palette.background = paperColor
         palette.foreground = leafColor
         palette.surface = surfaceColor
