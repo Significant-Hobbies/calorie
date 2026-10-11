@@ -4,12 +4,6 @@
     "title": "Calorie — A private food journal for weight loss.",
     "description": "Log meals, four nutrients, water, weight, and routines in seconds. See transparent fasting, exercise, and sleep estimates from your timestamps and targets.",
     "theme": "gallery",
-    "tokens": {
-      "--brand": "#47743a",
-      "--brand-ink": "#47743a",
-      "--brand-foreground": "#ffffff",
-      "--brand-soft": "#e7f0dc"
-    },
     "icon": "/favicon-64.png",
     "assetBase": "/images/home/",
     "canonical": "https://calorie.significanthobbies.com/",
@@ -82,6 +76,25 @@
           ]
         }
       ]
+    },
+    "mode": "dark",
+    "fromApp": {
+      "background": "#121813",
+      "foreground": "#ECF4EB",
+      "card": "#1E281F",
+      "surface": "#1E281F",
+      "muted": "#304031",
+      "mutedForeground": "#94979B",
+      "border": "#304031",
+      "brand": "#6FA55D",
+      "brandForeground": "#121813",
+      "destructive": "#FF7065",
+      "radius": "16px"
+    },
+    "fonts": {
+      "display": "ui-rounded",
+      "text": "ui-rounded",
+      "accentStyle": "normal"
     }
   },
   "product": "Calorie",
