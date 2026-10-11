@@ -18,7 +18,9 @@ controls remain semantic HTML rather than raster assets.
 
 ## Color
 
-All authored colors use OKLCH.
+The native app's default palette uses the exact dark hex tokens below. The
+landing must match these tokens. The OKLCH tokens below describe the optional
+light palette.
 
 ```css
 :root {
@@ -44,8 +46,33 @@ carbs, fibre, and energy timing. Neither accent is decorative filler.
 
 Dark mode is a separate semantic palette, not a color inversion. It keeps green,
 sky, plum, cherry, and amber meanings intact while replacing paper, surface,
-line, and ink tokens with low-glare values. Light is the first-run default;
-explicit Light, Dark, and System choices are device-scoped.
+line, and ink tokens with low-glare values. Dark is the default for new
+documents and first run, including before the journal loads. Existing stored
+themes are retained; Light, Dark, and System remain selectable.
+
+| Dark role | Hex |
+| --- | --- |
+| Paper / background | `#121813` |
+| Leaf / foreground | `#ECF4EB` |
+| Card / surface | `#1E281F` |
+| Surface strong / muted / landing border | `#304031` |
+| Secondary label on paper / landing muted foreground | `#94979B` |
+| Moss / brand | `#6FA55D` |
+| On moss / brand foreground | `#121813` |
+| Cherry / destructive | `#FF7065` |
+| Amber | `#F4C14C` |
+| Moss strong | `#91C37F` |
+| Sky | `#25383E` |
+| Plum | `#3A2F41` |
+
+Secondary native text uses the system's semantic secondary label; `#94979B`
+is its approximate composite on paper. Native shared controls retain the
+library's dark border, hairline, and input roles. Landing borders use surface
+strong for decorative hairlines.
+
+Labels and loading indicators on dark moss fills use paper, not white:
+`#121813` on `#6FA55D` has 6.19:1 contrast; white has only 2.91:1. The light
+theme keeps white on its darker moss fill.
 
 ## Typography
 

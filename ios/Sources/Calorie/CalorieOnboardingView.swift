@@ -241,7 +241,7 @@ struct CalorieOnboardingView: View {
                 Task { await saveFirstFood() }
             } label: {
                 if isSaving {
-                    ProgressView().tint(.white).frame(maxWidth: .infinity)
+                    ProgressView().tint(CaloriePalette.onMoss).frame(maxWidth: .infinity)
                 } else {
                     Text("Log my first food").frame(maxWidth: .infinity)
                 }

@@ -106,7 +106,7 @@ final class CalorieSyncCommitTests: XCTestCase {
 
         XCTAssertTrue(f.model.document.waterEntries.isEmpty)
         XCTAssertEqual(f.model.document.profile, profileBefore, "A tombstone must never blank the profile")
-        XCTAssertEqual(f.model.document.theme, .system, "A tombstone must never blank the appearance setting")
+        XCTAssertEqual(f.model.document.theme, .dark, "A tombstone must never blank the appearance setting")
     }
 
     func testPulledDailyNoteTombstoneRemovesTheDateKey() async throws {
