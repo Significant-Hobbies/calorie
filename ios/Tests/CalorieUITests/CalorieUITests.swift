@@ -181,7 +181,7 @@ final class CalorieUITests: XCTestCase {
         capture("Undo restored entry — 925 kcal")
     }
 
-    func testFoodAndWaterPersistAcrossRelaunchInAnIsolatedJournal() {
+    func testFoodWaterAndWeightPersistAcrossRelaunchInAnIsolatedJournal() {
         let app = XCUIApplication()
         let firstID = UUID().uuidString
         let secondID = UUID().uuidString
@@ -232,6 +232,13 @@ final class CalorieUITests: XCTestCase {
         app.buttons.ci("+ 250 ml").tap()
         XCTAssertTrue(app.staticTexts.ci("250 ml").waitForExistence(timeout: 3))
         capture("Persistent journal — water saved")
+        let editContext = app.buttons.ci("Edit weight, cycle & note")
+        for _ in 0..<5 where !editContext.isHittable { app.swipeUp() }
+        XCTAssertTrue(editContext.isHittable)
+        editContext.tap()
+        type("72.4", into: app.textFields.ci("Weight (kg, optional)"))
+        app.buttons.ci("Save").tap()
+        XCTAssertTrue(app.textFields.ci("Weight (kg, optional)").waitForNonExistence(timeout: 3))
         app.terminate()
 
         app.launch()
@@ -242,6 +249,13 @@ final class CalorieUITests: XCTestCase {
         XCTAssertTrue(app.buttons.ci("Log food").isHittable)
         XCTAssertTrue(app.tabBars.buttons.ci("Foods").isHittable)
         capture("Persistent journal — water after relaunch")
+        for _ in 0..<5 where !editContext.isHittable { app.swipeUp() }
+        editContext.tap()
+        let weight = app.textFields.ci("Weight (kg, optional)")
+        XCTAssertTrue(weight.waitForExistence(timeout: 3))
+        XCTAssertEqual(weight.value as? String, "72.4")
+        capture("Persistent journal — weight after relaunch")
+        app.buttons.ci("Cancel").tap()
         app.buttons.ci("Log food").tap()
         XCTAssertTrue(app.navigationBars.ci("Log food").waitForExistence(timeout: 3))
         app.buttons.ci("Close").tap()
@@ -266,7 +280,11 @@ final class CalorieUITests: XCTestCase {
         ).firstMatch.exists)
         revealWater()
         XCTAssertTrue(app.staticTexts.ci("0 ml").exists)
-        capture("Independent UUID — empty food and water journal")
+        app.tabBars.buttons.ci("Progress").tap()
+        let noWeight = app.staticTexts.ci("No weight check-ins yet.")
+        for _ in 0..<5 where !noWeight.isHittable { app.swipeUp() }
+        XCTAssertTrue(noWeight.isHittable)
+        capture("Independent UUID — empty food, water and weight journal")
     }
 
     func testPrimaryTabsAreReachable() {
