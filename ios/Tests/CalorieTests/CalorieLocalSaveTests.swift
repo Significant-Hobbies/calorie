@@ -70,7 +70,7 @@ final class CalorieLocalSaveTests: XCTestCase {
         XCTAssertEqual(durationSampleCount(.logFormElapsed, in: metrics), 1)
     }
 
-    func testDismissDuringFailedQuickLogSaveRecordsFailureNotCancel() async throws {
+    func testDismissDuringFailedQuickLogSavePreservesReopenedSession() async throws {
         let root = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
         defer { try? FileManager.default.removeItem(at: root) }
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
@@ -85,12 +85,25 @@ final class CalorieLocalSaveTests: XCTestCase {
         for _ in 0..<10_000 where !model.isQuickLogSaveInProgress { await Task.yield() }
         XCTAssertTrue(model.isQuickLogSaveInProgress)
         model.cancelQuickLogSessionIfActive()
+        model.beginQuickLogSession()
 
         let saved = await save.value
         XCTAssertFalse(saved)
-        let metrics = try loadMetrics(root)
+        var metrics = try loadMetrics(root)
+        XCTAssertEqual(interactionCount(.logFormOpened, in: metrics), 2)
         XCTAssertEqual(interactionCount(.logSaveFailed, in: metrics), 1)
-        XCTAssertEqual(interactionCount(.logCancelled, in: metrics), 0)
+        XCTAssertEqual(interactionCount(.logCancelled, in: metrics), 1)
+        XCTAssertEqual(durationSampleCount(.logFormElapsed, in: metrics), 1)
+
+        try FileManager.default.removeItem(at: blocker)
+        let reopenedSave = await model.log(food, servings: 1, meal: .lunch, at: model.selectedDate)
+        XCTAssertTrue(reopenedSave)
+        metrics = try loadMetrics(root)
+        XCTAssertEqual(interactionCount(.logFormOpened, in: metrics), 2)
+        XCTAssertEqual(interactionCount(.logSaved, in: metrics), 1)
+        XCTAssertEqual(interactionCount(.logSaveFailed, in: metrics), 1)
+        XCTAssertEqual(interactionCount(.logCancelled, in: metrics), 1)
+        XCTAssertEqual(durationSampleCount(.logFormElapsed, in: metrics), 2)
     }
 
     func testDismissDuringEntryEditSaveRecordsCommittedOutcome() async throws {

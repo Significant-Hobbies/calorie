@@ -446,7 +446,6 @@ private struct EntryEditorView: View {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }
                         .textCase(.lowercase).accessibilityLabel("Cancel")
-                        .disabled(model.isEntryEditSaveInProgress)
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Save") {
@@ -457,7 +456,6 @@ private struct EntryEditorView: View {
                         }
                     }
                     .textCase(.lowercase).accessibilityLabel("Save")
-                    .disabled(model.isEntryEditSaveInProgress)
                 }
             }
         }
