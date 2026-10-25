@@ -59,11 +59,19 @@ final class LocalInteractionMetricsStore {
                 report.days.append(LocalInteractionDay(date: dayKey))
                 dayIndex = report.days.count - 1
             }
-            report.days[dayIndex].counters[event.rawValue, default: 0] += 1
+            let (nextCount, countOverflow) = report.days[dayIndex].counters[event.rawValue, default: 0]
+                .addingReportingOverflow(1)
+            guard !countOverflow else { return }
+            report.days[dayIndex].counters[event.rawValue] = nextCount
             if let elapsedSeconds, elapsedSeconds.isFinite, elapsedSeconds >= 0,
                let duration = Self.duration(for: event) {
-                report.days[dayIndex].durationTotalsSeconds[duration.rawValue, default: 0] += elapsedSeconds
-                report.days[dayIndex].durationSamples[duration.rawValue, default: 0] += 1
+                let nextTotal = report.days[dayIndex].durationTotalsSeconds[duration.rawValue, default: 0]
+                    + elapsedSeconds
+                let (nextSamples, sampleOverflow) = report.days[dayIndex].durationSamples[duration.rawValue, default: 0]
+                    .addingReportingOverflow(1)
+                guard nextTotal.isFinite, !sampleOverflow else { return }
+                report.days[dayIndex].durationTotalsSeconds[duration.rawValue] = nextTotal
+                report.days[dayIndex].durationSamples[duration.rawValue] = nextSamples
             }
             report.days.sort { $0.date < $1.date }
             report.updatedAtISO = Self.iso8601(now)

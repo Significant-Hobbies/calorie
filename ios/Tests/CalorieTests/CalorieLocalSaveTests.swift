@@ -6,6 +6,49 @@ import XCTest
 
 @MainActor
 final class CalorieLocalSaveTests: XCTestCase {
+    func testOverflowingExistingMetricsAreDroppedWithoutRewritingSidecar() throws {
+        let root = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        let now = Date()
+        let timeZone = TimeZone.current
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = timeZone
+        let components = calendar.dateComponents([.year, .month, .day], from: now)
+        let date = String(format: "%04d-%02d-%02d", components.year ?? 0, components.month ?? 0, components.day ?? 0)
+        let file = root.appending(path: "interaction-metrics.json")
+
+        let counterReport = LocalInteractionReport(
+            coverageStartedAtISO: "2026-10-26T00:00:00Z",
+            updatedAtISO: "2026-10-26T00:00:00Z",
+            timeZoneIdentifier: timeZone.identifier,
+            days: [LocalInteractionDay(date: date, counters: [LocalInteractionEvent.logFormOpened.rawValue: Int.max])]
+        )
+        let encoder = JSONEncoder()
+        let counterData = try encoder.encode(counterReport)
+        try counterData.write(to: file)
+        let counterStore = LocalInteractionMetricsStore(fileURL: file)
+        counterStore.record(.logFormOpened, now: now, timeZone: timeZone)
+        XCTAssertEqual(try Data(contentsOf: file), counterData)
+
+        let durationReport = LocalInteractionReport(
+            coverageStartedAtISO: "2026-10-26T00:00:00Z",
+            updatedAtISO: "2026-10-26T00:00:00Z",
+            timeZoneIdentifier: timeZone.identifier,
+            days: [LocalInteractionDay(
+                date: date,
+                counters: [LocalInteractionEvent.logSaved.rawValue: 1],
+                durationTotalsSeconds: [LocalInteractionDuration.logFormElapsed.rawValue: Double.greatestFiniteMagnitude],
+                durationSamples: [LocalInteractionDuration.logFormElapsed.rawValue: 1]
+            )]
+        )
+        let durationData = try encoder.encode(durationReport)
+        try durationData.write(to: file)
+        let durationStore = LocalInteractionMetricsStore(fileURL: file)
+        durationStore.record(.logSaved, elapsedSeconds: Double.greatestFiniteMagnitude, now: now, timeZone: timeZone)
+        XCTAssertEqual(try Data(contentsOf: file), durationData)
+    }
+
     func testFailedFoodSaveRetainsSheetAndReportsFailureUntilRetry() async throws {
         let root = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
         defer { try? FileManager.default.removeItem(at: root) }
