@@ -74,7 +74,6 @@ struct QuickLogView: View {
         }
         .presentationDetents([.medium, .large])
         .presentationDragIndicator(.visible)
-        .onAppear { model.beginQuickLogSession() }
     }
 
     private func selection(_ food: Food) -> some View {

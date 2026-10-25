@@ -35,16 +35,6 @@ final class AppModel {
     private let legacyJournal: (any LegacyCalorieServing)?
     private let interactionMetrics: LocalInteractionMetricsStore
     private let interactionMetricsEnabled: Bool
-    private var quickLogSessionID: UUID?
-    private var quickLogStartedAt: TimeInterval?
-    private var quickLogSaveInFlightSessionID: UUID?
-    private var quickLogDismissedElapsed: [UUID: TimeInterval] = [:]
-    private var entryEditSessionID: UUID?
-    private var entryEditStartedAt: TimeInterval?
-    private var entryEditSaveInFlightSessionID: UUID?
-    private var entryEditDismissedElapsed: [UUID: TimeInterval] = [:]
-    private(set) var isQuickLogSaveInProgress = false
-    private(set) var isEntryEditSaveInProgress = false
     private var activeLocalMutations = 0
     private var localMutationRevision = 0
     private var syncRequestedAfterMutation = false
@@ -238,90 +228,12 @@ final class AppModel {
 
     @discardableResult
     func log(_ food: Food, servings: Double, meal: Meal, at date: Date) async -> Bool {
-        let sessionID = quickLogSessionID
-        guard sessionID == nil || quickLogSaveInFlightSessionID == nil else { return false }
-        if let sessionID {
-            quickLogSaveInFlightSessionID = sessionID
-            isQuickLogSaveInProgress = true
-        }
         let committed = await mutate({ $0.log(food: food, servings: servings, meal: meal, at: date) })
-        if quickLogSaveInFlightSessionID == sessionID, sessionID != nil {
-            quickLogSaveInFlightSessionID = nil
-            isQuickLogSaveInProgress = false
-        }
-        guard committed else {
-            if let sessionID {
-                interactionMetrics.record(.logSaveFailed)
-                if let elapsed = quickLogDismissedElapsed.removeValue(forKey: sessionID) {
-                    finishQuickLog(sessionID: sessionID, with: .logCancelled, elapsed: elapsed)
-                }
-            }
-            return false
-        }
-        if let sessionID {
-            let elapsed = quickLogDismissedElapsed.removeValue(forKey: sessionID)
-                ?? quickLogStartedAt.map { max(0, ProcessInfo.processInfo.systemUptime - $0) }
-            finishQuickLog(sessionID: sessionID, with: .logSaved, elapsed: elapsed)
-        }
+        if interactionMetricsEnabled { interactionMetrics.record(committed ? .logSaved : .logSaveFailed) }
+        guard committed else { return false }
         isQuickLogPresented = false
         message = "\(food.name) added."
         return true
-    }
-
-    func beginQuickLogSession() {
-        guard interactionMetricsEnabled, quickLogSessionID == nil else { return }
-        let sessionID = UUID()
-        quickLogSessionID = sessionID
-        quickLogStartedAt = ProcessInfo.processInfo.systemUptime
-        interactionMetrics.record(.logFormOpened)
-    }
-
-    func cancelQuickLogSessionIfActive() {
-        guard let sessionID = quickLogSessionID, let startedAt = quickLogStartedAt else { return }
-        let elapsed = max(0, ProcessInfo.processInfo.systemUptime - startedAt)
-        if quickLogSaveInFlightSessionID == sessionID {
-            quickLogDismissedElapsed[sessionID] = elapsed
-            quickLogSessionID = nil
-            quickLogStartedAt = nil
-            return
-        }
-        finishQuickLog(sessionID: sessionID, with: .logCancelled, elapsed: elapsed)
-    }
-
-    private func finishQuickLog(sessionID: UUID, with event: LocalInteractionEvent, elapsed: TimeInterval?) {
-        if quickLogSessionID == sessionID {
-            quickLogSessionID = nil
-            quickLogStartedAt = nil
-        }
-        interactionMetrics.record(event, elapsedSeconds: elapsed)
-    }
-
-    func beginEntryEditSession() {
-        guard interactionMetricsEnabled, entryEditSessionID == nil else { return }
-        let sessionID = UUID()
-        entryEditSessionID = sessionID
-        entryEditStartedAt = ProcessInfo.processInfo.systemUptime
-        interactionMetrics.record(.entryEditOpened)
-    }
-
-    func cancelEntryEditSessionIfActive() {
-        guard let sessionID = entryEditSessionID, let startedAt = entryEditStartedAt else { return }
-        let elapsed = max(0, ProcessInfo.processInfo.systemUptime - startedAt)
-        if entryEditSaveInFlightSessionID == sessionID {
-            entryEditDismissedElapsed[sessionID] = elapsed
-            entryEditSessionID = nil
-            entryEditStartedAt = nil
-            return
-        }
-        finishEntryEdit(sessionID: sessionID, with: .entryEditCancelled, elapsed: elapsed)
-    }
-
-    private func finishEntryEdit(sessionID: UUID, with event: LocalInteractionEvent, elapsed: TimeInterval?) {
-        if entryEditSessionID == sessionID {
-            entryEditSessionID = nil
-            entryEditStartedAt = nil
-        }
-        interactionMetrics.record(event, elapsedSeconds: elapsed)
     }
 
     func delete(_ entry: FoodEntry) async {
@@ -346,12 +258,6 @@ final class AppModel {
 
     @discardableResult
     func update(_ entry: FoodEntry, servings: Double, meal: Meal, timestamp: Date) async -> Bool {
-        let sessionID = entryEditSessionID
-        guard sessionID == nil || entryEditSaveInFlightSessionID == nil else { return false }
-        if let sessionID {
-            entryEditSaveInFlightSessionID = sessionID
-            isEntryEditSaveInProgress = true
-        }
         let committed = await mutate { document in
             guard let index = document.foodEntries.firstIndex(where: { $0.id == entry.id }) else {
                 throw CalorieError.entryNotFound
@@ -368,26 +274,10 @@ final class AppModel {
             }
             document.foodEntries[index] = updated
         }
-        if entryEditSaveInFlightSessionID == sessionID, sessionID != nil {
-            entryEditSaveInFlightSessionID = nil
-            isEntryEditSaveInProgress = false
-        }
-        guard committed else {
-            if let sessionID {
-                interactionMetrics.record(.entryEditSaveFailed)
-                if let elapsed = entryEditDismissedElapsed.removeValue(forKey: sessionID) {
-                    finishEntryEdit(sessionID: sessionID, with: .entryEditCancelled, elapsed: elapsed)
-                }
-            }
-            return false
-        }
-        if let sessionID {
-            let elapsed = entryEditDismissedElapsed.removeValue(forKey: sessionID)
-                ?? entryEditStartedAt.map { max(0, ProcessInfo.processInfo.systemUptime - $0) }
-            finishEntryEdit(sessionID: sessionID, with: .entryEditSaved, elapsed: elapsed)
-        }
+        if interactionMetricsEnabled { interactionMetrics.record(committed ? .entryEditSaved : .entryEditSaveFailed) }
+        guard committed else { return false }
         message = "Food entry updated."
-        return committed
+        return true
     }
 
     func addWater(_ millilitres: Int) async {

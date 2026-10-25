@@ -26,7 +26,7 @@ struct RootView: View {
             }
         }
         .botanicalBackground()
-        .sheet(isPresented: $model.isQuickLogPresented, onDismiss: model.cancelQuickLogSessionIfActive) {
+        .sheet(isPresented: $model.isQuickLogPresented) {
             QuickLogView()
         }
         .sheet(isPresented: $model.isApprovalPresented) { ApprovalView() }
