@@ -37,6 +37,12 @@ final class AppModel {
     private let interactionMetricsEnabled: Bool
     private var quickLogStartedAt: TimeInterval?
     private var entryEditStartedAt: TimeInterval?
+    private var quickLogSavesInFlight = 0
+    private var entryEditSavesInFlight = 0
+    private var quickLogDismissedDuringSave = false
+    private var entryEditDismissedDuringSave = false
+    private(set) var isQuickLogSaveInProgress = false
+    private(set) var isEntryEditSaveInProgress = false
     private var activeLocalMutations = 0
     private var localMutationRevision = 0
     private var syncRequestedAfterMutation = false
@@ -230,11 +236,29 @@ final class AppModel {
 
     @discardableResult
     func log(_ food: Food, servings: Double, meal: Meal, at date: Date) async -> Bool {
-        guard await mutate({ $0.log(food: food, servings: servings, meal: meal, at: date) }) else {
-            if quickLogStartedAt != nil { interactionMetrics.record(.logSaveFailed) }
+        let tracksSession = quickLogStartedAt != nil
+        if tracksSession {
+            guard quickLogSavesInFlight == 0 else { return false }
+            quickLogSavesInFlight += 1
+            isQuickLogSaveInProgress = true
+        }
+        let committed = await mutate({ $0.log(food: food, servings: servings, meal: meal, at: date) })
+        if tracksSession {
+            quickLogSavesInFlight -= 1
+            isQuickLogSaveInProgress = quickLogSavesInFlight > 0
+        }
+        guard committed else {
+            if tracksSession {
+                interactionMetrics.record(.logSaveFailed)
+                if quickLogDismissedDuringSave, quickLogSavesInFlight == 0 {
+                    quickLogStartedAt = nil
+                    quickLogDismissedDuringSave = false
+                }
+            }
             return false
         }
-        finishQuickLog(with: .logSaved)
+        if tracksSession { finishQuickLog(with: .logSaved) }
+        if quickLogSavesInFlight == 0 { quickLogDismissedDuringSave = false }
         isQuickLogPresented = false
         message = "\(food.name) added."
         return true
@@ -248,6 +272,10 @@ final class AppModel {
 
     func cancelQuickLogSessionIfActive() {
         guard quickLogStartedAt != nil else { return }
+        if quickLogSavesInFlight > 0 {
+            quickLogDismissedDuringSave = true
+            return
+        }
         finishQuickLog(with: .logCancelled)
     }
 
@@ -265,6 +293,10 @@ final class AppModel {
 
     func cancelEntryEditSessionIfActive() {
         guard entryEditStartedAt != nil else { return }
+        if entryEditSavesInFlight > 0 {
+            entryEditDismissedDuringSave = true
+            return
+        }
         finishEntryEdit(with: .entryEditCancelled)
     }
 
@@ -296,6 +328,12 @@ final class AppModel {
 
     @discardableResult
     func update(_ entry: FoodEntry, servings: Double, meal: Meal, timestamp: Date) async -> Bool {
+        let tracksSession = entryEditStartedAt != nil
+        if tracksSession {
+            guard entryEditSavesInFlight == 0 else { return false }
+            entryEditSavesInFlight += 1
+            isEntryEditSaveInProgress = true
+        }
         let committed = await mutate { document in
             guard let index = document.foodEntries.firstIndex(where: { $0.id == entry.id }) else {
                 throw CalorieError.entryNotFound
@@ -312,11 +350,22 @@ final class AppModel {
             }
             document.foodEntries[index] = updated
         }
+        if tracksSession {
+            entryEditSavesInFlight -= 1
+            isEntryEditSaveInProgress = entryEditSavesInFlight > 0
+        }
         guard committed else {
-            if entryEditStartedAt != nil { interactionMetrics.record(.entryEditSaveFailed) }
+            if tracksSession {
+                interactionMetrics.record(.entryEditSaveFailed)
+                if entryEditDismissedDuringSave, entryEditSavesInFlight == 0 {
+                    entryEditStartedAt = nil
+                    entryEditDismissedDuringSave = false
+                }
+            }
             return false
         }
-        finishEntryEdit(with: .entryEditSaved)
+        if tracksSession { finishEntryEdit(with: .entryEditSaved) }
+        if entryEditSavesInFlight == 0 { entryEditDismissedDuringSave = false }
         message = "Food entry updated."
         return committed
     }

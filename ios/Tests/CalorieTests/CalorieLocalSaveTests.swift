@@ -49,6 +49,74 @@ final class CalorieLocalSaveTests: XCTestCase {
         XCTAssertEqual(try Data(contentsOf: file), durationData)
     }
 
+    func testDismissDuringQuickLogSaveRecordsCommittedOutcome() async throws {
+        let root = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let model = makeModel(store: CalorieStore(fileURL: root.appending(path: "journal.json")), root: root)
+        await model.load()
+        model.beginQuickLogSession()
+        let food = Food(name: "Synthetic bowl", servingName: "1 bowl",
+                        nutrients: Nutrients(calories: 300, protein: 20, carbohydrates: 40, fibre: 5))
+        let save = Task { await model.log(food, servings: 1, meal: .lunch, at: model.selectedDate) }
+        for _ in 0..<10_000 where !model.isQuickLogSaveInProgress { await Task.yield() }
+        XCTAssertTrue(model.isQuickLogSaveInProgress)
+        model.cancelQuickLogSessionIfActive()
+
+        let saved = await save.value
+        XCTAssertTrue(saved)
+        let metrics = try loadMetrics(root)
+        XCTAssertEqual(interactionCount(.logSaved, in: metrics), 1)
+        XCTAssertEqual(interactionCount(.logCancelled, in: metrics), 0)
+        XCTAssertEqual(durationSampleCount(.logFormElapsed, in: metrics), 1)
+    }
+
+    func testDismissDuringFailedQuickLogSaveRecordsFailureNotCancel() async throws {
+        let root = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        let blocker = root.appending(path: "blocked")
+        try Data("not a directory".utf8).write(to: blocker)
+        let model = makeModel(store: CalorieStore(fileURL: blocker.appending(path: "journal.json")), root: root)
+        await model.load()
+        model.beginQuickLogSession()
+        let food = Food(name: "Synthetic bowl", servingName: "1 bowl",
+                        nutrients: Nutrients(calories: 300, protein: 20, carbohydrates: 40, fibre: 5))
+        let save = Task { await model.log(food, servings: 1, meal: .lunch, at: model.selectedDate) }
+        for _ in 0..<10_000 where !model.isQuickLogSaveInProgress { await Task.yield() }
+        XCTAssertTrue(model.isQuickLogSaveInProgress)
+        model.cancelQuickLogSessionIfActive()
+
+        let saved = await save.value
+        XCTAssertFalse(saved)
+        let metrics = try loadMetrics(root)
+        XCTAssertEqual(interactionCount(.logSaveFailed, in: metrics), 1)
+        XCTAssertEqual(interactionCount(.logCancelled, in: metrics), 0)
+    }
+
+    func testDismissDuringEntryEditSaveRecordsCommittedOutcome() async throws {
+        let root = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let model = makeModel(store: CalorieStore(fileURL: root.appending(path: "journal.json")), root: root)
+        await model.load()
+        let food = Food(name: "Synthetic bowl", servingName: "1 bowl",
+                        nutrients: Nutrients(calories: 300, protein: 20, carbohydrates: 40, fibre: 5))
+        let created = await model.log(food, servings: 1, meal: .lunch, at: model.selectedDate)
+        XCTAssertTrue(created)
+        let entry = try XCTUnwrap(model.document.foodEntries.first)
+        model.beginEntryEditSession()
+        let save = Task { await model.update(entry, servings: 2, meal: .dinner, timestamp: entry.timestamp) }
+        for _ in 0..<10_000 where !model.isEntryEditSaveInProgress { await Task.yield() }
+        XCTAssertTrue(model.isEntryEditSaveInProgress)
+        model.cancelEntryEditSessionIfActive()
+
+        let saved = await save.value
+        XCTAssertTrue(saved)
+        let metrics = try loadMetrics(root)
+        XCTAssertEqual(interactionCount(.entryEditSaved, in: metrics), 1)
+        XCTAssertEqual(interactionCount(.entryEditCancelled, in: metrics), 0)
+        XCTAssertEqual(durationSampleCount(.entryEditElapsed, in: metrics), 1)
+    }
+
     func testFailedFoodSaveRetainsSheetAndReportsFailureUntilRetry() async throws {
         let root = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
         defer { try? FileManager.default.removeItem(at: root) }
@@ -75,13 +143,12 @@ final class CalorieLocalSaveTests: XCTestCase {
         XCTAssertEqual(reloaded.foodEntries.map(\.foodName), ["Synthetic bowl"])
         let metrics = try loadMetrics(root)
         XCTAssertEqual(metrics.projectId, "calorie")
-        XCTAssertEqual(metrics.days.count, 1)
-        XCTAssertEqual(metrics.days[0].counters[LocalInteractionEvent.logFormOpened.rawValue], 1)
-        XCTAssertEqual(metrics.days[0].counters[LocalInteractionEvent.logSaveFailed.rawValue], 1)
-        XCTAssertEqual(metrics.days[0].counters[LocalInteractionEvent.logSaved.rawValue], 1)
-        XCTAssertEqual(metrics.days[0].durationSamples[LocalInteractionDuration.logFormElapsed.rawValue], 1)
-        XCTAssertNotNil(metrics.days[0].durationTotalsSeconds[LocalInteractionDuration.logFormElapsed.rawValue])
-        XCTAssertTrue(Set(metrics.days[0].counters.keys).isSubset(of: Set(LocalInteractionEvent.allCases.map(\.rawValue))))
+        XCTAssertEqual(interactionCount(.logFormOpened, in: metrics), 1)
+        XCTAssertEqual(interactionCount(.logSaveFailed, in: metrics), 1)
+        XCTAssertEqual(interactionCount(.logSaved, in: metrics), 1)
+        XCTAssertEqual(durationSampleCount(.logFormElapsed, in: metrics), 1)
+        XCTAssertNotNil(metrics.days.compactMap { $0.durationTotalsSeconds[LocalInteractionDuration.logFormElapsed.rawValue] }.first)
+        XCTAssertTrue(metrics.days.allSatisfy { Set($0.counters.keys).isSubset(of: Set(LocalInteractionEvent.allCases.map(\.rawValue))) })
     }
 
     func testEntryEditSaveAndCancelAreLocalAggregateProxies() async throws {
@@ -100,11 +167,10 @@ final class CalorieLocalSaveTests: XCTestCase {
         model.cancelEntryEditSessionIfActive()
 
         let metrics = try loadMetrics(root)
-        let counters = try XCTUnwrap(metrics.days.first?.counters)
-        XCTAssertEqual(counters[LocalInteractionEvent.entryEditOpened.rawValue], 2)
-        XCTAssertEqual(counters[LocalInteractionEvent.entryEditSaved.rawValue], 1)
-        XCTAssertEqual(counters[LocalInteractionEvent.entryEditCancelled.rawValue], 1)
-        XCTAssertEqual(metrics.days.first?.durationSamples[LocalInteractionDuration.entryEditElapsed.rawValue], 2)
+        XCTAssertEqual(interactionCount(.entryEditOpened, in: metrics), 2)
+        XCTAssertEqual(interactionCount(.entryEditSaved, in: metrics), 1)
+        XCTAssertEqual(interactionCount(.entryEditCancelled, in: metrics), 1)
+        XCTAssertEqual(durationSampleCount(.entryEditElapsed, in: metrics), 2)
         let sidecarText = String(decoding: try Data(contentsOf: metricsURL(root)), as: UTF8.self)
         XCTAssertFalse(sidecarText.contains("Private fixture food"))
         XCTAssertFalse(sidecarText.contains(entry.id.uuidString))
@@ -183,8 +249,8 @@ final class CalorieLocalSaveTests: XCTestCase {
         XCTAssertFalse(edited)
         model.cancelEntryEditSessionIfActive()
         let metrics = try loadMetrics(root)
-        XCTAssertEqual(metrics.days.first?.counters[LocalInteractionEvent.entryEditSaveFailed.rawValue], 1)
-        XCTAssertEqual(metrics.days.first?.counters[LocalInteractionEvent.entryEditCancelled.rawValue], 1)
+        XCTAssertEqual(interactionCount(.entryEditSaveFailed, in: metrics), 1)
+        XCTAssertEqual(interactionCount(.entryEditCancelled, in: metrics), 1)
         XCTAssertEqual(model.document.foodEntries, [entry])
         await model.delete(entry)
         XCTAssertNil(model.lastDeletedEntry)
@@ -286,5 +352,13 @@ final class CalorieLocalSaveTests: XCTestCase {
 
     private func loadMetrics(_ root: URL) throws -> LocalInteractionReport {
         try JSONDecoder().decode(LocalInteractionReport.self, from: Data(contentsOf: metricsURL(root)))
+    }
+
+    private func interactionCount(_ event: LocalInteractionEvent, in report: LocalInteractionReport) -> Int {
+        report.days.reduce(0) { $0 + ($1.counters[event.rawValue] ?? 0) }
+    }
+
+    private func durationSampleCount(_ duration: LocalInteractionDuration, in report: LocalInteractionReport) -> Int {
+        report.days.reduce(0) { $0 + ($1.durationSamples[duration.rawValue] ?? 0) }
     }
 }

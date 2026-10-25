@@ -69,6 +69,7 @@ struct QuickLogView: View {
                         if selectedFood == nil { dismiss() } else { self.selectedFood = nil }
                     }
                     .accessibilityLabel(selectedFood == nil ? "Close" : "Back")
+                    .disabled(model.isQuickLogSaveInProgress)
                 }
             }
         }
@@ -132,6 +133,7 @@ struct QuickLogView: View {
                     Task { await model.log(food, servings: servings, meal: meal, at: time) }
                 }
                 .buttonStyle(BotanicalButtonStyle())
+                .disabled(model.isQuickLogSaveInProgress)
             }
             .padding(20)
         }
