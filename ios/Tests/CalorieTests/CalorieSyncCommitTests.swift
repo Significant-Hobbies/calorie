@@ -139,7 +139,7 @@ final class CalorieSyncCommitTests: XCTestCase {
             MirrorRecord(name: UUID().uuidString.lowercased(), modifiedAt: .now, payload: Data("{}".utf8)),
         ])
         XCTAssertEqual(f.model.document, before)
-        let fileURL = await f.store.fileURL
+        let fileURL = f.store.fileURL
         XCTAssertFalse(
             FileManager.default.fileExists(atPath: fileURL.path),
             "Records the journal does not own must not write it to disk"

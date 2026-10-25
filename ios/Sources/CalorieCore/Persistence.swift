@@ -1,7 +1,7 @@
 import Foundation
 
 public actor CalorieStore {
-    public let fileURL: URL
+    public nonisolated let fileURL: URL
 
     public init(fileURL: URL? = nil) {
         if let fileURL {

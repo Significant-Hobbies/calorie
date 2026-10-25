@@ -60,12 +60,14 @@ final class AppModel {
         store: CalorieStore = CalorieStore(),
         mirror: PersonalMirrorConnection? = AppModel.makeMirrorConnection(),
         legacyJournal: (any LegacyCalorieServing)? = LegacyCalorieJournal(),
-        interactionMetrics: LocalInteractionMetricsStore = LocalInteractionMetricsStore()
+        interactionMetrics: LocalInteractionMetricsStore? = nil
     ) {
         self.store = store
         self.mirror = mirror
         self.legacyJournal = legacyJournal
-        self.interactionMetrics = interactionMetrics
+        self.interactionMetrics = interactionMetrics ?? LocalInteractionMetricsStore(
+            fileURL: store.fileURL.deletingLastPathComponent().appending(path: "interaction-metrics-v1.json")
+        )
         let arguments = ProcessInfo.processInfo.arguments
         interactionMetricsEnabled = !arguments.contains(where: {
             $0.hasSuffix("-demo") || $0 == "--persistent-ui-fixture" || $0 == "--cleanup-persistent-ui-fixture"
@@ -657,7 +659,7 @@ final class AppModel {
     /// traversed the path in the first place.
     private func legacyImportMarkerURL(for userID: String) async -> URL {
         let key = SHA256.hash(data: Data(userID.utf8)).map { String(format: "%02x", $0) }.joined()
-        return await store.fileURL
+        return store.fileURL
             .deletingLastPathComponent()
             .appending(path: "legacy-import-\(key).done")
     }

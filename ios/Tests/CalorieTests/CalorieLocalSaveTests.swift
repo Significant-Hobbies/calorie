@@ -73,6 +73,24 @@ final class CalorieLocalSaveTests: XCTestCase {
         XCTAssertEqual(interactionCount(.logSaveFailed, in: metrics), 0)
     }
 
+    func testInjectedJournalDefaultsMetricsToSiblingSidecar() async throws {
+        let root = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let journalURL = root.appending(path: "journal.json")
+        let metricsURL = root.appending(path: "interaction-metrics-v1.json")
+        let model = AppModel(store: CalorieStore(fileURL: journalURL), mirror: nil, legacyJournal: nil)
+        await model.load()
+
+        let food = Food(name: "Synthetic bowl", servingName: "1 bowl",
+                        nutrients: Nutrients(calories: 300, protein: 20, carbohydrates: 40, fibre: 5))
+        let saved = await model.log(food, servings: 1, meal: .lunch, at: model.selectedDate)
+        XCTAssertTrue(saved)
+
+        XCTAssertTrue(FileManager.default.fileExists(atPath: metricsURL.path))
+        let report = try JSONDecoder().decode(LocalInteractionReport.self, from: Data(contentsOf: metricsURL))
+        XCTAssertEqual(interactionCount(.logSaved, in: report), 1)
+    }
+
     func testFailedFoodSaveRetainsSheetAndReportsFailureUntilRetry() async throws {
         let root = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
         defer { try? FileManager.default.removeItem(at: root) }
