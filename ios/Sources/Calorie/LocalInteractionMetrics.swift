@@ -1,16 +1,20 @@
 import Foundation
 
 enum LocalInteractionEvent: String, CaseIterable {
+    // Reserved schema entries; current AppModel wiring does not emit open or cancel events.
     case logFormOpened = "log_form_opened"
     case logSaved = "log_saved"
     case logCancelled = "log_cancelled"
+    // Request outcome, not a disk-failure rate: false also covers refusals before I/O.
     case logSaveFailed = "log_save_failed"
     case entryEditOpened = "entry_edit_opened"
     case entryEditSaved = "entry_edit_saved"
     case entryEditCancelled = "entry_edit_cancelled"
+    // Request outcome, not a disk-failure rate: false also covers refusals before I/O.
     case entryEditSaveFailed = "entry_edit_save_failed"
 }
 
+// Reserved schema values; current AppModel wiring does not emit durations.
 enum LocalInteractionDuration: String, CaseIterable {
     case logFormElapsed = "log_form_elapsed"
     case entryEditElapsed = "entry_edit_elapsed"

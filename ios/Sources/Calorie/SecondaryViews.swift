@@ -562,6 +562,8 @@ struct YouView: View {
                 .textCase(.lowercase).accessibilityLabel("Reset journal")
             Button("Cancel", role: .cancel) {}
                 .textCase(.lowercase).accessibilityLabel("Cancel")
+        } message: {
+            Text("Usage counts remain on this device.")
         }
         .confirmationDialog(
             "Delete your Calorie cloud account?",
