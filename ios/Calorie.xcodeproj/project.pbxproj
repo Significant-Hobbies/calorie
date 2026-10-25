@@ -35,6 +35,7 @@
 		9A3D45CEDC31C27CC3147C08 /* CalorieCore.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = DC17149D5C06CBF45F708679 /* CalorieCore.framework */; };
 		A8224A20DD29245A504AD39D /* CalorieUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B02FB98A0C748A0D823CFF0E /* CalorieUITests.swift */; };
 		AD3C9AC8E8E54DAA43140F1E /* AppModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 038969CDF1B5BC7ACD39E9BA /* AppModel.swift */; };
+		D11A3A8B46D64BB1A1AA1101 /* LocalInteractionMetrics.swift in Sources */ = {isa = PBXBuildFile; fileRef = D11A3A8B46D64BB1A1AA1102 /* LocalInteractionMetrics.swift */; };
 		B3B258069F32F20F9DB3C832 /* CalorieCore.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = DC17149D5C06CBF45F708679 /* CalorieCore.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		F7CB72C8736F6065249E7BF9 /* PersonalSyncKit in Frameworks */ = {isa = PBXBuildFile; productRef = 002ECA2451C6B565726001E3 /* PersonalSyncKit */; };
 /* End PBXBuildFile section */
@@ -122,6 +123,7 @@
 		B2A77FA6E63313F1DF330D08 /* CalorieLocalSaveTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CalorieLocalSaveTests.swift; sourceTree = "<group>"; };
 		BB8AC23F88B95C56898E9611 /* Calorie.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = Calorie.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		DA0C6738799B8E33E8896F89 /* Persistence.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Persistence.swift; sourceTree = "<group>"; };
+		D11A3A8B46D64BB1A1AA1102 /* LocalInteractionMetrics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalInteractionMetrics.swift; sourceTree = "<group>"; };
 		DC17149D5C06CBF45F708679 /* CalorieCore.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = CalorieCore.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 		EBB24B8FF2959E506077CF87 /* Design.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Design.swift; sourceTree = "<group>"; };
 		FC23CF128665E724C9079F98 /* TrackedQuality.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrackedQuality.swift; sourceTree = "<group>"; };
@@ -178,6 +180,7 @@
 				EBB24B8FF2959E506077CF87 /* Design.swift */,
 				FF1E3D43289FA952AA9D5BAD /* Info.plist */,
 				4BF7A9ADCAC206743C61A76F /* LegacyCalorieJournal.swift */,
+				D11A3A8B46D64BB1A1AA1102 /* LocalInteractionMetrics.swift */,
 				82843A6E095B0D695BE975A9 /* QuickLogView.swift */,
 				2536F3912B308A351D1EC58A /* RootView.swift */,
 				3523182BBBDD1E71250C273B /* SecondaryViews.swift */,
@@ -472,6 +475,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				AD3C9AC8E8E54DAA43140F1E /* AppModel.swift in Sources */,
+				D11A3A8B46D64BB1A1AA1101 /* LocalInteractionMetrics.swift in Sources */,
 				22F1A4570EF1F5215F84B176 /* CalorieAccount.swift in Sources */,
 				6F65D34632FD28BAE0BAB1C2 /* CalorieApp.swift in Sources */,
 				8356EFC6244193FC06E9CDE7 /* CalorieOnboardingView.swift in Sources */,

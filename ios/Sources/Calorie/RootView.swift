@@ -26,7 +26,9 @@ struct RootView: View {
             }
         }
         .botanicalBackground()
-        .sheet(isPresented: $model.isQuickLogPresented) { QuickLogView() }
+        .sheet(isPresented: $model.isQuickLogPresented, onDismiss: model.cancelQuickLogSessionIfActive) {
+            QuickLogView()
+        }
         .sheet(isPresented: $model.isApprovalPresented) { ApprovalView() }
         .overlay(alignment: .bottom) {
             if model.lastDeletedEntry != nil {

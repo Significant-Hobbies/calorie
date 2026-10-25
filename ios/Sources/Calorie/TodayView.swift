@@ -26,7 +26,7 @@ struct TodayView: View {
         .clipped()
         .botanicalBackground()
         .navigationBarHidden(true)
-        .sheet(item: $editingEntry) { entry in
+        .sheet(item: $editingEntry, onDismiss: model.cancelEntryEditSessionIfActive) { entry in
             EntryEditorView(entry: entry)
         }
         .sheet(isPresented: $isDailyContextPresented) {
@@ -459,6 +459,7 @@ private struct EntryEditorView: View {
                 }
             }
         }
+        .onAppear { model.beginEntryEditSession() }
     }
 }
 

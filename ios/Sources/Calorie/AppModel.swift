@@ -33,6 +33,10 @@ final class AppModel {
     private let store: CalorieStore
     private let mirror: PersonalMirrorConnection?
     private let legacyJournal: (any LegacyCalorieServing)?
+    private let interactionMetrics: LocalInteractionMetricsStore
+    private let interactionMetricsEnabled: Bool
+    private var quickLogStartedAt: TimeInterval?
+    private var entryEditStartedAt: TimeInterval?
     private var activeLocalMutations = 0
     private var localMutationRevision = 0
     private var syncRequestedAfterMutation = false
@@ -57,14 +61,20 @@ final class AppModel {
     init(
         store: CalorieStore = CalorieStore(),
         mirror: PersonalMirrorConnection? = AppModel.makeMirrorConnection(),
-        legacyJournal: (any LegacyCalorieServing)? = LegacyCalorieJournal()
+        legacyJournal: (any LegacyCalorieServing)? = LegacyCalorieJournal(),
+        interactionMetrics: LocalInteractionMetricsStore = LocalInteractionMetricsStore()
     ) {
         self.store = store
         self.mirror = mirror
         self.legacyJournal = legacyJournal
-        if ProcessInfo.processInfo.arguments.contains("--progress-demo") { selectedTab = 1 }
-        if ProcessInfo.processInfo.arguments.contains("--foods-demo") { selectedTab = 2 }
-        if ProcessInfo.processInfo.arguments.contains("--you-demo") { selectedTab = 3 }
+        self.interactionMetrics = interactionMetrics
+        let arguments = ProcessInfo.processInfo.arguments
+        interactionMetricsEnabled = !arguments.contains(where: {
+            $0.hasSuffix("-demo") || $0 == "--persistent-ui-fixture" || $0 == "--cleanup-persistent-ui-fixture"
+        })
+        if arguments.contains("--progress-demo") { selectedTab = 1 }
+        if arguments.contains("--foods-demo") { selectedTab = 2 }
+        if arguments.contains("--you-demo") { selectedTab = 3 }
     }
 
     var preferredColorScheme: ColorScheme? {
@@ -218,10 +228,50 @@ final class AppModel {
         return succeeded
     }
 
-    func log(_ food: Food, servings: Double, meal: Meal, at date: Date) async {
-        guard await mutate({ $0.log(food: food, servings: servings, meal: meal, at: date) }) else { return }
+    @discardableResult
+    func log(_ food: Food, servings: Double, meal: Meal, at date: Date) async -> Bool {
+        guard await mutate({ $0.log(food: food, servings: servings, meal: meal, at: date) }) else {
+            if quickLogStartedAt != nil { interactionMetrics.record(.logSaveFailed) }
+            return false
+        }
+        finishQuickLog(with: .logSaved)
         isQuickLogPresented = false
         message = "\(food.name) added."
+        return true
+    }
+
+    func beginQuickLogSession() {
+        guard interactionMetricsEnabled, quickLogStartedAt == nil else { return }
+        quickLogStartedAt = ProcessInfo.processInfo.systemUptime
+        interactionMetrics.record(.logFormOpened)
+    }
+
+    func cancelQuickLogSessionIfActive() {
+        guard quickLogStartedAt != nil else { return }
+        finishQuickLog(with: .logCancelled)
+    }
+
+    private func finishQuickLog(with event: LocalInteractionEvent) {
+        guard let startedAt = quickLogStartedAt else { return }
+        quickLogStartedAt = nil
+        interactionMetrics.record(event, elapsedSeconds: max(0, ProcessInfo.processInfo.systemUptime - startedAt))
+    }
+
+    func beginEntryEditSession() {
+        guard interactionMetricsEnabled, entryEditStartedAt == nil else { return }
+        entryEditStartedAt = ProcessInfo.processInfo.systemUptime
+        interactionMetrics.record(.entryEditOpened)
+    }
+
+    func cancelEntryEditSessionIfActive() {
+        guard entryEditStartedAt != nil else { return }
+        finishEntryEdit(with: .entryEditCancelled)
+    }
+
+    private func finishEntryEdit(with event: LocalInteractionEvent) {
+        guard let startedAt = entryEditStartedAt else { return }
+        entryEditStartedAt = nil
+        interactionMetrics.record(event, elapsedSeconds: max(0, ProcessInfo.processInfo.systemUptime - startedAt))
     }
 
     func delete(_ entry: FoodEntry) async {
@@ -262,7 +312,11 @@ final class AppModel {
             }
             document.foodEntries[index] = updated
         }
-        guard committed else { return false }
+        guard committed else {
+            if entryEditStartedAt != nil { interactionMetrics.record(.entryEditSaveFailed) }
+            return false
+        }
+        finishEntryEdit(with: .entryEditSaved)
         message = "Food entry updated."
         return committed
     }
