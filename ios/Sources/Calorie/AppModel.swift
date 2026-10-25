@@ -33,6 +33,8 @@ final class AppModel {
     private let store: CalorieStore
     private let mirror: PersonalMirrorConnection?
     private let legacyJournal: (any LegacyCalorieServing)?
+    private let interactionMetrics: LocalInteractionMetricsStore
+    private let interactionMetricsEnabled: Bool
     private var activeLocalMutations = 0
     private var localMutationRevision = 0
     private var syncRequestedAfterMutation = false
@@ -57,14 +59,22 @@ final class AppModel {
     init(
         store: CalorieStore = CalorieStore(),
         mirror: PersonalMirrorConnection? = AppModel.makeMirrorConnection(),
-        legacyJournal: (any LegacyCalorieServing)? = LegacyCalorieJournal()
+        legacyJournal: (any LegacyCalorieServing)? = LegacyCalorieJournal(),
+        interactionMetrics: LocalInteractionMetricsStore? = nil
     ) {
         self.store = store
         self.mirror = mirror
         self.legacyJournal = legacyJournal
-        if ProcessInfo.processInfo.arguments.contains("--progress-demo") { selectedTab = 1 }
-        if ProcessInfo.processInfo.arguments.contains("--foods-demo") { selectedTab = 2 }
-        if ProcessInfo.processInfo.arguments.contains("--you-demo") { selectedTab = 3 }
+        self.interactionMetrics = interactionMetrics ?? LocalInteractionMetricsStore(
+            fileURL: store.fileURL.deletingLastPathComponent().appending(path: "interaction-metrics-v1.json")
+        )
+        let arguments = ProcessInfo.processInfo.arguments
+        interactionMetricsEnabled = !arguments.contains(where: {
+            $0.hasSuffix("-demo") || $0 == "--persistent-ui-fixture" || $0 == "--cleanup-persistent-ui-fixture"
+        })
+        if arguments.contains("--progress-demo") { selectedTab = 1 }
+        if arguments.contains("--foods-demo") { selectedTab = 2 }
+        if arguments.contains("--you-demo") { selectedTab = 3 }
     }
 
     var preferredColorScheme: ColorScheme? {
@@ -218,10 +228,14 @@ final class AppModel {
         return succeeded
     }
 
-    func log(_ food: Food, servings: Double, meal: Meal, at date: Date) async {
-        guard await mutate({ $0.log(food: food, servings: servings, meal: meal, at: date) }) else { return }
+    @discardableResult
+    func log(_ food: Food, servings: Double, meal: Meal, at date: Date) async -> Bool {
+        let committed = await mutate({ $0.log(food: food, servings: servings, meal: meal, at: date) })
+        if interactionMetricsEnabled { interactionMetrics.record(committed ? .logSaved : .logSaveFailed) }
+        guard committed else { return false }
         isQuickLogPresented = false
         message = "\(food.name) added."
+        return true
     }
 
     func delete(_ entry: FoodEntry) async {
@@ -262,9 +276,10 @@ final class AppModel {
             }
             document.foodEntries[index] = updated
         }
+        if interactionMetricsEnabled { interactionMetrics.record(committed ? .entryEditSaved : .entryEditSaveFailed) }
         guard committed else { return false }
         message = "Food entry updated."
-        return committed
+        return true
     }
 
     func addWater(_ millilitres: Int) async {
@@ -644,7 +659,7 @@ final class AppModel {
     /// traversed the path in the first place.
     private func legacyImportMarkerURL(for userID: String) async -> URL {
         let key = SHA256.hash(data: Data(userID.utf8)).map { String(format: "%02x", $0) }.joined()
-        return await store.fileURL
+        return store.fileURL
             .deletingLastPathComponent()
             .appending(path: "legacy-import-\(key).done")
     }
