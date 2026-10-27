@@ -1,4 +1,5 @@
-import { wantsMarkdown } from './agent-surfaces/http.mjs';
+import { AGENT_GUIDANCE } from './public-agent-guidance.mjs';
+import { wantsMarkdown, markdownResponse } from './agent-surfaces/http.mjs';
 import { handlePublicReadability, privatePath, robots } from './public-readability.mjs';
 
 const PRODUCT_ORIGIN = 'https://calorie.significanthobbies.com';
@@ -28,53 +29,7 @@ Calorie is for someone pursuing weight loss who wants practical daily context wi
 
 > A private, local-first iPhone and iPad food and body journal with fast logging and transparent timing estimates.
 
-## When to use this
-
-- Best fit: understanding Calorie as a private native journal for someone pursuing weight loss
-- Best fit: checking how food timestamps and personal targets produce transparent fasting, exercise, and sleep estimates
-- Best fit: confirming local-first privacy, optional Apple sync, internal-beta access, and current commercial state
-- Not a fit: medical, nutrition, or weight-loss prescriptions
-- Not a fit: barcode scanning, social feeds, wearable sync, or web-based diet tracking
-- Not a fit: public App Store or TestFlight installation links
-
-## Product
-
-- [Home](${PRODUCT_ORIGIN}/): Native product landing
-- [Privacy](${PRODUCT_ORIGIN}/privacy/): Local and cloud data handling
-- [Support](${PRODUCT_ORIGIN}/support/): Product support
-- [Beta status](${PRODUCT_ORIGIN}/testflight/): Honest distribution status
-- [Journal articles](${PRODUCT_ORIGIN}/blog/): Calorie journal articles
-
-## Machine surfaces
-
-- [Agent catalog](${PRODUCT_ORIGIN}/api/ai)
-- [AI catalog](${PRODUCT_ORIGIN}/.well-known/ai-catalog.json)
-- [Agent Skill index](${PRODUCT_ORIGIN}/.well-known/agent-skills/index.json)
-- [OpenAPI spec](${PRODUCT_ORIGIN}/openapi.json)
-- [Homepage markdown](${PRODUCT_ORIGIN}/index.md)
-- [Access and pricing](${PRODUCT_ORIGIN}/pricing.md)
-- [Agent instructions](${PRODUCT_ORIGIN}/agents.md)
-- [Calorie product-guide skill](${PRODUCT_ORIGIN}/skill.md)
-- [This index](${PRODUCT_ORIGIN}/llms.txt)
-
-## Developer docs
-
-- [OpenAPI specification](${PRODUCT_ORIGIN}/openapi.json): Full API surface description (OpenAPI 3.1)
-- [Agent catalog](${PRODUCT_ORIGIN}/api/ai): JSON inventory of public agent surfaces
-
-## CLI
-
-\`\`\`bash
-# Fetch the agent catalog
-curl -s ${PRODUCT_ORIGIN}/api/ai | jq .
-
-# Get the OpenAPI spec
-curl -s ${PRODUCT_ORIGIN}/openapi.json | jq .
-
-# Fetch the homepage as markdown
-curl -s -H 'Accept: text/markdown' ${PRODUCT_ORIGIN}/
-\`\`\`
-`,
+${AGENT_GUIDANCE}`,
   llmsFullTxt: `# Calorie — full agent brief
 
 Calorie is a private, native food and body journal for someone pursuing weight loss. It keeps meal logging fast, tracks four core nutrients plus water, routines, weight, and goals, and derives fasting, exercise, and sleep estimates from visible inputs and rules.
@@ -454,7 +409,7 @@ export async function handleAgentEdge(request, env) {
     return text(PUBLIC_MARKDOWN[directMarkdownRoute], 'text/markdown; charset=utf-8');
   }
   if (path === '/sitemap.xml') {
-    // Prefer the synced marketing sitemap (includes generated blog routes);
+    // Serve the public-registry sitemap emitted by scripts/build-readability.mjs;
     // fall back to the static catalog when assets are unavailable (tests).
     if (env?.ASSETS) return env.ASSETS.fetch(request);
     return text(sitemapForCatalog(catalogForOrigin(url.origin)), 'application/xml; charset=utf-8');
@@ -465,7 +420,11 @@ export async function handleAgentEdge(request, env) {
   if (path === '/api/ai') return json(catalogForOrigin(url.origin));
 
   // Runtime public negotiation is exclusively owned by the registered adapter.
-  if (env?.ASSETS) return null;
+  if (env?.ASSETS) {
+    if (wantsMarkdown(request) && !path.includes('.') && !path.startsWith('/api/'))
+      return markdown404(path, request);
+    return null;
+  }
 
   const normalizedPublicPath = normalizePath(path);
   const negotiatedMarkdown = PUBLIC_MARKDOWN[normalizedPublicPath];
@@ -481,7 +440,7 @@ export async function handleAgentEdge(request, env) {
   // Agent-friendly 404: return a markdown recovery body for unknown paths
   // when the client asks for markdown.
   if (wantsMarkdown(request) && !path.includes('.') && !path.startsWith('/api/')) {
-    return markdown404(path, request.method);
+    return markdown404(path, request);
   }
 
   return null;
@@ -575,7 +534,7 @@ function normalizePath(pathname) {
   return withSlash.replace(/\/{2,}/g, '/').replace(/\/+$/, '') || '/';
 }
 
-function markdown404(pathname, method) {
+function markdown404(pathname, request) {
   const path = normalizePath(pathname);
   const body = `# 404 — Not Found
 
@@ -589,15 +548,12 @@ function markdown404(pathname, method) {
 - [Agent catalog (JSON)](${PRODUCT_ORIGIN}/api/ai)
 - [OpenAPI spec](${PRODUCT_ORIGIN}/openapi.json)
 `;
-  return new Response(method === 'HEAD' ? null : body, {
-    status: 404,
-    headers: {
-      'Content-Type': 'text/markdown; charset=utf-8',
-      'Cache-Control': 'no-store',
-      'X-Content-Type-Options': 'nosniff',
-      Vary: 'Accept',
-    },
+  const response = markdownResponse(body, request, {
+    'Cache-Control': 'no-store',
+    'CDN-Cache-Control': 'no-store',
+    'Cloudflare-CDN-Cache-Control': 'no-store',
   });
+  return new Response(response.body, { status: 404, headers: response.headers });
 }
 
 function text(body, type, extra = {}) {

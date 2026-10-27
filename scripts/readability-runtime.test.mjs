@@ -31,8 +31,6 @@ for (const product of ['calorie']) {
         String(port),
         '--inspector-port',
         String(inspectorPort),
-        '--compatibility-date',
-        '2026-08-11',
         '--log-level',
         'error',
       ],
@@ -79,7 +77,11 @@ for (const product of ['calorie']) {
         assert.equal(suffix.status, 200);
         assert.match(suffix.headers.get('content-type'), /^text\/markdown/);
         // Wrangler's local proxy can rewrite URL-valued response headers to its origin.
-        assert.ok([route.url, origin + new URL(route.url).pathname].includes(suffix.headers.get('content-location')));
+        assert.ok(
+          [route.url, origin + new URL(route.url).pathname].includes(
+            suffix.headers.get('content-location')
+          )
+        );
         assert.ok(text.includes(route.url));
         assert.match(suffix.headers.get('link'), /rel="canonical"/);
         assert.equal(suffix.headers.get('x-robots-tag'), 'noindex, follow');

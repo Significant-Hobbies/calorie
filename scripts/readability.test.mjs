@@ -82,7 +82,12 @@ test('unknown Markdown paths cannot advertise off-origin canonicals', async () =
   const { createAgentSurfaceManifest } = await import('../src/agent-surfaces/manifest.mjs');
   const { createAgentSurfaceHandler } = await import('../src/agent-surfaces/handler.mjs');
   const fixtureOrigin = 'https://public.example';
-  const manifest = createAgentSurfaceManifest({ name: 'Public fixture', url: fixtureOrigin, summary: 'Public fixture', pages: { '/': '# Public' } });
+  const manifest = createAgentSurfaceManifest({
+    name: 'Public fixture',
+    url: fixtureOrigin,
+    summary: 'Public fixture',
+    pages: { '/': '# Public' },
+  });
   const handler = createAgentSurfaceHandler({ manifest });
   for (const path of ['/api/md//evil.example/x', '//evil.example/x.md']) {
     const response = await handler(new Request(fixtureOrigin + path));
@@ -91,5 +96,41 @@ test('unknown Markdown paths cannot advertise off-origin canonicals', async () =
     assert.equal(response.headers.get('cache-control'), 'no-store');
     assert.equal(response.headers.get('x-robots-tag'), 'noindex, follow');
     assert.ok(response.headers.get('link').includes(fixtureOrigin + '/llms.txt'));
+  }
+});
+
+test('legacy agent discovery, sitemap dates and negotiated404 remain available', async () => {
+  const index = await (
+    await handleAgentEdge(new Request(origin + '/llms.txt'), { ASSETS: assets })
+  ).text();
+  for (const link of [
+    '/skill.md',
+    '/pricing.md',
+    '/agents.md',
+    '/.well-known/agent-skills/index.json',
+    '/.well-known/ai-catalog.json',
+  ])
+    assert.ok(index.includes(origin + link), link);
+  assert.ok(index.includes('Not a fit: medical, nutrition, or weight-loss prescriptions'));
+  const before = await readFile(new URL('../marketing/sitemap.xml', import.meta.url), 'utf8');
+  const after = await readFile(new URL('../dist/sitemap.xml', import.meta.url), 'utf8');
+  for (const [, entry] of before.matchAll(/<url\b[^>]*>([\s\S]*?)<\/url>/g)) {
+    const location = entry.match(/<loc>([^<]+)<\/loc>/)?.[1];
+    const date = entry.match(/<lastmod>([^<]+)<\/lastmod>/)?.[1];
+    if (date && after.includes(`<loc>${location}</loc>`))
+      assert.ok(after.includes(`<loc>${location}</loc><lastmod>${date}</lastmod>`));
+  }
+  for (const method of ['GET', 'HEAD']) {
+    const missing = await handleAgentEdge(
+      new Request(origin + '/unknown-public-path', {
+        method,
+        headers: { accept: 'text/markdown' },
+      }),
+      { ASSETS: assets }
+    );
+    assert.equal(missing.status, 404);
+    assert.equal(missing.headers.get('x-robots-tag'), 'noindex, follow');
+    assert.equal(missing.headers.get('cache-control'), 'no-store');
+    if (method === 'HEAD') assert.equal(await missing.text(), '');
   }
 });

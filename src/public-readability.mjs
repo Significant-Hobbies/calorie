@@ -1,3 +1,4 @@
+import { AGENT_GUIDANCE } from './public-agent-guidance.mjs';
 import {
   createStaticAssetHandler,
   advertiseMarkdown,
@@ -10,6 +11,7 @@ export const identity = {
   contact: 'https://calorie.significanthobbies.com/support/',
   openapi: 'https://calorie.significanthobbies.com/openapi.json',
   sitemap: 'https://calorie.significanthobbies.com/sitemap.xml',
+  notes: [AGENT_GUIDANCE],
   trainingAllowed: true,
   excludedPaths: ['/api', '/v1', '/app', '/auth', '/admin', '/dashboard'],
 };

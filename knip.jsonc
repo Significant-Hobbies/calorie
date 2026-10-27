@@ -1,8 +1,22 @@
 {
   "$schema": "https://unpkg.com/knip@6/schema.json",
-  "project": ["src/**/*.{ts,mjs}", "*.config.ts"],
-  "ignoreDependencies": ["jscpd"],
+  "project": [
+    "src/**/*.{ts,mjs}",
+    "*.config.ts"
+  ],
+  "ignoreDependencies": [
+    "jscpd"
+  ],
   "ignoreIssues": {
-    "src/agent-edge.mjs": ["exports"]
-  }
+    "src/agent-edge.mjs": [
+      "exports"
+    ],
+    "src/agent-surfaces/**": [
+      "exports"
+    ]
+  },
+  "entry": [
+    "src/worker.ts",
+    "scripts/build-readability.mjs"
+  ]
 }

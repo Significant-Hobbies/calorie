@@ -102,6 +102,9 @@ function checkComplexity() {
     '**/*.test.*',
     '-x',
     'src/agent-edge.mjs',
+    // Shared toolkit exports/complexity are verified in its canonical repository.
+    '-x',
+    'src/agent-surfaces/*',
     '--csv',
   ]);
   const rows = result.stdout
@@ -139,7 +142,7 @@ function checkDuplication() {
     '--mode',
     'strict',
     '--ignore',
-    '**/*.test.*,src/agent-edge.mjs,**/*.d.ts,**/*.d.mts,**/node_modules/**,**/dist/**,**/coverage/**',
+    '**/*.test.*,src/agent-edge.mjs,src/agent-surfaces/**,**/*.d.ts,**/*.d.mts,**/node_modules/**,**/dist/**,**/coverage/**',
     '--reporters',
     'json',
     '--output',

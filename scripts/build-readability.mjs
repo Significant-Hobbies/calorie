@@ -13,6 +13,15 @@ const content = JSON.parse(
   await readFile(path.join(root, 'landing/src/content/calorie.json'), 'utf8')
 );
 const source = path.join(root, 'marketing');
+const sourceSitemap = await readFile(path.join(source, 'sitemap.xml'), 'utf8');
+const lastModifiedByUrl = new Map(
+  [...sourceSitemap.matchAll(/<url\b[^>]*>([\s\S]*?)<\/url>/g)]
+    .map(([, entry]) => [
+      entry.match(/<loc>([^<]+)<\/loc>/)?.[1],
+      entry.match(/<lastmod>([^<]+)<\/lastmod>/)?.[1],
+    ])
+    .filter(([url, date]) => url && date)
+);
 const routes = [];
 const bodies = new Map();
 const escape = (value) =>
@@ -70,6 +79,9 @@ async function visit(directory) {
         md: identity.url + (route === '/' ? '/index.md' : `${route.slice(0, -1)}.md`),
         assetPath,
         aliases: [assetPath],
+        ...(lastModifiedByUrl.has(canonical)
+          ? { lastModified: lastModifiedByUrl.get(canonical) }
+          : {}),
       });
       bodies.set(route, markdown);
       await writeFile(path.join(output, assetPath), markdown);
@@ -106,7 +118,7 @@ for (const file of ['llms.txt', 'llms-full.txt', 'ai.txt']) {
 await writeFile(path.join(output, 'robots.txt'), robots());
 await writeFile(
   path.join(output, 'sitemap.xml'),
-  `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">${routes.map((route) => `<url><loc>${route.url}</loc></url>`).join('')}</urlset>\n`
+  `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">${routes.map((route) => `<url><loc>${route.url}</loc>${route.lastModified ? `<lastmod>${route.lastModified}</lastmod>` : ''}</url>`).join('')}</urlset>\n`
 );
 console.log(
   `Generated ${routes.length} source-backed public Markdown routes and discovery documents.`
