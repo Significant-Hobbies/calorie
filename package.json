@@ -33,7 +33,9 @@
     "quality:hygiene": "node scripts/check-code-health.mjs hygiene",
     "quality:native": "node scripts/check-native-code-health.mjs",
     "quality": "pnpm format:check && pnpm lint && pnpm typecheck && pnpm test:coverage && pnpm quality:unused && pnpm quality:complexity && pnpm quality:duplication && pnpm quality:cycles && pnpm quality:dependencies && pnpm quality:suppressions && pnpm build && pnpm quality:hygiene",
-    "check": "pnpm quality"
+    "check": "pnpm quality",
+    "test:readability": "pnpm build && node --test scripts/readability.test.mjs",
+    "check:readability": "pnpm test:readability && pnpm exec vitest run src/agent-edge.test.ts && pnpm typecheck && node --test scripts/readability-runtime.test.mjs"
   },
   "dependencies": {
     "@saas-maker/app-health": "https://github.com/sass-maker/app-health/releases/download/node-v0.4.0/saas-maker-app-health-0.4.0.tgz",

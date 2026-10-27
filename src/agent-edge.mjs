@@ -1,3 +1,6 @@
+import { wantsMarkdown } from './agent-surfaces/http.mjs';
+import { handlePublicReadability, privatePath, robots } from './public-readability.mjs';
+
 const PRODUCT_ORIGIN = 'https://calorie.significanthobbies.com';
 
 export const AGENT_SURFACE = {
@@ -413,8 +416,14 @@ function surface(id, path, description) {
 }
 
 export async function handleAgentEdge(request, env) {
-  if (request.method !== 'GET' && request.method !== 'HEAD') return null;
   const url = new URL(request.url);
+  if (privatePath(url.pathname) || /^\/articles\/calorie\/[^/]+\.md$/.test(url.pathname))
+    return null;
+  if (env?.ASSETS) {
+    const readable = await handlePublicReadability(request, env.ASSETS);
+    if (readable) return readable;
+  }
+  if (request.method !== 'GET' && request.method !== 'HEAD') return null;
   const path = url.pathname || '/';
 
   if (path === '/openapi.json' || path === '/openapi.yaml') {
@@ -451,9 +460,12 @@ export async function handleAgentEdge(request, env) {
     return text(sitemapForCatalog(catalogForOrigin(url.origin)), 'application/xml; charset=utf-8');
   }
   if (path === '/robots.txt') {
-    return text(robotsForOrigin(url.origin), 'text/plain; charset=utf-8');
+    return text(robots(), 'text/plain; charset=utf-8');
   }
   if (path === '/api/ai') return json(catalogForOrigin(url.origin));
+
+  // Runtime public negotiation is exclusively owned by the registered adapter.
+  if (env?.ASSETS) return null;
 
   const normalizedPublicPath = normalizePath(path);
   const negotiatedMarkdown = PUBLIC_MARKDOWN[normalizedPublicPath];
@@ -548,36 +560,6 @@ function sitemapForCatalog(catalog) {
   return `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${routes}\n</urlset>\n`;
 }
 
-function robotsForOrigin(origin) {
-  return `User-agent: *
-Allow: /
-
-User-agent: GPTBot
-Allow: /
-
-User-agent: OAI-SearchBot
-Allow: /
-
-User-agent: ClaudeBot
-Allow: /
-
-User-agent: PerplexityBot
-Allow: /
-
-Sitemap: ${origin}/sitemap.xml
-# Agent indexing
-Allow: /llms.txt
-Allow: /llms-full.txt
-Allow: /index.md
-Allow: /api/ai
-Allow: /.well-known/ai-catalog.json
-Allow: /.well-known/agent-skills/
-Allow: /agents.md
-Allow: /pricing.md
-Allow: /skill.md
-`;
-}
-
 function escapeXml(value) {
   return value
     .replaceAll('&', '&amp;')
@@ -585,13 +567,6 @@ function escapeXml(value) {
     .replaceAll('>', '&gt;')
     .replaceAll('"', '&quot;')
     .replaceAll("'", '&apos;');
-}
-
-function wantsMarkdown(request) {
-  const accept = (request.headers.get('accept') || '').toLowerCase();
-  if (!accept.includes('text/markdown')) return false;
-  if (!accept.includes('text/html')) return true;
-  return accept.indexOf('text/markdown') < accept.indexOf('text/html');
 }
 
 function normalizePath(pathname) {

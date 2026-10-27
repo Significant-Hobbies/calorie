@@ -5,6 +5,7 @@ import {
   stageTimingMiddleware,
 } from './worker/endpoint-health';
 import { handleAgentEdge } from './agent-edge.mjs';
+import { advertisePublic } from './public-readability.mjs';
 import { registerAccountRoutes } from './worker/account';
 import { registerAuthRoutes, registerSessionMiddleware } from './worker/auth';
 import { SECURITY_HEADERS } from './worker/http';
@@ -22,6 +23,7 @@ app.use('*', async (c, next) => {
   const agentResponse = await handleAgentEdge(c.req.raw, c.env);
   if (agentResponse) return agentResponse;
   await next();
+  c.res = await advertisePublic(c.req.raw, c.res, c.env?.ASSETS);
 });
 
 for (const retiredPath of ['/app', '/app/', '/app/*']) {

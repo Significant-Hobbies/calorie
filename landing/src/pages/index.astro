@@ -19,6 +19,7 @@ if (content.footer) content.footer.studio = studioFromProjects(projects, { curre
 
 <Base {...baseProps(content)}>
   <Fragment slot="head">
+    <meta name="ai-summary" content={content.page.description} />
     <link rel="alternate" type="text/markdown" href="https://calorie.significanthobbies.com/index.md" />
     <link rel="alternate" type="application/rss+xml" title="Calorie journal" href="/blog/rss.xml" />
     <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png" />

@@ -83,7 +83,7 @@ describe('public agent surfaces', () => {
   });
 
   it.each(['https://calorie.significanthobbies.com', 'https://calorie-preview.example'])(
-    'keeps sitemap and robots on the request origin: %s',
+    'preserves fallback sitemap origin and canonical robots sitemap: %s',
     async (origin) => {
       const [sitemap, robots] = await Promise.all([
         app.request(`${origin}/sitemap.xml`),
@@ -102,7 +102,9 @@ describe('public agent surfaces', () => {
       }
 
       expect(robots.status).toBe(200);
-      expect(await robots.text()).toContain(`Sitemap: ${origin}/sitemap.xml`);
+      expect(await robots.text()).toContain(
+        'Sitemap: https://calorie.significanthobbies.com/sitemap.xml'
+      );
     }
   );
 });

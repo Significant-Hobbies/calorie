@@ -8,6 +8,7 @@
     "includes": [
       "**",
       "!dist",
+      "!src/agent-surfaces",
       "!node_modules",
       "!.wrangler",
       "!.agents",
