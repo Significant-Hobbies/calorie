@@ -25,3 +25,5 @@ if (!existsSync(path.join(dist, 'index.html'))) {
   throw new Error('Landing snapshot missing: dist/index.html. Run pnpm landing:build.');
 }
 console.log('Assembled the native Calorie product landing.');
+
+await import('./build-readability.mjs');
