@@ -117,8 +117,10 @@ test('legacy agent discovery, sitemap dates and negotiated404 remain available',
   for (const [, entry] of before.matchAll(/<url\b[^>]*>([\s\S]*?)<\/url>/g)) {
     const location = entry.match(/<loc>([^<]+)<\/loc>/)?.[1];
     const date = entry.match(/<lastmod>([^<]+)<\/lastmod>/)?.[1];
-    if (date && after.includes(`<loc>${location}</loc>`))
+    if (date) {
+      assert.ok(after.includes(`<loc>${location}</loc>`), `Missing dated source URL: ${location}`);
       assert.ok(after.includes(`<loc>${location}</loc><lastmod>${date}</lastmod>`));
+    }
   }
   for (const method of ['GET', 'HEAD']) {
     const missing = await handleAgentEdge(
