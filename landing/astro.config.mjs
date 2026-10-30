@@ -7,6 +7,6 @@ export default defineConfig({
   site: 'https://calorie.significanthobbies.com',
   integrations: [react()],
   trailingSlash: 'ignore',
-  build: { format: 'directory' },
+  build: { format: 'directory', inlineStylesheets: 'always' },
   vite: { plugins: [tailwindcss()] },
 });
