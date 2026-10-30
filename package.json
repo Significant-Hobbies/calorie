@@ -39,7 +39,7 @@
   },
   "dependencies": {
     "@saas-maker/app-health": "https://github.com/sass-maker/app-health/releases/download/node-v0.4.0/saas-maker-app-health-0.4.0.tgz",
-    "better-auth": "1.6.25",
+    "better-auth": "1.7.14",
     "drizzle-orm": "0.45.2",
     "hono": "4.13.3"
   },
